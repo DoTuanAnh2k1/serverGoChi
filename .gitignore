@@ -1,0 +1,10 @@
+dist
+vendor
+config/stores/*
+config/uploads/*
+*.DS_Store
+!*.gitkeep
+.idea*
+go.mod
+go.sum
+.vscode*
