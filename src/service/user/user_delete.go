@@ -6,7 +6,7 @@ import (
 	"serverGoChi/src/store"
 )
 
-func UpdateUser(user db_models.TblAccount) error {
+func UpdateUser(user *db_models.TblAccount) error {
 	sto := store.GetSingleton()
 	err := sto.UpdateUser(user)
 	if err != nil {

@@ -37,8 +37,8 @@ type DatabaseStore interface {
 
 	GetAllUser() ([]*db_models.TblAccount, error)
 	GetUserByUserName(string) (*db_models.TblAccount, error)
-	UpdateUser(account db_models.TblAccount) error
-	AddUser(db_models.TblAccount) error
+	UpdateUser(account *db_models.TblAccount) error
+	AddUser(*db_models.TblAccount) error
 
 	Ping() error
 	UpdateLoginHistory(string, string, time.Time) error

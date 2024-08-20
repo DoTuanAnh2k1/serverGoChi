@@ -14,6 +14,7 @@ import (
 )
 
 func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
+	log.Logger.Info("Handler Authenticate delete user")
 	if r.Method != http.MethodPost {
 		log.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -51,7 +52,7 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 
 	if u != nil && u.IsEnable == true {
 		u.IsEnable = false
-		err := user.AddUser(*u)
+		err := user.UpdateUser(u)
 		if err != nil {
 			log.Logger.Error("Cant update user to db: ", err)
 			response.Write(w, http.StatusInternalServerError, "Cant update user to db")
@@ -64,7 +65,7 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
-
+		log.Logger.Info("Disable user with username: ", u.AccountName)
 		response.Success(w, "")
 	} else {
 		logOperationHistory.ExecutedTime = time.Now()
@@ -73,7 +74,12 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
-
+		if u == nil {
+			log.Logger.Info("Not found user: ", u.AccountName)
+		}
+		if !u.IsEnable {
+			log.Logger.Info("User already disable")
+		}
 		response.Write(w, http.StatusNotFound, "User Not Found")
 	}
 }

@@ -4,6 +4,7 @@ import (
 	"serverGoChi/models/db_models"
 	"serverGoChi/src/log"
 	"serverGoChi/src/store"
+	"serverGoChi/src/utils/bcrypt"
 	"time"
 )
 
@@ -50,4 +51,17 @@ func GetRolesById(userId int64) (string, error) {
 		roleToString = roleToString + " " + v.Permission
 	}
 	return roleToString, nil
+}
+
+func Authenticate(username, password string) (bool, error, int64) {
+	sto := store.GetSingleton()
+	user, err := sto.GetUserByUserName(username)
+	if err != nil {
+		log.Logger.Error("Cant user by username from database: ", err)
+		return false, err, -1
+	}
+	if bcrypt.Matches(username+password, user.Password) {
+		return true, nil, user.AccountID
+	}
+	return false, nil, -1
 }

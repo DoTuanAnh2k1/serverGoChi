@@ -20,7 +20,7 @@ func init() {
 	// Set Configuration File Value
 	configEnv := strings.ToLower(os.Getenv("CONFIG_ENV"))
 	if len(configEnv) == 0 {
-		configEnv = "development"
+		configEnv = "config.yaml"
 	}
 
 	// Set Configuration Path Value
@@ -73,8 +73,14 @@ func configLoadFile() {
 
 // ConfigLoadValues Function to Load Configuration Values
 func configLoadValues() {
+	if err := Config.ReadInConfig(); err != nil {
+		log.Printf("Error reading config file: %v", err)
+	} else {
+		log.Println("Config file loaded successfully")
+	}
+
 	// Server Name Value
-	Config.SetDefault("SERVER_NAME", "vEMS CLI Authenticate")
+	Config.SetDefault("SERVER_NAME", "server go chi")
 
 	// Server IP Value
 	Config.SetDefault("SERVER_IP", "0.0.0.0")

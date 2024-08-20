@@ -15,6 +15,7 @@ import (
 )
 
 func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
+	log.Logger.Info("Handler Authenticate set user")
 	if r.Method != http.MethodPost {
 		log.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -31,7 +32,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 
 	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
-		log.Logger.Error("Error to get user from token key")
+		log.Logger.Error("Error to get user from context")
 		response.InternalError(w, "Internal Server Error")
 		return
 	}
@@ -63,7 +64,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		userInfo.LockedTime = time.Now()
 		userInfo.AccountType = 2
 		userInfo.Status = true
-		err := user.AddUser(userInfo)
+		err := user.AddUser(&userInfo)
 		if err != nil {
 			log.Logger.Error("Cant create user to db: ", err)
 			response.Write(w, http.StatusInternalServerError, "Cant create user to db")
@@ -77,16 +78,15 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
 		log.Logger.Info("Create user")
-
 		response.Created(w)
 	}
 
 	if !u.IsEnable == false {
 		u.IsEnable = true
-		u.CreatedBy = "" // get username from middleware
+		u.CreatedBy = userMiddleware.Username
 		u.UpdatedDate = time.Now()
 		userInfo.LoginFailureCount = 0
-		err := user.AddUser(*u)
+		err := user.UpdateUser(u)
 		if err != nil {
 			log.Logger.Error("Cant create user to db: ", err)
 			response.Write(w, http.StatusInternalServerError, "Cant get user by username from db")
@@ -99,7 +99,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
-
+		log.Logger.Info("Enable user with username: ", u.AccountName)
 		response.Created(w)
 	} else {
 		logOperationHistory.ExecutedTime = time.Now()
@@ -108,7 +108,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
-
+		log.Logger.Info("User already exist, nothing change")
 		response.Write(w, http.StatusNotModified, "User already exist!")
 	}
 }

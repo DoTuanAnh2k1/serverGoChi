@@ -28,21 +28,27 @@ func GetInstance() *Client {
 
 func (c *Client) Init(cfg *config_models.Config) error {
 	var err error
+	//var (
+	//	DbUsername = cfg.Db.Mysql.User
+	//	DbPassword = cfg.Db.Mysql.Password
+	//	DbHost     = cfg.Db.Mysql.Host
+	//	DbPort     = cfg.Db.Mysql.Port
+	//	DbName     = cfg.Db.Mysql.Name
+	//)
 	var (
-		DbUsername = cfg.Db.Mysql.User
-		DbPassword = cfg.Db.Mysql.Password
-		DbHost     = cfg.Db.Mysql.Host
+		DbUsername = "ems"
+		DbPassword = "Ems@2021"
+		DbHost     = "127.0.0.1"
 		DbPort     = cfg.Db.Mysql.Port
-		DbName     = cfg.Db.Mysql.Name
+		DbName     = "ems"
 	)
 	dsn := DbUsername + ":" + DbPassword + "@tcp" + "(" + DbHost + ":" + DbPort + ")/" + DbName + "?" + "parseTime=true&loc=Local"
-
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
-
 	if err != nil {
 		log.Logger.Debugf("Error connecting to database : error=%v", err)
 		return err
 	}
+	log.Logger.Info("Connect to database: ", dsn)
 	c.Db = db
 	return nil
 }
@@ -80,8 +86,8 @@ func (c *Client) GetUserByUserName(username string) (*db_models.TblAccount, erro
 	return result, nil
 }
 
-func (c *Client) AddUser(user db_models.TblAccount) error {
-	cond := &user
+func (c *Client) AddUser(user *db_models.TblAccount) error {
+	cond := user
 	tx := c.Db.Create(cond)
 	if tx == nil {
 		return errors.New("no database connection")
@@ -92,8 +98,8 @@ func (c *Client) AddUser(user db_models.TblAccount) error {
 	return nil
 }
 
-func (c *Client) UpdateUser(user db_models.TblAccount) error {
-	cond := &user
+func (c *Client) UpdateUser(user *db_models.TblAccount) error {
+	cond := user
 	tx := c.Db.Updates(cond)
 	if tx == nil {
 		return errors.New("no database connection")
@@ -148,7 +154,7 @@ func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNe
 func (c *Client) GetNeListById(id int64) ([]*db_models.CliNe, error) {
 	cond := &db_models.CliNe{ID: id}
 	var userList []*db_models.CliNe
-	tx := c.Db.Find(userList, cond)
+	tx := c.Db.Find(&userList, cond)
 	if tx == nil {
 		return nil, errors.New("no database connection")
 	}
@@ -163,7 +169,7 @@ func (c *Client) GetRolesById(id int64) ([]*db_models.CliRoleUserMapping, error)
 		UserID: id,
 	}
 	var roleList []*db_models.CliRoleUserMapping
-	tx := c.Db.Find(roleList, cond)
+	tx := c.Db.Find(&roleList, cond)
 	if tx == nil {
 		return nil, errors.New("no database connection")
 	}

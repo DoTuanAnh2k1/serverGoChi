@@ -15,6 +15,7 @@ import (
 )
 
 func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
+	log.Logger.Info("Handler request authenticate user show")
 	if r.Method != http.MethodGet {
 		log.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -71,15 +72,14 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant get tblId by user id: ", err)
 			// response.Write(w, http.StatusInternalServerError, "Cant get tblId by user id")
-
-			continue
+			// continue
 		}
 
 		neList, err := authenticate.GetNeListById(tblId)
 		if err != nil {
 			log.Logger.Error("Cant get ne list: ", err)
 			// response.Write(w, http.StatusInternalServerError, "Cant get ne list")
-			continue
+			// continue
 		}
 
 		var tblNes []TblNe
@@ -96,7 +96,7 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant get role by user id: ", err)
 			// response.Write(w, http.StatusInternalServerError, "Cant get role by user id")
-			continue
+			//continue
 		}
 
 		userShowAuthenticateRespList = append(userShowAuthenticateRespList, UserShowAuthenticateResp{

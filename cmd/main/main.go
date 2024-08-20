@@ -30,7 +30,6 @@ func main() {
 	store.Init(&config_models.DatabaseConfigInit)
 	// Starting Server
 	svr.Start()
-
 	stopOrKillServer()
 }
 
