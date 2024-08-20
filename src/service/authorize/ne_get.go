@@ -15,3 +15,13 @@ func GetNeListBySystemType(systemType string) ([]*db_models.CliNe, error) {
 	}
 	return cliNeList, nil
 }
+
+func GetNeByNeId(id int64) (*db_models.CliNe, error) {
+	sto := store.GetSingleton()
+	cliNe, err := sto.GetCliNeByNeId(id)
+	if err != nil {
+		log.Logger.Error("Cant get cli ne, err: ", err)
+		return nil, err
+	}
+	return cliNe, nil
+}

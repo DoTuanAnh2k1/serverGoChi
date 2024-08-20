@@ -81,7 +81,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		response.Created(w)
 	}
 
-	if !u.IsEnable == false {
+	if !u.IsEnable {
 		u.IsEnable = true
 		u.CreatedBy = userMiddleware.Username
 		u.UpdatedDate = time.Now()
