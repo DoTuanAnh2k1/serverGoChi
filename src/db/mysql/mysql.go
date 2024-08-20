@@ -221,7 +221,7 @@ func (c *Client) DeleteCliRole(cliRole db_models.CliRole) error {
 
 func (c *Client) GetAllCliRole() ([]*db_models.CliRole, error) {
 	var cliRoleList []*db_models.CliRole
-	tx := c.Db.Find(cliRoleList)
+	tx := c.Db.Find(&cliRoleList)
 	if tx == nil {
 		return nil, errors.New("no database connection")
 	}
@@ -229,4 +229,17 @@ func (c *Client) GetAllCliRole() ([]*db_models.CliRole, error) {
 		return nil, tx.Error
 	}
 	return cliRoleList, nil
+}
+
+func (c *Client) GetCliNeListBySystemType(systemType string) ([]*db_models.CliNe, error) {
+	var cliNeList []*db_models.CliNe
+	cond := &db_models.CliNe{SystemType: systemType}
+	tx := c.Db.Find(&cliNeList, cond)
+	if tx == nil {
+		return nil, errors.New("no database connection")
+	}
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return cliNeList, nil
 }

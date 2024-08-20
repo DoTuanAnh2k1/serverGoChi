@@ -55,4 +55,5 @@ type DatabaseStore interface {
 	CreateCliRole(db_models.CliRole) error
 	DeleteCliRole(db_models.CliRole) error
 	GetAllCliRole() ([]*db_models.CliRole, error)
+	GetCliNeListBySystemType(string) ([]*db_models.CliNe, error)
 }

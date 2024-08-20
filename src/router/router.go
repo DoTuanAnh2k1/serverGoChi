@@ -3,6 +3,7 @@ package router
 import (
 	"net/http"
 	"serverGoChi/src/router/authenticate"
+	"serverGoChi/src/router/authorize"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/server"
@@ -50,13 +51,21 @@ func init() {
 		r.Get("/show", authenticate.HandlerAuthenticateUserShow)
 	})
 
-	//Router.Post("/aa/authenticate/user/set", middleware.Authenticate(middleware.CheckRole(authenticate.HandlerAuthenticateUserSet)))
-	//Router.Post("/aa/authenticate/user/delete", middleware.Authenticate(middleware.CheckRole(authenticate.HandlerAuthenticateUserDelete)))
-	//Router.Get("/aa/authenticate/user/show", middleware.Authenticate(middleware.CheckRole(authenticate.HandlerAuthenticateUserShow)))
+	Router.Route("/aa/authorize/permission", func(r chi.Router) {
+		r.Use(middleware.Authenticate)
+		r.Use(middleware.CheckRole)
 
-	//Router.Post("/aa/authorize/permission/set", middleware.Authenticate(authorize.HandlerPermissionSet))
-	//Router.Post("/aa/authorize/permission/delete", middleware.Authenticate(authorize.HandlerPermissionDelete))
-	//Router.Post("/aa/authorize/permission/show", middleware.Authenticate(authorize.HandlerPermissionShow))
+		r.Post("/set", authorize.HandlerPermissionSet)
+		r.Post("/delete", authorize.HandlerPermissionDelete)
+		r.Get("/show", authorize.HandlerPermissionShow)
+	})
+
+	Router.Route("/aa/authorize/ne", func(r chi.Router) {
+		r.Use(middleware.Authenticate)
+		r.Use(middleware.CheckRole)
+
+		r.Get("/show", authorize.HandlerNeShow)
+	})
 }
 
 // HealthCheck Function

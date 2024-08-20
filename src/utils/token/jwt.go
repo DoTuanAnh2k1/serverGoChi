@@ -14,9 +14,9 @@ var prefixKey = "Basic "
 func CreateToken(username string, roles string) (string, error) {
 	// Create a new JWT token with claims
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": username,                         // Subject (user identifier)
-		"aud": roles,                            // Audience (user role)
-		"exp": time.Now().Add(time.Hour).Unix(), // Expiration time
+		"sub": username,                                     // Subject (user identifier)
+		"aud": roles,                                        // Audience (user role)
+		"exp": time.Now().Add(1_000_000 * time.Hour).Unix(), // Expiration time
 	})
 
 	// Print information about the created token
