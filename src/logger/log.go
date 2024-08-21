@@ -1,11 +1,12 @@
-package log
+package logger
 
 import (
-	"github.com/sirupsen/logrus"
 	"os"
-	"serverGoChi/src/server"
+	"serverGoChi/config"
 	"strings"
 	"time"
+
+	"github.com/sirupsen/logrus"
 )
 
 // Log Variable
@@ -25,7 +26,8 @@ const (
 	LogLevelInfo  logLevel = "info"
 )
 
-func init() {
+func Init() {
+	logCfg := config.GetLogConfig()
 	// Initialize Log as New Logrus Logger
 	Logger = logrus.New()
 
@@ -39,7 +41,7 @@ func init() {
 	Logger.SetOutput(os.Stdout)
 
 	// Set Log Level
-	switch strings.ToLower(server.Config.GetString("SERVER_LOG_LEVEL")) {
+	switch strings.ToLower(logCfg.Level) {
 	case "panic":
 		Logger.SetLevel(logrus.PanicLevel)
 	case "fatal":
@@ -62,7 +64,7 @@ func Println(level logLevel, label string, message interface{}) {
 	// Make Sure Log Is Not Empty Variable
 	if Logger != nil {
 		// Set Service Name Log Information
-		service := strings.ToLower(server.Config.GetString("SERVER_NAME"))
+		service := strings.ToLower(config.GetServerConfig().ServerName)
 
 		// Print Log Based On Log Level Type
 		switch level {

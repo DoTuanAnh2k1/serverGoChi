@@ -2,7 +2,6 @@ package middleware
 
 import (
 	"net/http"
-	"serverGoChi/src/server"
 	"strings"
 )
 
@@ -40,15 +39,6 @@ func RouterRealIP(next http.Handler) http.Handler {
 		} else if XRealIP := r.Header.Get(http.CanonicalHeaderKey("X-Real-IP")); XRealIP != "" {
 			r.RemoteAddr = XRealIP
 		}
-		next.ServeHTTP(w, r)
-	})
-}
-
-// RouterEntitySize Function
-func RouterEntitySize(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Validate Entity Size
-		r.Body = http.MaxBytesReader(w, r.Body, server.Config.GetInt64("SERVER_UPLOAD_LIMIT"))
 		next.ServeHTTP(w, r)
 	})
 }

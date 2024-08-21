@@ -2,7 +2,7 @@ package middleware
 
 import (
 	"net/http"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router/response"
 	"strings"
 )
@@ -13,12 +13,12 @@ func CheckRole(next http.Handler) http.Handler {
 		// Get the user from the context
 		u, ok := r.Context().Value(UserContextKey).(*User)
 		if !ok {
-			log.Logger.Error("Failed to retrieve user from context")
+			logger.Logger.Error("Failed to retrieve user from context")
 			response.InternalError(w, "Internal Server Error")
 			return
 		}
 
-		log.Logger.Info("User retrieved from context: ", u)
+		logger.Logger.Info("User retrieved from context: ", u)
 
 		// Check if the user has an "admin" role
 		checkRole := false
@@ -32,7 +32,7 @@ func CheckRole(next http.Handler) http.Handler {
 
 		// If the user does not have the required role, return a forbidden status
 		if !checkRole {
-			log.Logger.Error("User does not have the required role")
+			logger.Logger.Error("User does not have the required role")
 			response.Write(w, http.StatusForbidden, "No authority")
 			return
 		}

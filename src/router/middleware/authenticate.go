@@ -3,7 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/utils/token"
 	"strings"
@@ -25,14 +25,14 @@ func Authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			log.Logger.Error("Request don't have authorize header")
+			logger.Logger.Error("Request don't have authorize header")
 			response.Unauthorized(w)
 			return
 		}
 
 		authHeaderParts := strings.SplitN(authHeader, " ", 2)
 		if len(authHeaderParts) != 2 || authHeaderParts[0] != "Basic" {
-			log.Logger.Error("Authorize header of request invalid")
+			logger.Logger.Error("Authorize header of request invalid")
 			response.Unauthorized(w)
 			return
 		}
@@ -40,7 +40,7 @@ func Authenticate(next http.Handler) http.Handler {
 		tokenString := authHeaderParts[1]
 		userName, roles, err := token.ParseToken(tokenString)
 		if err != nil {
-			log.Logger.Error("Cannot verify token: ", err)
+			logger.Logger.Error("Cannot verify token: ", err)
 			response.InternalError(w, "Cannot verify token")
 			return
 		}

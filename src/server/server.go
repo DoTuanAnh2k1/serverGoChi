@@ -2,13 +2,11 @@ package server
 
 import (
 	"context"
-	"fmt"
 	"log"
 	"net"
 	"net/http"
-	"os"
+	"serverGoChi/config"
 	"serverGoChi/models/config_models"
-	"strconv"
 	"sync"
 	"time"
 )
@@ -17,26 +15,20 @@ import (
 type Server struct {
 	srv *http.Server
 	wg  sync.WaitGroup
-	Cfg *config_models.Config
+	cfg config_models.ServerConfig
 }
 
-// Server Configuration Struct
-type serverConfig struct {
-	IP   string
-	Port string
-}
-
-// Server Configuration Variable
-var ServerCfg serverConfig
 
 // NewServer Function to Create a New Server Handler
 func NewServer(handler http.Handler) *Server {
+	cfg := config.GetServerConfig()
 	// Initialize New Server
 	server := &Server{
 		srv: &http.Server{
-			Addr:    net.JoinHostPort(ServerCfg.IP, ServerCfg.Port),
+			Addr:    net.JoinHostPort(cfg.Host, cfg.Port),
 			Handler: handler,
 		},
+		cfg: cfg,
 	}
 	return server
 }
@@ -52,9 +44,9 @@ func (s *Server) Start() {
 	s.wg.Add(1)
 
 	// Start The Server
-	log.Println("{\"label\":\"server-http\",\"level\":\"info\",\"msg\":\"server master started at pid " + strconv.Itoa(os.Getpid()) + "\",\"service\":\"" + Config.GetString("SERVER_NAME") + "\",\"time\":" + fmt.Sprint(time.Now().Format(time.RFC3339Nano)) + "\"}")
+
 	go func() {
-		log.Println("{\"label\":\"server-http\",\"level\":\"info\",\"msg\":\"server worker started at pid " + strconv.Itoa(os.Getpid()) + " listening on " + net.JoinHostPort(ServerCfg.IP, ServerCfg.Port) + "\",\"service\":\"" + Config.GetString("SERVER_NAME") + "\",\"time\":" + fmt.Sprint(time.Now().Format(time.RFC3339Nano)) + "\"}")
+		log.Printf("Starting server at %s:%s ...", s.cfg.Host, s.cfg.Port)
 		s.srv.ListenAndServe()
 
 		s.wg.Done()
@@ -73,7 +65,7 @@ func (s *Server) Stop() {
 	// Hanlde Any Error While Stopping Server
 	if err := s.srv.Shutdown(ctx); err != nil {
 		if err = s.srv.Close(); err != nil {
-			log.Fatalln("{\"label\":\"server-http\",\"level\":\"error\",\"msg\":\"" + err.Error() + "\",\"service\":\"" + Config.GetString("SERVER_NAME") + "\",\"time\":" + fmt.Sprint(time.Now().Format(time.RFC3339Nano)) + "\"}")
+			log.Printf("Stop server %s:%s at %v", s.cfg.Host, s.cfg.Port, time.Now().Format(time.RFC3339))
 			return
 		}
 	}

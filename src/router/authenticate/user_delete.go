@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"serverGoChi/models/db_models"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/service/history_command"
@@ -14,9 +14,9 @@ import (
 )
 
 func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
-	log.Logger.Info("Handler Authenticate delete user")
+	logger.Logger.Info("Handler Authenticate delete user")
 	if r.Method != http.MethodPost {
-		log.Logger.Error("Method not allowed")
+		logger.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
@@ -24,19 +24,19 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 	var userInfo db_models.TblAccount
 	err := json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
-		log.Logger.Error("Error parsing JSON request body: ", err)
+		logger.Logger.Error("Error parsing JSON request body: ", err)
 		response.Write(w, http.StatusInternalServerError, "Error parsing JSON request body")
 		return
 	}
 
 	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
-		log.Logger.Error("Error to get user from token key")
+		logger.Logger.Error("Error to get user from token key")
 		response.InternalError(w, "Internal Server Error")
 		return
 	}
 
-	logOperationHistory := db_models.CliOperationHistory{
+	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authenticate-user delete username %v password xxx", userInfo.AccountName),
 		CreatedDate: time.Now(),
 		Scope:       "ext-config",
@@ -45,7 +45,7 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 
 	u, err := user.GetUserByUserName(userInfo.AccountName)
 	if err != nil {
-		log.Logger.Error("Cant get user by username from db: ", err)
+		logger.Logger.Error("Cant get user by username from db: ", err)
 		response.Write(w, http.StatusInternalServerError, "Cant get user by username from db")
 		return
 	}
@@ -54,31 +54,31 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 		u.IsEnable = false
 		err := user.UpdateUser(u)
 		if err != nil {
-			log.Logger.Error("Cant update user to db: ", err)
+			logger.Logger.Error("Cant update user to db: ", err)
 			response.Write(w, http.StatusInternalServerError, "Cant update user to db")
 			return
 		}
 
-		logOperationHistory.ExecutedTime = time.Now()
-		logOperationHistory.Result = "success"
-		err = history_command.SaveHistoryCommand(logOperationHistory)
+		loggerOperationHistory.ExecutedTime = time.Now()
+		loggerOperationHistory.Result = "success"
+		err = history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
-			log.Logger.Error("Cant save command to db: ", err)
+			logger.Logger.Error("Cant save command to db: ", err)
 		}
-		log.Logger.Info("Disable user with username: ", u.AccountName)
+		logger.Logger.Info("Disable user with username: ", u.AccountName)
 		response.Success(w, "")
 	} else {
-		logOperationHistory.ExecutedTime = time.Now()
-		logOperationHistory.Result = "failure"
-		err = history_command.SaveHistoryCommand(logOperationHistory)
+		loggerOperationHistory.ExecutedTime = time.Now()
+		loggerOperationHistory.Result = "failure"
+		err = history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
-			log.Logger.Error("Cant save command to db: ", err)
+			logger.Logger.Error("Cant save command to db: ", err)
 		}
 		if u == nil {
-			log.Logger.Info("Not found user: ", u.AccountName)
+			logger.Logger.Info("Not found user: ", u.AccountName)
 		}
 		if !u.IsEnable {
-			log.Logger.Info("User already disable")
+			logger.Logger.Info("User already disable")
 		}
 		response.Write(w, http.StatusNotFound, "User Not Found")
 	}

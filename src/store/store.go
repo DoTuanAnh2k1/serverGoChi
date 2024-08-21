@@ -1,6 +1,7 @@
 package store
 
 import (
+	"serverGoChi/config"
 	"serverGoChi/models/config_models"
 	"serverGoChi/models/db_models"
 	"serverGoChi/src/db/mysql"
@@ -15,9 +16,9 @@ func GetSingleton() DatabaseStore {
 	return store
 }
 
-func Init(cfg *config_models.Config) {
-
-	switch cfg.Db.DbType {
+func Init() {
+	cfg := config.GetDatabaseConfig()
+	switch cfg.DbType {
 	case "mysql":
 		store = mysql.GetInstance()
 	case "mongodb":
@@ -33,7 +34,7 @@ func Init(cfg *config_models.Config) {
 
 // DatabaseStore Database Store
 type DatabaseStore interface {
-	Init(cfg *config_models.Config) error
+	Init(cfg config_models.DatabaseConfig) error
 
 	GetAllUser() ([]*db_models.TblAccount, error)
 	GetUserByUserName(string) (*db_models.TblAccount, error)

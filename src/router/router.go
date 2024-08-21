@@ -2,12 +2,12 @@ package router
 
 import (
 	"net/http"
+	"serverGoChi/config"
 	"serverGoChi/src/router/authenticate"
 	"serverGoChi/src/router/authorize"
 	"serverGoChi/src/router/list"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
-	"serverGoChi/src/server"
 	"serverGoChi/src/store"
 
 	"github.com/go-chi/chi"
@@ -20,20 +20,21 @@ var RouterBasePath string
 var Router *chi.Mux
 
 // Initialize Function in Router
-func init() {
+func Init() {
 	// Initialize Router
+	routerCfg := config.GetRouterConfig()
 	Router = chi.NewRouter()
-	RouterBasePath = server.Config.GetString("ROUTER_BASE_PATH")
+
+	RouterBasePath = routerCfg.BasePath
 
 	// Set Router CORS Configuration
-	middleware.RouterCORSCfg.Origins = server.Config.GetString("CORS_ALLOWED_ORIGIN")
-	middleware.RouterCORSCfg.Methods = server.Config.GetString("CORS_ALLOWED_METHOD")
-	middleware.RouterCORSCfg.Headers = server.Config.GetString("CORS_ALLOWED_HEADER")
+	middleware.RouterCORSCfg.Origins = routerCfg.Origins
+	middleware.RouterCORSCfg.Methods = routerCfg.Methods
+	middleware.RouterCORSCfg.Headers = routerCfg.Headers
 
 	// Set Router Middleware
 	Router.Use(middleware.RouterCORS)
 	Router.Use(middleware.RouterRealIP)
-	Router.Use(middleware.RouterEntitySize)
 
 	// Set Router Handler
 	Router.NotFound(handlerNotFound)

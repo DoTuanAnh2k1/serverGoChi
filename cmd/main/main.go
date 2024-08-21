@@ -5,35 +5,28 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"serverGoChi/config"
 	"serverGoChi/models/config_models"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router"
 	"serverGoChi/src/server"
 	"serverGoChi/src/store"
 	"syscall"
+
+	"github.com/joho/godotenv"
 )
-
-// Server Variable
-var svr *server.Server
-
-// Init Function
-func init() {
-	// Set Go Log Flags
-	log.SetFlags(log.Flags() &^ (log.Ldate | log.Ltime))
-
-	// Initialize Server
-	svr = server.NewServer(router.Router)
-}
 
 // Main Function
 func main() {
 	// Init store
-	store.Init(&config_models.DatabaseConfigInit)
+	svr := Initialize()
+
 	// Starting Server
 	svr.Start()
-	stopOrKillServer()
+	stopOrKillServer(svr)
 }
 
-func stopOrKillServer() {
+func stopOrKillServer(svr *server.Server) {
 	signals := make(chan os.Signal, 1)
 	signal.Notify(signals, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGINT, os.Interrupt)
 	sig := <-signals
@@ -41,4 +34,39 @@ func stopOrKillServer() {
 	fmt.Println(sig)
 	svr.Stop()
 	os.Exit(1)
+}
+
+func Initialize() *server.Server {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatal("Error loading .env file")
+	}
+	cfg := &config_models.Config{
+		Svr: config_models.ServerConfig{
+			Host: os.Getenv("SERVER_HOST"),
+			Port: os.Getenv("SERVER_PORT"),
+		},
+		Db: config_models.DatabaseConfig{
+			DbType: os.Getenv("DB_DRIVER"),
+			Mysql: config_models.MySqlConfig{
+				Host:     os.Getenv("MYSQL_HOST"),
+				Port:     os.Getenv("MYSQL_PORT"),
+				User:     os.Getenv("MYSQL_USER"),
+				Password: os.Getenv("MYSQL_PASSWORD"),
+				Name:     os.Getenv("MYSQL_DB_NAME"),
+			},
+		},
+		Log: config_models.LogConfig{
+			Level: os.Getenv("LOG_LEVEL"),
+		},
+	}
+	config.Init(cfg)
+	fmt.Println("Starting", *cfg)
+	logger.Init()
+
+	router.Init()
+	store.Init()
+
+	// Initialize Server
+	return server.NewServer(router.Router)
 }

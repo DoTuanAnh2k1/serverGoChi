@@ -2,10 +2,11 @@ package token
 
 import (
 	"errors"
-	"github.com/golang-jwt/jwt/v5"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"strings"
 	"time"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 var secretKey = []byte("optimus-prime-auto-bot")
@@ -20,11 +21,11 @@ func CreateToken(username string, roles string) (string, error) {
 	})
 
 	// Print information about the created token
-	log.Logger.Info("Token claims added: %+v\n", claims)
+	logger.Logger.Info("Token claims added: %+v\n", claims)
 
 	tokenString, err := claims.SignedString(secretKey)
 	if err != nil {
-		log.Logger.Error("Cannot create json web token: ", err)
+		logger.Logger.Error("Cannot create json web token: ", err)
 		return "", err
 	}
 
@@ -44,14 +45,14 @@ func ParseToken(tokenString string) (string, string, error) {
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
 		// Validate the signing method
 		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			log.Logger.Error("unexpected signing method")
+			logger.Logger.Error("unexpected signing method")
 			return nil, errors.New("unexpected signing method")
 		}
 		return secretKey, nil
 	})
 
 	if err != nil {
-		log.Logger.Error("Error parsing token: ", err)
+		logger.Logger.Error("Error parsing token: ", err)
 		return "", "", err
 	}
 

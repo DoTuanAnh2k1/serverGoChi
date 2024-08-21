@@ -2,7 +2,7 @@ package list
 
 import (
 	"net/http"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/service/authenticate"
@@ -11,29 +11,29 @@ import (
 
 func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		log.Logger.Error("Method not allowed")
+		logger.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
-		log.Logger.Error("Error to get user from token key")
+		logger.Logger.Error("Error to get user from token key")
 		response.InternalError(w, "Internal Server Error")
 		return
 	}
-	log.Logger.Info("Handler list ne")
+	logger.Logger.Info("Handler list ne")
 
 	tblAccount, err := user.GetUserByUserName(userMiddleware.Username)
 	if err != nil {
-		log.Logger.Error("Cannot get user by username from db: ", err)
+		logger.Logger.Error("Cannot get user by username from db: ", err)
 		response.InternalError(w, "Cannot get user by username from db")
 		return
 	}
 
 	cliNeList, err := authenticate.GetNeListById(tblAccount.AccountID)
 	if err != nil {
-		log.Logger.Error("Cannot list cli ne from db: ", err)
+		logger.Logger.Error("Cannot list cli ne from db: ", err)
 		response.InternalError(w, "Cannot list cli ne from db")
 		return
 	}
@@ -57,7 +57,7 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 		neResp.Status = "Fail"
 		neResp.Message = "cannot find any ne belongs to the user"
 
-		log.Logger.Info("cannot find any ne belongs to the user")
+		logger.Logger.Info("cannot find any ne belongs to the user")
 		response.Write(w, http.StatusNotFound, neResp)
 		return
 	}
@@ -67,7 +67,7 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 	neResp.Message = "Success"
 	neResp.NeDataList = neDataList
 
-	log.Logger.Info("Success")
+	logger.Logger.Info("Success")
 	response.Write(w, http.StatusFound, neResp)
 	return
 }

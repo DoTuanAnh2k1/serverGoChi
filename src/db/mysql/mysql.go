@@ -1,10 +1,11 @@
 package mysql
 
 import (
+	"serverGoChi/models/config_models"
+	"serverGoChi/src/logger"
+
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
-	"serverGoChi/models/config_models"
-	"serverGoChi/src/log"
 )
 
 type Client struct {
@@ -22,29 +23,23 @@ func GetInstance() *Client {
 	return client
 }
 
-func (c *Client) Init(cfg *config_models.Config) error {
+func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	var err error
-	//var (
-	//	DbUsername = cfg.Db.Mysql.User
-	//	DbPassword = cfg.Db.Mysql.Password
-	//	DbHost     = cfg.Db.Mysql.Host
-	//	DbPort     = cfg.Db.Mysql.Port
-	//	DbName     = cfg.Db.Mysql.Name
-	//)
 	var (
-		DbUsername = "ems"
-		DbPassword = "Ems@2021"
-		DbHost     = "127.0.0.1"
-		DbPort     = cfg.Db.Mysql.Port
-		DbName     = "ems"
+		DbUsername = cfg.Mysql.User
+		DbPassword = cfg.Mysql.Password
+		DbHost     = cfg.Mysql.Host
+		DbPort     = cfg.Mysql.Port
+		DbName     = cfg.Mysql.Name
 	)
+	
 	dsn := DbUsername + ":" + DbPassword + "@tcp" + "(" + DbHost + ":" + DbPort + ")/" + DbName + "?" + "parseTime=true&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {
-		log.Logger.Debugf("Error connecting to database : error=%v", err)
+		logger.Logger.Debugf("Error connecting to database : error=%v", err)
 		return err
 	}
-	log.Logger.Info("Connect to database: ", dsn)
+	logger.Logger.Info("Connect to database: ", dsn)
 	c.Db = db
 	return nil
 }

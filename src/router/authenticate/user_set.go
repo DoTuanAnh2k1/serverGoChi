@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"serverGoChi/models/db_models"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/service/history_command"
@@ -15,9 +15,9 @@ import (
 )
 
 func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
-	log.Logger.Info("Handler Authenticate set user")
+	logger.Logger.Info("Handler Authenticate set user")
 	if r.Method != http.MethodPost {
-		log.Logger.Error("Method not allowed")
+		logger.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
@@ -25,19 +25,19 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	var userInfo db_models.TblAccount
 	err := json.NewDecoder(r.Body).Decode(&userInfo)
 	if err != nil {
-		log.Logger.Error("Error parsing JSON request body: ", err)
+		logger.Logger.Error("Error parsing JSON request body: ", err)
 		response.Write(w, http.StatusInternalServerError, "Error parsing JSON request body")
 		return
 	}
 
 	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
-		log.Logger.Error("Error to get user from context")
+		logger.Logger.Error("Error to get user from context")
 		response.InternalError(w, "Internal Server Error")
 		return
 	}
 
-	logOperationHistory := db_models.CliOperationHistory{
+	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authenticate-user set username %v password xxx", userInfo.AccountName),
 		CreatedDate: time.Now(),
 		Scope:       "ext-config",
@@ -46,7 +46,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 
 	u, err := user.GetUserByUserName(userInfo.AccountName)
 	if err != nil {
-		log.Logger.Info("Cant get user by username from db: ", err)
+		logger.Logger.Info("Cant get user by username from db: ", err)
 		// response.Write(w, http.StatusInternalServerError, "Cant get user by username from db")
 		// return
 	}
@@ -66,18 +66,18 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		userInfo.Status = true
 		err := user.AddUser(&userInfo)
 		if err != nil {
-			log.Logger.Error("Cant create user to db: ", err)
+			logger.Logger.Error("Cant create user to db: ", err)
 			response.Write(w, http.StatusInternalServerError, "Cant create user to db")
 			return
 		}
 
-		logOperationHistory.ExecutedTime = time.Now()
-		logOperationHistory.Result = "success"
-		err = history_command.SaveHistoryCommand(logOperationHistory)
+		loggerOperationHistory.ExecutedTime = time.Now()
+		loggerOperationHistory.Result = "success"
+		err = history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
-			log.Logger.Error("Cant save command to db: ", err)
+			logger.Logger.Error("Cant save command to db: ", err)
 		}
-		log.Logger.Info("Create user")
+		logger.Logger.Info("Create user")
 		response.Created(w)
 	}
 
@@ -88,27 +88,27 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		userInfo.LoginFailureCount = 0
 		err := user.UpdateUser(u)
 		if err != nil {
-			log.Logger.Error("Cant create user to db: ", err)
+			logger.Logger.Error("Cant create user to db: ", err)
 			response.Write(w, http.StatusInternalServerError, "Cant get user by username from db")
 			return
 		}
 
-		logOperationHistory.ExecutedTime = time.Now()
-		logOperationHistory.Result = "success"
-		err = history_command.SaveHistoryCommand(logOperationHistory)
+		loggerOperationHistory.ExecutedTime = time.Now()
+		loggerOperationHistory.Result = "success"
+		err = history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
-			log.Logger.Error("Cant save command to db: ", err)
+			logger.Logger.Error("Cant save command to db: ", err)
 		}
-		log.Logger.Info("Enable user with username: ", u.AccountName)
+		logger.Logger.Info("Enable user with username: ", u.AccountName)
 		response.Created(w)
 	} else {
-		logOperationHistory.ExecutedTime = time.Now()
-		logOperationHistory.Result = "failure"
-		err = history_command.SaveHistoryCommand(logOperationHistory)
+		loggerOperationHistory.ExecutedTime = time.Now()
+		loggerOperationHistory.Result = "failure"
+		err = history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
-			log.Logger.Error("Cant save command to db: ", err)
+			logger.Logger.Error("Cant save command to db: ", err)
 		}
-		log.Logger.Info("User already exist, nothing change")
+		logger.Logger.Info("User already exist, nothing change")
 		response.Write(w, http.StatusNotModified, "User already exist!")
 	}
 }

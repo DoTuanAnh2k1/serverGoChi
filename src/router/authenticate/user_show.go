@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"serverGoChi/models/db_models"
-	"serverGoChi/src/log"
+	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/service/authenticate"
@@ -14,21 +14,21 @@ import (
 )
 
 func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
-	log.Logger.Info("Handler request authenticate user show")
+	logger.Logger.Info("Handler request authenticate user show")
 	if r.Method != http.MethodGet {
-		log.Logger.Error("Method not allowed")
+		logger.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
 
 	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
-		log.Logger.Error("Error to get user from token key")
+		logger.Logger.Error("Error to get user from token key")
 		response.InternalError(w, "Internal Server Error")
 		return
 	}
 
-	logOperationHistory := db_models.CliOperationHistory{
+	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authenticate-user delete username %v password xxx", "xxx"), // Get from middleware
 		CreatedDate: time.Now(),
 		Scope:       "ext-config",
@@ -37,16 +37,16 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 
 	userList, err := user.GetAllUser()
 	if err != nil {
-		log.Logger.Error("Cant get all user from db: ", err)
+		logger.Logger.Error("Cant get all user from db: ", err)
 		response.Write(w, http.StatusInternalServerError, "Cant get all user from db")
 		return
 	}
 	if userList == nil || len(userList) == 0 {
-		logOperationHistory.ExecutedTime = time.Now()
-		logOperationHistory.Result = "failure"
-		err = history_command.SaveHistoryCommand(logOperationHistory)
+		loggerOperationHistory.ExecutedTime = time.Now()
+		loggerOperationHistory.Result = "failure"
+		err = history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
-			log.Logger.Error("Cant save command to db: ", err)
+			logger.Logger.Error("Cant save command to db: ", err)
 		}
 
 		response.NotFound(w, "Empty List of Users")
@@ -56,14 +56,14 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 	for _, userElement := range userList {
 		tblId, err := authenticate.GetTblIdByUserId(userElement.AccountID)
 		if err != nil {
-			log.Logger.Error("Cant get tblId by user id: ", err)
+			logger.Logger.Error("Cant get tblId by user id: ", err)
 			// response.Write(w, http.StatusInternalServerError, "Cant get tblId by user id")
 			// continue
 		}
 
 		neList, err := authenticate.GetNeListById(tblId)
 		if err != nil {
-			log.Logger.Error("Cant get ne list: ", err)
+			logger.Logger.Error("Cant get ne list: ", err)
 			// response.Write(w, http.StatusInternalServerError, "Cant get ne list")
 			// continue
 		}
@@ -80,7 +80,7 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 
 		role, err := authenticate.GetRolesById(userElement.AccountID)
 		if err != nil {
-			log.Logger.Error("Cant get role by user id: ", err)
+			logger.Logger.Error("Cant get role by user id: ", err)
 			// response.Write(w, http.StatusInternalServerError, "Cant get role by user id")
 			//continue
 		}
@@ -92,11 +92,11 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 
-	logOperationHistory.ExecutedTime = time.Now()
-	logOperationHistory.Result = "success"
-	err = history_command.SaveHistoryCommand(logOperationHistory)
+	loggerOperationHistory.ExecutedTime = time.Now()
+	loggerOperationHistory.Result = "success"
+	err = history_command.SaveHistoryCommand(loggerOperationHistory)
 	if err != nil {
-		log.Logger.Error("Cant save command to db: ", err)
+		logger.Logger.Error("Cant save command to db: ", err)
 	}
 
 	response.Write(w, http.StatusFound, userShowAuthenticateRespList)
