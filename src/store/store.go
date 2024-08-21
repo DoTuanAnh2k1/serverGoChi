@@ -57,4 +57,5 @@ type DatabaseStore interface {
 	GetAllCliRole() ([]*db_models.CliRole, error)
 	GetCliNeListBySystemType(string) ([]*db_models.CliNe, error)
 	GetCliNeByNeId(int64) (*db_models.CliNe, error)
+	AddRole(*db_models.CliRoleUserMapping) error
 }

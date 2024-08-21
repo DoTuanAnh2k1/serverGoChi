@@ -51,6 +51,7 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 		if err1 != nil {
 			log.Logger.Error("Cant save command to db: ", err1)
 		}
+
 		response.Write(w, http.StatusInternalServerError, "Cant check is exist cli role")
 		return
 	}
@@ -61,6 +62,7 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
+
 		response.Write(w, http.StatusNotModified, "")
 	} else {
 		logOperationHistory.ExecutedTime = time.Now()
@@ -69,6 +71,7 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			log.Logger.Error("Cant save command to db: ", err)
 		}
+
 		err = authorize.CreateCliRole(cliRole)
 		if err != nil {
 			log.Logger.Error("Error create cli role: ", err)

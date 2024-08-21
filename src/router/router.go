@@ -39,32 +39,41 @@ func init() {
 	Router.MethodNotAllowed(handlerMethodNotAllowed)
 	Router.Get("/favicon.ico", handlerFavIcon)
 
-	// Router.Post("/aa/authorize", handlerAuthorize)
-	Router.Post("/aa/authenticate", authenticate.HandlerAuthenticate)
+	Router.Route("/aa", func(router chi.Router) {
+		router.Post("/authenticate", authenticate.HandlerAuthenticate)
+		router.Route("/authenticate/user", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Use(middleware.CheckRole)
 
-	Router.Route("/aa/authenticate/user", func(r chi.Router) {
-		r.Use(middleware.Authenticate)
-		r.Use(middleware.CheckRole)
+			r.Post("/set", authenticate.HandlerAuthenticateUserSet)
+			r.Post("/delete", authenticate.HandlerAuthenticateUserDelete)
+			r.Get("/show", authenticate.HandlerAuthenticateUserShow)
+		})
 
-		r.Post("/set", authenticate.HandlerAuthenticateUserSet)
-		r.Post("/delete", authenticate.HandlerAuthenticateUserDelete)
-		r.Get("/show", authenticate.HandlerAuthenticateUserShow)
-	})
+		router.Route("/authorize", func(r chi.Router) {
+			r.Route("/permission", func(subRouter chi.Router) {
+				subRouter.Use(middleware.Authenticate)
+				subRouter.Use(middleware.CheckRole)
 
-	Router.Route("/aa/authorize/permission", func(r chi.Router) {
-		r.Use(middleware.Authenticate)
-		r.Use(middleware.CheckRole)
+				subRouter.Post("/set", authorize.HandlerPermissionSet)
+				subRouter.Post("/delete", authorize.HandlerPermissionDelete)
+				subRouter.Get("/show", authorize.HandlerPermissionShow)
+			})
 
-		r.Post("/set", authorize.HandlerPermissionSet)
-		r.Post("/delete", authorize.HandlerPermissionDelete)
-		r.Get("/show", authorize.HandlerPermissionShow)
-	})
+			r.Route("/ne", func(subRouter chi.Router) {
+				subRouter.Use(middleware.Authenticate)
+				subRouter.Use(middleware.CheckRole)
 
-	Router.Route("/aa/authorize/ne", func(r chi.Router) {
-		r.Use(middleware.Authenticate)
-		r.Use(middleware.CheckRole)
+				subRouter.Get("/show", authorize.HandlerNeShow)
+			})
 
-		r.Get("/show", authorize.HandlerNeShow)
+			r.Route("/user", func(subRouter chi.Router) {
+				subRouter.Use(middleware.Authenticate)
+				subRouter.Use(middleware.CheckRole)
+
+				subRouter.Post("/set", authorize.HandlerUserSet)
+			})
+		})
 	})
 }
 

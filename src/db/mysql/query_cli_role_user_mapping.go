@@ -19,3 +19,14 @@ func (c *Client) GetRolesById(id int64) ([]*db_models.CliRoleUserMapping, error)
 	}
 	return roleList, nil
 }
+
+func (c *Client) AddRole(role *db_models.CliRoleUserMapping) error {
+	tx := c.Db.Save(role)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	if tx.Error != nil {
+		return tx.Error
+	}
+	return nil
+}
