@@ -78,3 +78,13 @@ func AddUserRole(role *db_models.CliRoleUserMapping) error {
 	}
 	return nil
 }
+
+func DeleteUserRole(role *db_models.CliRoleUserMapping) error {
+	sto := store.GetSingleton()
+	err := sto.DeleteRole(role)
+	if err != nil {
+		log.Logger.Error("Cannot delete role: ", err)
+		return err
+	}
+	return nil
+}

@@ -30,3 +30,14 @@ func (c *Client) AddRole(role *db_models.CliRoleUserMapping) error {
 	}
 	return nil
 }
+
+func (c *Client) DeleteRole(role *db_models.CliRoleUserMapping) error {
+	tx := c.Db.Delete(&role)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	if tx.Error != nil {
+		return tx.Error
+	}
+	return nil
+}

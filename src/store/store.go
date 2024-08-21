@@ -39,18 +39,12 @@ type DatabaseStore interface {
 	GetUserByUserName(string) (*db_models.TblAccount, error)
 	UpdateUser(account *db_models.TblAccount) error
 	AddUser(*db_models.TblAccount) error
-
 	Ping() error
 	UpdateLoginHistory(string, string, time.Time) error
-
 	SaveHistoryCommand(db_models.CliOperationHistory) error
-
 	GetCLIUserNeMappingByUserId(int64) (*db_models.CliUserNeMapping, error)
-
 	GetNeListById(int64) ([]*db_models.CliNe, error)
-
 	GetRolesById(int64) ([]*db_models.CliRoleUserMapping, error)
-
 	GetCliRole(db_models.CliRole) (*db_models.CliRole, error)
 	CreateCliRole(db_models.CliRole) error
 	DeleteCliRole(db_models.CliRole) error
@@ -58,4 +52,5 @@ type DatabaseStore interface {
 	GetCliNeListBySystemType(string) ([]*db_models.CliNe, error)
 	GetCliNeByNeId(int64) (*db_models.CliNe, error)
 	AddRole(*db_models.CliRoleUserMapping) error
+	DeleteRole(*db_models.CliRoleUserMapping) error
 }

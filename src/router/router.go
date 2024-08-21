@@ -72,6 +72,7 @@ func init() {
 				subRouter.Use(middleware.CheckRole)
 
 				subRouter.Post("/set", authorize.HandlerUserSet)
+				subRouter.Post("/delete", authorize.HandlerUserDelete)
 			})
 		})
 	})
