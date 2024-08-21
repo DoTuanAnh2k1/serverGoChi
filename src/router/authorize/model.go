@@ -7,6 +7,11 @@ type (
 		NeId     string `json:"neid"`
 	}
 
+	NeDeleteReq struct {
+		Username string `json:"username"`
+		NeId     string `json:"neid"`
+	}
+
 	UserDeleteReq struct {
 		Username   string `json:"username"`
 		Permission string `json:"permission"`

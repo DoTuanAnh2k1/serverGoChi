@@ -98,3 +98,13 @@ func AddUserCliNe(cliUserNe *db_models.CliUserNeMapping) error {
 	}
 	return nil
 }
+
+func DeleteCliNe(cliUserNe *db_models.CliUserNeMapping) error {
+	sto := store.GetSingleton()
+	err := sto.DeleteUserNeMapping(cliUserNe)
+	if err != nil {
+		log.Logger.Error("Cannot Delete Cli Ne to User: ", err)
+		return err
+	}
+	return nil
+}

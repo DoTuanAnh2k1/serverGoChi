@@ -28,3 +28,14 @@ func (c *Client) CreateUserNeMapping(cliUserMapping *db_models.CliUserNeMapping)
 	}
 	return nil
 }
+
+func (c *Client) DeleteUserNeMapping(cliUserMapping *db_models.CliUserNeMapping) error {
+	tx := c.Db.Delete(cliUserMapping)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	if tx.Error != nil {
+		return tx.Error
+	}
+	return nil
+}

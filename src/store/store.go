@@ -54,4 +54,5 @@ type DatabaseStore interface {
 	AddRole(*db_models.CliRoleUserMapping) error
 	DeleteRole(*db_models.CliRoleUserMapping) error
 	CreateUserNeMapping(*db_models.CliUserNeMapping) error
+	DeleteUserNeMapping(*db_models.CliUserNeMapping) error
 }
