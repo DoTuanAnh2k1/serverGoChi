@@ -85,6 +85,7 @@ func init() {
 			r.Use(middleware.CheckRole)
 
 			r.Get("/ne", list.HandlerListNe)
+			r.Get("/ne/monitor", list.HandlerListNeMonitor)
 		})
 	})
 }

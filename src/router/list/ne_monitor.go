@@ -6,10 +6,11 @@ import (
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/service/authenticate"
+	"serverGoChi/src/service/list"
 	"serverGoChi/src/service/user"
 )
 
-func HandlerListNe(w http.ResponseWriter, r *http.Request) {
+func HandlerListNeMonitor(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		log.Logger.Error("Method not allowed")
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -38,36 +39,31 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var neResp NeResponse
-	var neDataList []NeData
-	for _, cliNe := range cliNeList {
-		neDataList = append(neDataList, NeData{
-			Site:        cliNe.SiteName,
-			Ne:          cliNe.Name,
-			Ip:          cliNe.IPAddress,
-			Description: cliNe.Description,
-			Namespace:   cliNe.Namespace,
-			Port:        cliNe.Port,
-			UrlList:     nil, // Need table tbl_ne to get this list
-		})
-	}
-
-	if len(neDataList) == 0 {
-		neResp.Code = "400"
-		neResp.Status = "Fail"
-		neResp.Message = "cannot find any ne belongs to the user"
-
-		log.Logger.Info("cannot find any ne belongs to the user")
-		response.Write(w, http.StatusNotFound, neResp)
+	if len(cliNeList) == 0 {
+		log.Logger.Info("Cli Ne List is empty")
+		response.Write(w, http.StatusNotFound, "Cli Ne List is empty")
 		return
 	}
 
-	neResp.Code = "200"
-	neResp.Status = "Found"
-	neResp.Message = "Success"
-	neResp.NeDataList = neDataList
+	var neMonitorInfoList []NeMonitorInfo
+	for _, cliNe := range cliNeList {
+		neMonitor, err := list.GetNeMonitorById(cliNe.ID)
+		if err != nil || neMonitor == nil {
+			log.Logger.Error("Ne Monitor is null")
+			continue
+		}
+		neMonitorInfoList = append(neMonitorInfoList, NeMonitorInfo{
+			Site:         cliNe.SiteName,
+			Ne:           cliNe.Name,
+			Ip:           cliNe.IPAddress,
+			Description:  cliNe.Description,
+			Namespace:    cliNe.Namespace,
+			Port:         cliNe.Port,
+			NeMonitorURL: neMonitor.NeIP,
+		})
+	}
 
-	log.Logger.Info("Success")
-	response.Write(w, http.StatusFound, neResp)
+	log.Logger.Info("End of handler request list ne monitor")
+	response.Write(w, http.StatusOK, "Success")
 	return
 }
