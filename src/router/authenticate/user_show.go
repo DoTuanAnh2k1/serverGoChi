@@ -3,7 +3,6 @@ package authenticate
 import (
 	"fmt"
 	"net/http"
-	"regexp"
 	"serverGoChi/models/db_models"
 	"serverGoChi/src/log"
 	"serverGoChi/src/router/middleware"
@@ -53,21 +52,8 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 		response.NotFound(w, "Empty List of Users")
 	}
 
-	timePattern := "^[0-9]*$"
-	pattern, err := regexp.Compile(timePattern)
-	if err != nil {
-		log.Logger.Error("Cant compile regex: ", err)
-		response.Write(w, http.StatusInternalServerError, "Cant compile regex")
-		return
-	}
-
 	var userShowAuthenticateRespList []UserShowAuthenticateResp
 	for _, userElement := range userList {
-		isMatches := pattern.MatchString(userElement.AccountName)
-		if !isMatches || userElement.IsEnable {
-			continue
-		}
-
 		tblId, err := authenticate.GetTblIdByUserId(userElement.AccountID)
 		if err != nil {
 			log.Logger.Error("Cant get tblId by user id: ", err)

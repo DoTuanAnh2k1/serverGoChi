@@ -67,7 +67,7 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = user.GetUserByUserName(neSetReq.Username)
+	tblAccount, err := user.GetUserByUserName(neSetReq.Username)
 	if err != nil {
 		logOperationHistory.ExecutedTime = time.Now()
 		logOperationHistory.Result = "failure"
@@ -81,7 +81,7 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = authorize.GetNeByNeId(neId)
+	cliNe, err := authorize.GetNeByNeId(neId)
 	if err != nil {
 		logOperationHistory.ExecutedTime = time.Now()
 		logOperationHistory.Result = "failure"
@@ -92,6 +92,18 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 
 		log.Logger.Info("Cannot get ne by ne id from db: ", err)
 		response.Write(w, http.StatusInternalServerError, "Cannot get ne by ne id from db")
+		return
+	}
+
+	if tblAccount == nil || cliNe == nil {
+		log.Logger.Info("User or Ne Not Found")
+		logOperationHistory.ExecutedTime = time.Now()
+		logOperationHistory.Result = "failure"
+		err = history_command.SaveHistoryCommand(logOperationHistory)
+		if err != nil {
+			log.Logger.Error("Cant save command to db: ", err)
+		}
+		response.NotFound(w, "User or Ne Not Found")
 		return
 	}
 
