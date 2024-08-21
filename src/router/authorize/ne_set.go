@@ -96,8 +96,3 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 }
-
-type NeSetReq struct {
-	Username string `json:"username"`
-	NeId     string `json:"neid"`
-}

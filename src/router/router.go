@@ -73,6 +73,7 @@ func init() {
 
 				subRouter.Post("/set", authorize.HandlerUserSet)
 				subRouter.Post("/delete", authorize.HandlerUserDelete)
+				subRouter.Get("/show", authorize.HandlerUserShow)
 			})
 		})
 	})

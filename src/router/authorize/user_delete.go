@@ -128,8 +128,3 @@ func HandlerUserDelete(w http.ResponseWriter, r *http.Request) {
 	response.NotFound(w, "Cannot find permission of user")
 	return
 }
-
-type UserDeleteReq struct {
-	Username   string `json:"username"`
-	Permission string `json:"permission"`
-}

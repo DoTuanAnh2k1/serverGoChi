@@ -127,8 +127,3 @@ func HandlerUserSet(w http.ResponseWriter, r *http.Request) {
 		log.Logger.Error("Cannot save command to db: ", err)
 	}
 }
-
-type UserSetReq struct {
-	Username   string `json:"username"`
-	Permission string `json:"permission"`
-}

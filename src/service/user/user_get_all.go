@@ -10,7 +10,7 @@ func GetAllUser() ([]*db_models.TblAccount, error) {
 	sto := store.GetSingleton()
 	userList, err := sto.GetAllUser()
 	if err != nil {
-		log.Logger.Error("Failed to get user")
+		log.Logger.Error("Failed to get all user")
 		return nil, err
 	}
 	return userList, nil
