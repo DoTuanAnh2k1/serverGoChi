@@ -7,6 +7,11 @@ type (
 		NeId     string `json:"neid"`
 	}
 
+	NeDeleteReq struct {
+		Username string `json:"username"`
+		NeId     string `json:"neid"`
+	}
+
 	UserDeleteReq struct {
 		Username   string `json:"username"`
 		Permission string `json:"permission"`
@@ -15,6 +20,12 @@ type (
 	UserSetReq struct {
 		Username   string `json:"username"`
 		Permission string `json:"permission"`
+	}
+
+	AuthorizeReq struct {
+		Ne         string `json:"ne"`
+		Site       string `json:"site"`
+		SystemType string `json:"system_type"`
 	}
 )
 
@@ -32,5 +43,25 @@ type (
 		Port        int32  `json:"port"`
 		Description string `json:"description"`
 		Id          int64  `json:"id"`
+	}
+
+	AuthorizeResp struct {
+		Status           string         `json:"status"`
+		ResponseCode     string         `json:"response_code"`
+		ResponseDataList []ResponseData `json:"responseDataList"`
+	}
+)
+
+// Sub Struct
+type (
+	ResponseData struct {
+		Command string `json:"command"`
+	}
+
+	FiveGResponseData struct {
+		fiveGObject FiveGObject `json:"params"`
+	}
+
+	FiveGObject struct {
 	}
 )
