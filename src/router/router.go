@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"serverGoChi/src/router/authenticate"
 	"serverGoChi/src/router/authorize"
+	"serverGoChi/src/router/list"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/server"
@@ -77,6 +78,13 @@ func init() {
 				subRouter.Post("/delete", authorize.HandlerUserDelete)
 				subRouter.Get("/show", authorize.HandlerUserShow)
 			})
+		})
+
+		router.Route("/list", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Use(middleware.CheckRole)
+
+			r.Get("/ne", list.HandlerListNe)
 		})
 	})
 }
