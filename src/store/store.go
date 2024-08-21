@@ -53,4 +53,5 @@ type DatabaseStore interface {
 	GetCliNeByNeId(int64) (*db_models.CliNe, error)
 	AddRole(*db_models.CliRoleUserMapping) error
 	DeleteRole(*db_models.CliRoleUserMapping) error
+	CreateUserNeMapping(*db_models.CliUserNeMapping) error
 }

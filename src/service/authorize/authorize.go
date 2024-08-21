@@ -88,3 +88,13 @@ func DeleteUserRole(role *db_models.CliRoleUserMapping) error {
 	}
 	return nil
 }
+
+func AddUserCliNe(cliUserNe *db_models.CliUserNeMapping) error {
+	sto := store.GetSingleton()
+	err := sto.CreateUserNeMapping(cliUserNe)
+	if err != nil {
+		log.Logger.Error("Cannot Add Cli Ne to User: ", err)
+		return err
+	}
+	return nil
+}

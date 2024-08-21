@@ -8,6 +8,7 @@ import (
 	"serverGoChi/src/log"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
+	"serverGoChi/src/service/authenticate"
 	"serverGoChi/src/service/authorize"
 	"serverGoChi/src/service/history_command"
 	"serverGoChi/src/service/user"
@@ -107,4 +108,50 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	neList, err := authenticate.GetNeListById(tblAccount.AccountID)
+	if err != nil {
+		log.Logger.Error("Cannot get ne list")
+	}
+
+	for _, ne := range neList {
+		if ne.ID == neId {
+			logOperationHistory.ExecutedTime = time.Now()
+			logOperationHistory.Result = "failure"
+			err = history_command.SaveHistoryCommand(logOperationHistory)
+			if err != nil {
+				log.Logger.Error("Cant save command to db: ", err)
+			}
+
+			log.Logger.Info("NeId already Assigned")
+			response.Write(w, http.StatusNotModified, "NeId already Assigned")
+			return
+		}
+	}
+
+	err = authorize.AddUserCliNe(&db_models.CliUserNeMapping{
+		UserID:  tblAccount.AccountID,
+		TblNeID: neId,
+	})
+	if err != nil {
+		logOperationHistory.ExecutedTime = time.Now()
+		logOperationHistory.Result = "failure"
+		err = history_command.SaveHistoryCommand(logOperationHistory)
+		if err != nil {
+			log.Logger.Error("Cant save command to db: ", err)
+		}
+
+		log.Logger.Info("Cannot add cli ne to user: ", err)
+		response.InternalError(w, "Cannot add cli ne to user")
+		return
+	}
+
+	logOperationHistory.ExecutedTime = time.Now()
+	logOperationHistory.Result = "success"
+	err = history_command.SaveHistoryCommand(logOperationHistory)
+	if err != nil {
+		log.Logger.Error("Cant save command to db: ", err)
+	}
+
+	log.Logger.Info("Add cli ne to user")
+	response.Write(w, http.StatusOK, "Add cli ne to user")
 }

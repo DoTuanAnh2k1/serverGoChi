@@ -17,3 +17,14 @@ func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNe
 	}
 	return result, nil
 }
+
+func (c *Client) CreateUserNeMapping(cliUserMapping *db_models.CliUserNeMapping) error {
+	tx := c.Db.Create(cliUserMapping)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	if tx.Error != nil {
+		return tx.Error
+	}
+	return nil
+}
