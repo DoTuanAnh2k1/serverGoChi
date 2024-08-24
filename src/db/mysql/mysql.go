@@ -25,6 +25,13 @@ func GetInstance() *Client {
 
 func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	var err error
+	//var (
+	//	DbUsername = "ems"
+	//	DbPassword = "Ems@2021"
+	//	DbHost     = "127.0.0.1"
+	//	DbPort     = cfg.Db.Mysql.Port
+	//	DbName     = "ems"
+	//)
 	var (
 		DbUsername = cfg.Mysql.User
 		DbPassword = cfg.Mysql.Password
@@ -32,7 +39,7 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 		DbPort     = cfg.Mysql.Port
 		DbName     = cfg.Mysql.Name
 	)
-	
+
 	dsn := DbUsername + ":" + DbPassword + "@tcp" + "(" + DbHost + ":" + DbPort + ")/" + DbName + "?" + "parseTime=true&loc=Local"
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
 	if err != nil {

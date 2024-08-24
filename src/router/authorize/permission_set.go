@@ -20,7 +20,7 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var cliRole db_models.CliRole
+	var cliRole *db_models.CliRole
 	err := json.NewDecoder(r.Body).Decode(&cliRole)
 	if err != nil {
 		logger.Logger.Error("Error parsing JSON request body: ", err)
@@ -65,18 +65,25 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 
 		response.Write(w, http.StatusNotModified, "")
 	} else {
+		err = authorize.CreateCliRole(cliRole)
+		if err != nil {
+			loggerOperationHistory.ExecutedTime = time.Now()
+			loggerOperationHistory.Result = "failure"
+			err := history_command.SaveHistoryCommand(loggerOperationHistory)
+			if err != nil {
+				logger.Logger.Error("Cant save command to db: ", err)
+			}
+
+			logger.Logger.Error("Error create cli role: ", err)
+			response.Write(w, http.StatusInternalServerError, "Error create cli role")
+			return
+		}
+
 		loggerOperationHistory.ExecutedTime = time.Now()
 		loggerOperationHistory.Result = "success"
 		err := history_command.SaveHistoryCommand(loggerOperationHistory)
 		if err != nil {
 			logger.Logger.Error("Cant save command to db: ", err)
-		}
-
-		err = authorize.CreateCliRole(cliRole)
-		if err != nil {
-			logger.Logger.Error("Error create cli role: ", err)
-			response.Write(w, http.StatusInternalServerError, "Error create cli role")
-			return
 		}
 		response.Created(w)
 	}

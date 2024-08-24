@@ -6,7 +6,7 @@ import (
 	"serverGoChi/models/db_models"
 )
 
-func (c *Client) GetCliRole(cliRole db_models.CliRole) (*db_models.CliRole, error) {
+func (c *Client) GetCliRole(cliRole *db_models.CliRole) (*db_models.CliRole, error) {
 	cond := &cliRole
 	result := &db_models.CliRole{}
 	tx := c.Db.First(result, cond)
@@ -22,9 +22,8 @@ func (c *Client) GetCliRole(cliRole db_models.CliRole) (*db_models.CliRole, erro
 	return result, nil
 }
 
-func (c *Client) CreateCliRole(cliRole db_models.CliRole) error {
-	cond := &cliRole
-	tx := c.Db.Create(cond)
+func (c *Client) CreateCliRole(cliRole *db_models.CliRole) error {
+	tx := c.Db.Create(&cliRole)
 	if tx == nil {
 		return errors.New("no database connection")
 	}
@@ -34,9 +33,8 @@ func (c *Client) CreateCliRole(cliRole db_models.CliRole) error {
 	return nil
 }
 
-func (c *Client) DeleteCliRole(cliRole db_models.CliRole) error {
-	cond := &cliRole
-	tx := c.Db.Delete(cond)
+func (c *Client) DeleteCliRole(cliRole *db_models.CliRole) error {
+	tx := c.Db.Delete(cliRole)
 	if tx == nil {
 		return errors.New("no database connection")
 	}

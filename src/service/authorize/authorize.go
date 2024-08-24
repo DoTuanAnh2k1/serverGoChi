@@ -16,20 +16,20 @@ func GetUserByName(name string) (*db_models.TblAccount, error) {
 	return user, nil
 }
 
-func IsExistCliRole(cliRole db_models.CliRole) (bool, error) {
+func IsExistCliRole(cliRole *db_models.CliRole) (bool, error) {
 	sto := store.GetSingleton()
 	cliRoleNew, err := sto.GetCliRole(cliRole)
 	if err != nil {
 		logger.Logger.Error("Cannot get user: ", err)
 		return false, err
 	}
-	if cliRoleNew == nil {
+	if cliRoleNew != nil {
 		return true, nil
 	}
 	return false, nil
 }
 
-func CreateCliRole(cliRole db_models.CliRole) error {
+func CreateCliRole(cliRole *db_models.CliRole) error {
 	sto := store.GetSingleton()
 	err := sto.CreateCliRole(cliRole)
 	if err != nil {
@@ -39,7 +39,7 @@ func CreateCliRole(cliRole db_models.CliRole) error {
 	return nil
 }
 
-func DeleteCliRole(cliRole db_models.CliRole) error {
+func DeleteCliRole(cliRole *db_models.CliRole) error {
 	sto := store.GetSingleton()
 	err := sto.DeleteCliRole(cliRole)
 	if err != nil {
