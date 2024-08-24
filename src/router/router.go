@@ -8,6 +8,7 @@ import (
 	"serverGoChi/src/router/list"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
+	"serverGoChi/src/router/validate"
 	"serverGoChi/src/store"
 
 	"github.com/go-chi/chi"
@@ -42,6 +43,12 @@ func Init() {
 	Router.Get("/favicon.ico", handlerFavIcon)
 
 	Router.Route("/aa", func(router chi.Router) {
+		// api for heath check db
+		router.Get("/heath-check-db", HealthCheck)
+		// api for validate token
+		router.Post("/validate-token", validate.HandlerValidateToken)
+
+		// apis for ssh server call
 		router.Post("/authenticate", authenticate.HandlerAuthenticate)
 		router.Route("/authenticate/user", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
@@ -92,13 +99,13 @@ func Init() {
 }
 
 // HealthCheck Function
-func HealthCheck(w http.ResponseWriter) {
+func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	// Check Database Connections
 	err := store.GetSingleton().Ping()
 
 	if err != nil {
 		response.InternalError(w, err.Error())
 	} else {
-		response.Success(w, "")
+		response.Success(w, "Database still alive")
 	}
 }

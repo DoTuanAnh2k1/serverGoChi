@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"serverGoChi/src/logger"
 	"serverGoChi/src/router/response"
@@ -40,6 +41,12 @@ func Authenticate(next http.Handler) http.Handler {
 		tokenString := authHeaderParts[1]
 		userName, roles, err := token.ParseToken(tokenString)
 		if err != nil {
+			if errors.Is(err, errors.New("invalid token")) {
+				logger.Logger.Info("Token invalid, cause: ", err)
+				response.Unauthorized(w)
+				return
+			}
+
 			logger.Logger.Error("Cannot verify token: ", err)
 			response.InternalError(w, "Cannot verify token")
 			return
