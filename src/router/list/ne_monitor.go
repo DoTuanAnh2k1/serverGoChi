@@ -5,7 +5,7 @@ import (
 	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
-	"serverGoChi/src/service/authenticate"
+	"serverGoChi/src/service/authorize"
 	"serverGoChi/src/service/list"
 	"serverGoChi/src/service/user"
 )
@@ -32,21 +32,27 @@ func HandlerListNeMonitor(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cliNeList, err := authenticate.GetNeListById(tblAccount.AccountID)
+	cliUserNeMappingList, err := authorize.GetAllCliNeOfUserByUserId(tblAccount.AccountID)
 	if err != nil {
-		logger.Logger.Error("Cannot list cli ne from db: ", err)
-		response.InternalError(w, "Cannot list cli ne from db")
+		logger.Logger.Error("Cannot list cli user ne mapping from db: ", err)
+		response.InternalError(w, "Cannot list cli user ne mapping from db")
 		return
 	}
 
-	if len(cliNeList) == 0 {
+	if len(cliUserNeMappingList) == 0 {
 		logger.Logger.Info("Cli Ne List is empty")
 		response.Write(w, http.StatusNotFound, "Cli Ne List is empty")
 		return
 	}
 
 	var neMonitorInfoList []NeMonitorInfo
-	for _, cliNe := range cliNeList {
+	for _, cliUserNeMapping := range cliUserNeMappingList {
+		cliNe, err := authorize.GetNeByNeId(cliUserNeMapping.TblNeID)
+		if err != nil {
+			logger.Logger.Error("Cannot list cli ne from db: ", err)
+			response.InternalError(w, "Cannot list cli ne from db")
+			return
+		}
 		neMonitor, err := list.GetNeMonitorById(cliNe.ID)
 		if err != nil || neMonitor == nil {
 			logger.Logger.Error("Ne Monitor is null")
@@ -64,6 +70,6 @@ func HandlerListNeMonitor(w http.ResponseWriter, r *http.Request) {
 	}
 
 	logger.Logger.Info("End of handler request list ne monitor")
-	response.Write(w, http.StatusOK, "Success")
+	response.Write(w, http.StatusOK, neMonitorInfoList)
 	return
 }

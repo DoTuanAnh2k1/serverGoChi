@@ -5,7 +5,7 @@ import (
 	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
-	"serverGoChi/src/service/authenticate"
+	"serverGoChi/src/service/authorize"
 	"serverGoChi/src/service/user"
 )
 
@@ -31,16 +31,22 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cliNeList, err := authenticate.GetNeListById(tblAccount.AccountID)
+	cliUserNeMappingList, err := authorize.GetAllCliNeOfUserByUserId(tblAccount.AccountID)
 	if err != nil {
-		logger.Logger.Error("Cannot list cli ne from db: ", err)
-		response.InternalError(w, "Cannot list cli ne from db")
+		logger.Logger.Error("Cannot list cli user ne mapping from db: ", err)
+		response.InternalError(w, "Cannot list cli user ne mapping from db")
 		return
 	}
 
 	var neResp NeResponse
 	var neDataList []NeData
-	for _, cliNe := range cliNeList {
+	for _, cliUserNeMapping := range cliUserNeMappingList {
+		cliNe, err := authorize.GetNeByNeId(cliUserNeMapping.TblNeID)
+		if err != nil {
+			logger.Logger.Error("Cannot list cli ne from db: ", err)
+			response.InternalError(w, "Cannot list cli ne from db")
+			return
+		}
 		neDataList = append(neDataList, NeData{
 			Site:        cliNe.SiteName,
 			Ne:          cliNe.Name,
