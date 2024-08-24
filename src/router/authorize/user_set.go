@@ -43,8 +43,8 @@ func HandlerUserSet(w http.ResponseWriter, r *http.Request) {
 		Account:     userMiddleware.Username,
 	}
 
-	logger.Logger.Info("Handler User Set with username: ", userMiddleware.Username)
-	u, err := user.GetUserByUserName(userMiddleware.Username)
+	logger.Logger.Info("Handler User Set with username: ", userSetReq.Username)
+	u, err := user.GetUserByUserName(userSetReq.Username)
 	if err != nil {
 		loggerOperationHistory.ExecutedTime = time.Now()
 		loggerOperationHistory.Result = "failure"

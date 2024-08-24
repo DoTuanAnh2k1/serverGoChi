@@ -43,8 +43,8 @@ func HandlerUserDelete(w http.ResponseWriter, r *http.Request) {
 		Account:     userMiddleware.Username,
 	}
 
-	logger.Logger.Info("Handler User Delete with username: ", userMiddleware.Username)
-	u, err := user.GetUserByUserName(userMiddleware.Username)
+	logger.Logger.Info("Handler User Delete with username: ", userDeleteReq.Username)
+	u, err := user.GetUserByUserName(userDeleteReq.Username)
 	if err != nil {
 		loggerOperationHistory.ExecutedTime = time.Now()
 		loggerOperationHistory.Result = "failure"
