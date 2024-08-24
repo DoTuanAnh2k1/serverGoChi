@@ -8,7 +8,6 @@ import (
 	"serverGoChi/src/logger"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
-	"serverGoChi/src/service/authenticate"
 	"serverGoChi/src/service/authorize"
 	"serverGoChi/src/service/history_command"
 	"serverGoChi/src/service/user"
@@ -108,13 +107,13 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	neList, err := authenticate.GetNeListById(tblAccount.AccountID)
+	neList, err := authorize.GetAllCliNeOfUserByUserId(tblAccount.AccountID)
 	if err != nil {
 		logger.Logger.Error("Cannot get ne list")
 	}
 
 	for _, ne := range neList {
-		if ne.ID == neId {
+		if ne.TblNeID == neId {
 			loggerOperationHistory.ExecutedTime = time.Now()
 			loggerOperationHistory.Result = "failure"
 			err = history_command.SaveHistoryCommand(loggerOperationHistory)

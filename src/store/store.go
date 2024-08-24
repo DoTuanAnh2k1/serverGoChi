@@ -57,4 +57,5 @@ type DatabaseStore interface {
 	CreateUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteUserNeMapping(*db_models.CliUserNeMapping) error
 	GetNeMonitorById(int64) (*db_models.CliNeMonitor, error)
+	GetAllNeOfUserByUserId(int64) ([]*db_models.CliUserNeMapping, error)
 }

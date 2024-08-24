@@ -39,3 +39,16 @@ func (c *Client) DeleteUserNeMapping(cliUserMapping *db_models.CliUserNeMapping)
 	}
 	return nil
 }
+
+func (c *Client) GetAllNeOfUserByUserId(userId int64) ([]*db_models.CliUserNeMapping, error) {
+	cond := &db_models.CliUserNeMapping{UserID: userId}
+	var result []*db_models.CliUserNeMapping
+	tx := c.Db.Find(&result, cond)
+	if tx == nil {
+		return nil, errors.New("no database connection")
+	}
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return result, nil
+}

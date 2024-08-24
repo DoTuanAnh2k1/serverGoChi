@@ -25,3 +25,13 @@ func GetNeByNeId(id int64) (*db_models.CliNe, error) {
 	}
 	return cliNe, nil
 }
+
+func GetAllCliNeOfUserByUserId(id int64) ([]*db_models.CliUserNeMapping, error) {
+	sto := store.GetSingleton()
+	cliNeList, err := sto.GetAllNeOfUserByUserId(id)
+	if err != nil {
+		logger.Logger.Error("Cant get cli ne, err: ", err)
+		return nil, err
+	}
+	return cliNeList, nil
+}
