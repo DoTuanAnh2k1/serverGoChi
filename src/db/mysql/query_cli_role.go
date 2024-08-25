@@ -34,7 +34,7 @@ func (c *Client) CreateCliRole(cliRole *db_models.CliRole) error {
 }
 
 func (c *Client) DeleteCliRole(cliRole *db_models.CliRole) error {
-	tx := c.Db.Delete(cliRole)
+	tx := c.Db.Delete(cliRole, cliRole.RoleID)
 	if tx == nil {
 		return errors.New("no database connection")
 	}

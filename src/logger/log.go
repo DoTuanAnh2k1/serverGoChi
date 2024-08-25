@@ -1,10 +1,10 @@
 package logger
 
 import (
+	"fmt"
 	"os"
 	"serverGoChi/config"
 	"strings"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -28,15 +28,20 @@ const (
 
 func Init() {
 	logCfg := config.GetLogConfig()
-	// Initialize Log as New Logrus Logger
-	Logger = logrus.New()
 
-	// Set Log Format to JSON Format
-	Logger.SetFormatter(&logrus.JSONFormatter{
-		DisableTimestamp: false,
-		TimestampFormat:  time.RFC3339Nano,
-	})
+	Logger = &logrus.Logger{
+		Out:   os.Stderr,
+		Level: logrus.DebugLevel,
+		Formatter: &myFormatter{logrus.TextFormatter{
+			FullTimestamp:          true,
+			TimestampFormat:        "2006-01-02 15:04:05",
+			ForceColors:            true,
+			DisableLevelTruncation: true,
+		},
+		},
+	}
 
+	Logger.SetReportCaller(true)
 	// Set Log Output to STDOUT
 	Logger.SetOutput(os.Stdout)
 
@@ -105,4 +110,40 @@ func Println(level logLevel, label string, message interface{}) {
 			}).Infoln(message)
 		}
 	}
+}
+
+type myFormatter struct {
+	logrus.TextFormatter
+}
+
+func (f *myFormatter) Format(entry *logrus.Entry) ([]byte, error) {
+	// this whole mess of dealing with ansi color codes is required if you want the colored output otherwise you will lose colors in the log levels
+	var levelColor int
+	switch entry.Level {
+	case logrus.DebugLevel, logrus.TraceLevel:
+		levelColor = 31 // gray
+	case logrus.WarnLevel:
+		levelColor = 33 // yellow
+	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
+		levelColor = 31 // red
+	default:
+		levelColor = 36 // blue
+	}
+	fileName := ""
+	line := 0
+	if entry.HasCaller() {
+		strList := strings.Split(entry.Caller.File, "/")
+		if len(strList) > 0 {
+			fileName = strList[len(strList)-1]
+		}
+		line = entry.Caller.Line
+	}
+	file := fmt.Sprintf("%s:%d", fileName, line)
+
+	return []byte(fmt.Sprintf("[%s][\x1b[%dm%-.4s\x1b[0m][%-30v]  %s\n", 
+	entry.Time.Format(f.TimestampFormat), 
+	levelColor, 
+	strings.ToUpper(entry.Level.String()), 
+	file, 
+	entry.Message)), nil
 }
