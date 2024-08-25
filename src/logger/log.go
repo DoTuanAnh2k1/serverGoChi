@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"serverGoChi/config"
@@ -10,7 +11,10 @@ import (
 )
 
 // Log Variable
-var Logger *logrus.Logger
+var (
+	Logger   *logrus.Logger
+	DbLogger *logrus.Logger
+)
 
 // Log Level Data Type
 type logLevel string
@@ -44,23 +48,28 @@ func Init() {
 	Logger.SetReportCaller(true)
 	// Set Log Output to STDOUT
 	Logger.SetOutput(os.Stdout)
-
+	DbLogger = Logger
 	// Set Log Level
-	switch strings.ToLower(logCfg.Level) {
+	setLogLevel(Logger, logCfg.Level)
+	setLogLevel(DbLogger, logCfg.DbLevel)
+}
+
+func setLogLevel(logger *logrus.Logger, level string) {
+	switch strings.ToLower(level) {
 	case "panic":
-		Logger.SetLevel(logrus.PanicLevel)
+		logger.SetLevel(logrus.PanicLevel)
 	case "fatal":
-		Logger.SetLevel(logrus.FatalLevel)
+		logger.SetLevel(logrus.FatalLevel)
 	case "error":
-		Logger.SetLevel(logrus.ErrorLevel)
+		logger.SetLevel(logrus.ErrorLevel)
 	case "warn":
-		Logger.SetLevel(logrus.WarnLevel)
+		logger.SetLevel(logrus.WarnLevel)
 	case "debug":
-		Logger.SetLevel(logrus.DebugLevel)
+		logger.SetLevel(logrus.DebugLevel)
 	case "trace":
 		Logger.SetLevel(logrus.TraceLevel)
 	default:
-		Logger.SetLevel(logrus.InfoLevel)
+		logger.SetLevel(logrus.InfoLevel)
 	}
 }
 
@@ -120,8 +129,10 @@ func (f *myFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 	// this whole mess of dealing with ansi color codes is required if you want the colored output otherwise you will lose colors in the log levels
 	var levelColor int
 	switch entry.Level {
-	case logrus.DebugLevel, logrus.TraceLevel:
-		levelColor = 31 // gray
+	case logrus.TraceLevel:
+		levelColor = 90 // blue
+	case logrus.DebugLevel:
+		levelColor = 97 // gray
 	case logrus.WarnLevel:
 		levelColor = 33 // yellow
 	case logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel:
@@ -139,11 +150,23 @@ func (f *myFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		line = entry.Caller.Line
 	}
 	file := fmt.Sprintf("%s:%d", fileName, line)
+	tag := ""
+	t, ok := entry.Data["TAG"]
+	if ok {
+		tag, ok = t.(string)
+		if ok {
+			tag = fmt.Sprintf("[\x1b[%dm%-.4s\x1b[0m] ", 33, tag)
+		}
+	}
+	buff := bytes.NewBuffer([]byte{})
+	buff.WriteString("[")
+	buff.WriteString(entry.Time.Format(f.TimestampFormat))
+	buff.WriteString("]")
+	buff.WriteString(fmt.Sprintf("[\x1b[%dm%-.4s\x1b[0m]", levelColor, strings.ToUpper(entry.Level.String())))
+	buff.WriteString(fmt.Sprintf("[%-30s]", file))
 
-	return []byte(fmt.Sprintf("[%s][\x1b[%dm%-.4s\x1b[0m][%-30v]  %s\n", 
-	entry.Time.Format(f.TimestampFormat), 
-	levelColor, 
-	strings.ToUpper(entry.Level.String()), 
-	file, 
-	entry.Message)), nil
+	buff.WriteString(fmt.Sprintf("%-5s", tag))
+
+	buff.WriteString(fmt.Sprintf(" %s\n", entry.Message))
+	return buff.Bytes(), nil
 }

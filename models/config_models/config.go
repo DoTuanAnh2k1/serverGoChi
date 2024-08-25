@@ -22,7 +22,8 @@ type RouterConfig struct {
 }
 
 type LogConfig struct {
-	Level string
+	Level   string
+	DbLevel string
 }
 
 type DatabaseConfig struct {

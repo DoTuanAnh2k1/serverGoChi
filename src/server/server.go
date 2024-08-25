@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"serverGoChi/config"
 	"serverGoChi/models/config_models"
+	"serverGoChi/src/logger"
 	"sync"
 	"time"
 )
@@ -46,7 +47,7 @@ func (s *Server) Start() {
 	// Start The Server
 
 	go func() {
-		log.Printf("Starting server at %s:%s ...", s.cfg.Host, s.cfg.Port)
+		logger.Logger.Infof("Starting server at %s:%s ...", s.cfg.Host, s.cfg.Port)
 		s.srv.ListenAndServe()
 
 		s.wg.Done()

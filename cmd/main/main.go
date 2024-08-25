@@ -57,11 +57,11 @@ func Initialize() *server.Server {
 			},
 		},
 		Log: config_models.LogConfig{
-			Level: os.Getenv("LOG_LEVEL"),
+			Level:   os.Getenv("LOG_LEVEL"),
+			DbLevel: os.Getenv("DB_LOG_LEVEL"),
 		},
 	}
 	config.Init(cfg)
-	fmt.Println("Starting", *cfg)
 	logger.Init()
 
 	router.Init()

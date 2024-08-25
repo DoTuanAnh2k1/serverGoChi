@@ -39,15 +39,19 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 		DbPort     = cfg.Mysql.Port
 		DbName     = cfg.Mysql.Name
 	)
-
+	gormLogger := logger.NewGormLogger()
+	gormLogger.LogMode(1)
 	dsn := DbUsername + ":" + DbPassword + "@tcp" + "(" + DbHost + ":" + DbPort + ")/" + DbName + "?" + "parseTime=true&loc=Local"
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{})
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{
+		Logger: gormLogger,
+	})
 	if err != nil {
 		logger.Logger.Debugf("Error connecting to database : error=%v", err)
 		return err
 	}
 	logger.Logger.Info("Connect to database: ", dsn)
 	c.Db = db
+
 	return nil
 }
 
