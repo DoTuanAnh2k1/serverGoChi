@@ -21,7 +21,7 @@ func CreateToken(username string, roles string) (string, error) {
 	})
 
 	// Print information about the created token
-	logger.Logger.Info("Token claims added: %+v\n", claims)
+	logger.Logger.Infof("Token claims added: %+v\n", claims)
 
 	tokenString, err := claims.SignedString(secretKey)
 	if err != nil {

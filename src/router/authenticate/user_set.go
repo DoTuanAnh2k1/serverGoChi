@@ -88,8 +88,8 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		userInfo.LoginFailureCount = 0
 		err := user.UpdateUser(u)
 		if err != nil {
-			logger.Logger.Error("Cant create user to db: ", err)
-			response.Write(w, http.StatusInternalServerError, "Cant get user by username from db")
+			logger.Logger.Error("Cannot create user: ", err)
+			response.Write(w, http.StatusInternalServerError, "Cannot create user")
 			return
 		}
 

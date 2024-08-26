@@ -5,6 +5,7 @@ import (
 	"serverGoChi/config"
 	"serverGoChi/src/router/authenticate"
 	"serverGoChi/src/router/authorize"
+	"serverGoChi/src/router/change_password"
 	"serverGoChi/src/router/list"
 	"serverGoChi/src/router/middleware"
 	"serverGoChi/src/router/response"
@@ -48,6 +49,13 @@ func Init() {
 		// api for validate token
 		router.Post("/validate-token", validate.HandlerValidateToken)
 
+		// api for change password
+		router.Route("/change-password", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Use(middleware.CheckRole)
+			r.Post("/", change_password.HandlerChangePassword)
+		})
+
 		// apis for ssh server call
 		router.Post("/authenticate", authenticate.HandlerAuthenticate)
 		router.Route("/authenticate/user", func(r chi.Router) {
@@ -60,28 +68,22 @@ func Init() {
 		})
 
 		router.Route("/authorize", func(r chi.Router) {
-			r.Route("/permission", func(subRouter chi.Router) {
-				subRouter.Use(middleware.Authenticate)
-				subRouter.Use(middleware.CheckRole)
+			r.Use(middleware.Authenticate)
+			r.Use(middleware.CheckRole)
 
+			r.Route("/permission", func(subRouter chi.Router) {
 				subRouter.Post("/set", authorize.HandlerPermissionSet)
 				subRouter.Post("/delete", authorize.HandlerPermissionDelete)
 				subRouter.Get("/show", authorize.HandlerPermissionShow)
 			})
 
 			r.Route("/ne", func(subRouter chi.Router) {
-				subRouter.Use(middleware.Authenticate)
-				subRouter.Use(middleware.CheckRole)
-
 				subRouter.Post("/delete", authorize.HandlerNeDelete)
 				subRouter.Post("/set", authorize.HandlerNeSet)
 				subRouter.Get("/show", authorize.HandlerNeShow)
 			})
 
 			r.Route("/user", func(subRouter chi.Router) {
-				subRouter.Use(middleware.Authenticate)
-				subRouter.Use(middleware.CheckRole)
-
 				subRouter.Post("/set", authorize.HandlerUserSet)
 				subRouter.Post("/delete", authorize.HandlerUserDelete)
 				subRouter.Get("/show", authorize.HandlerUserShow)

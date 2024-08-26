@@ -6,9 +6,7 @@ import (
 	"serverGoChi/src/logger"
 	"serverGoChi/src/router/response"
 	"serverGoChi/src/service/authenticate"
-	"serverGoChi/src/utils/request"
 	jsonWebToken "serverGoChi/src/utils/token"
-	"serverGoChi/src/utils/token_request_response"
 )
 
 func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
@@ -18,7 +16,7 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var requestUser request.User
+	var requestUser User
 	err := json.NewDecoder(r.Body).Decode(&requestUser)
 	if err != nil {
 		logger.Logger.Error("Error parsing JSON request body: ", err)
@@ -57,7 +55,7 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tokenReqResp := token_request_response.TokenRequestResponse{
+	tokenReqResp := TokenRequestResponse{
 		Status:       "success",
 		ResponseData: tokenString,
 		ResponseCode: "200",
@@ -66,4 +64,17 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 
 	logger.Logger.Infof("Requese comming from user %v with Ip Address: %v", requestUser.UserName, r.Host)
 	response.Write(w, http.StatusOK, tokenReqResp)
+}
+
+type TokenRequestResponse struct {
+	Status       string `json:"status"`
+	ResponseData string `json:"response_data"`
+	ResponseCode string `json:"response_code"`
+	SystemType   string `json:"system_type"`
+}
+
+// User stand for RequestUser
+type User struct {
+	UserName string `json:"username"`
+	Password string `json:"password"`
 }
