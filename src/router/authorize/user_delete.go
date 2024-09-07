@@ -125,6 +125,6 @@ func HandlerUserDelete(w http.ResponseWriter, r *http.Request) {
 		logger.Logger.Error("Cannot save command to db: ", err)
 	}
 	logger.Logger.Info("Cannot find permission of user")
-	response.NotFound(w, "Cannot find permission of user")
+	response.Write(w, http.StatusNotModified, "Cannot find permission of user")
 	return
 }
