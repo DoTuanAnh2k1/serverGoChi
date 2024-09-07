@@ -60,6 +60,9 @@ func Authenticate(username, password string) (bool, error, int64) {
 		logger.Logger.Error("Cant user by username from database: ", err)
 		return false, err, -1
 	}
+	if user.IsEnable == false {
+		return false, nil, -1
+	}
 	if bcrypt.Matches(username+password, user.Password) {
 		return true, nil, user.AccountID
 	}

@@ -92,7 +92,7 @@ func Init() {
 
 		router.Route("/list", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
-			r.Use(middleware.CheckRole)
+			//r.Use(middleware.CheckRole)
 
 			r.Get("/ne", list.HandlerListNe)
 			r.Get("/ne/monitor", list.HandlerListNeMonitor)

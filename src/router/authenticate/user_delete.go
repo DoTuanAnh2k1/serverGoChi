@@ -52,6 +52,7 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 
 	if u != nil && u.IsEnable == true {
 		u.IsEnable = false
+		u.LockedTime = time.Now()
 		err := user.UpdateUser(u)
 		if err != nil {
 			logger.Logger.Error("Cant update user to db: ", err)
