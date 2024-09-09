@@ -1,0 +1,716 @@
+openapi: 3.0.0
+info:
+  version: '1.0'
+  title: 'Management service'
+  description: |
+    
+
+servers:
+  - url: '{apiRoot}/mgt-svc/v1'
+paths:
+  /user/authen:
+    post:
+      tags:
+        - Authentication
+      operationId: User's authentication
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestUser'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/TokenRequestResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /user:
+    post:
+      tags:
+        - Authentication
+      operationId: Create or Modify User Profile
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/User'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Authentication
+      parameters:
+        - name: user
+          in: query
+          description: Username to get authorize
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/permission:
+    get:
+      tags:
+        - User Authorization
+      operationId: Show list user permission
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /user/permission:
+    get:
+      tags:
+        - User Authorization
+      operationId: Show user permission with id
+      parameters:
+        - name: user_id
+          in: query
+          description: UserId to get authorize
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'       
+    post:
+      tags:
+        - User Authorization
+      operationId: SetUserPermission
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /user/permission/delete:
+    post:
+      tags:
+        - User Authorization
+      operationId: DeleteUserPermission
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /author:
+    post:
+      tags:
+        - Authorize
+      operationId: authorizeToken
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RequestCommands'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/CommandResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  
+  /permission:
+    post:
+      tags:
+        - Permission
+      operationId: Create or update permission
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CliRole'
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Permission
+      operationId: DeletePermissionCliRole
+      parameters:
+        - name: permission_name
+          in: query
+          description: UserId to get authorize
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /user/network-element:
+    post:
+      tags:
+        - Network Element Authorization
+      operationId: Set or update Network Element Authorize for user
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Network Element Authorization
+      operationId: Delete Network Element Authorize for user
+      parameters:
+        - name: user
+          in: query
+          description: User Name to get authorize
+          schema:
+            type: string
+        - name: ne
+          in: query
+          description: Ne Name to get authorize
+          schema:
+            type: string    
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    get:   
+      tags:
+        - Network Element Authorization
+      operationId: Get User's Network Element Authorize
+      parameters:
+        - name: user
+          in: query
+          description: User Name to get authorize
+          schema:
+            type: string
+        - name: ne
+          in: query
+          description: Ne Name to get authorize
+          schema:
+            type: string    
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /user/network-elements/delete:
+    post:
+      tags:
+        - Network Element Authorization
+      operationId: Delete User's list Network Element Authorize 
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/network-element/show:              
+    get:   
+      tags:
+        - Network Element Authorization
+      operationId: Get User Network Element Authorize List
+      parameters:
+        - name: user
+          in: query
+          description: User Name to get authorize
+          schema:
+            type: string
+        - name: ne
+          in: query
+          description: Ne Name to get authorize
+          schema:
+            type: string    
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+                              
+  /network-elements:
+    get:
+      tags:
+        - user-controller
+      operationId: getNe
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/NeResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /network-elements/command-mode:
+    get:
+      tags:
+        - user-controller
+      operationId: getNeMonitor
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: string
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /history:
+    get:
+      tags:
+        - History 
+      operationId: get history by limit and Network Element name
+      parameters:
+        - name: limit
+          in: query
+          required: true
+          schema:
+            type: string
+        - name: ne_name
+          in: query
+          required: true
+          schema:
+            type: string   
+        - name: from
+          in: query
+          required: true
+          schema:
+            type: string 
+        - name: to
+          in: query
+          required: true
+          schema:
+            type: string      
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoginHistory'
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - History
+      operationId: Save history
+      parameters:
+        - name: limit
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LoginHistory'
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+components:
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        status:
+          type: integer
+          format: int32
+        message:
+          type: string
+    RequestCommands:
+      required:
+        - system_type
+      type: object
+      properties:
+        ne:
+          type: string
+        site:
+          type: string
+        system_type:
+          type: string
+    CommandResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        response_code:
+          type: string
+        responseDataList:
+          type: array
+          items:
+            $ref: '#/components/schemas/ResponseData'
+    ResponseData:
+      type: object
+      properties:
+        command:
+          type: string
+    CliRole:
+      type: object
+      properties:
+        roleId:
+          type: integer
+          format: int64
+        scope:
+          type: string
+        includeType:
+          type: string
+        neType:
+          type: string
+        permission:
+          type: string
+        path:
+          type: string
+    RequestUser:
+      type: object
+      properties:
+        username:
+          type: string
+        password:
+          type: string
+    TokenRequestResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        responseData:
+          type: string
+        response_code:
+          type: string
+        system_type:
+          type: string
+    TblNe:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        ip_address:
+          type: string
+        system_type:
+          type: string
+        name:
+          type: string
+        site_name:
+          type: string
+        description:
+          type: string
+        namespace:
+          type: string
+        port:
+          type: integer
+          format: int32
+        neCommand:
+          type: string
+        tblNeSlaves:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: '#/components/schemas/TblNeSlave'
+    TblNeSlave:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        neId:
+          type: integer
+          format: int64
+        ipAdress:
+          type: string
+        port:
+          type: integer
+          format: int32
+        tblNe:
+          $ref: '#/components/schemas/TblNe'
+    User:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        username:
+          type: string
+        password:
+          type: string
+        is_active:
+          type: boolean
+        phone_number:
+          type: string
+        fail_attempt:
+          type: integer
+          format: int32
+        email:
+          type: string
+        created_by:
+          type: string
+        created_date:
+          type: string
+          format: date-time
+        updatedDate:
+          type: string
+          format: date-time
+        updateBy:
+          type: string
+        accountType:
+          type: integer
+          format: int32
+        status:
+          type: integer
+          format: int32
+        tblNes:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: '#/components/schemas/TblNe'
+        userCliRoleMappings:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: '#/components/schemas/UserCliRoleMapping'
+        lockTime:
+          type: string
+          format: date-time
+        userCliRoleMapping:
+          type: string
+    UserCliRoleMapping:
+      type: object
+      properties:
+        userId:
+          type: integer
+          format: int64
+        permission:
+          type: string
+        user:
+          $ref: '#/components/schemas/User'
+        cliRoles:
+          uniqueItems: true
+          type: array
+          items:
+            $ref: '#/components/schemas/CliRole'
+    NeData:
+      type: object
+      properties:
+        site:
+          type: string
+        ne:
+          type: string
+        ip:
+          type: string
+        description:
+          type: string
+        namespace:
+          type: string
+        port:
+          type: integer
+          format: int32
+        urlList:
+          type: array
+          items:
+            $ref: '#/components/schemas/Url'
+    NeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+        code:
+          type: string
+        message:
+          type: string
+        neDataList:
+          type: array
+          items:
+            $ref: '#/components/schemas/NeData'
+    Url:
+      type: object
+      properties:
+        ipAddress:
+          type: string
+        port:
+          type: integer
+          format: int32
+    LoginHistory:
+      type: object
+      properties:
+        username:
+          type: string
+        timeLogin:
+          type: string
+        ip_address:
+          type: string
