@@ -26,8 +26,8 @@ paths:
             '*/*':
               schema:
                 $ref: '#/components/schemas/TokenRequestResponse'
-        '500':
-          description: Internal Server Error
+        '401':
+          description: Unauthorized
           content:
             '*/*':
               schema:
@@ -49,7 +49,25 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Wrong/Missing query/body field
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
@@ -66,30 +84,26 @@ paths:
           schema:
             type: string
       responses:
-        '200':
-          description: OK
+        '204':
+          description: Delete success
+        '400':
+          description: Wrong/Missing query/body field
           content:
-            '*/*':
+            "*/*":
               schema:
-                type: string
-        '500':
-          description: Internal Server Error
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
           content:
-            '*/*':
+            "*/*":
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /users/permission:
-    get:
-      tags:
-        - User Authorization
-      operationId: Show list user permission
-      responses:
-        '200':
-          description: OK
+        '404':
+          description: Not found user or network element
           content:
-            '*/*':
+            "*/*":
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
@@ -102,9 +116,9 @@ paths:
         - User Authorization
       operationId: Show user permission with id
       parameters:
-        - name: user_id
+        - name: user
           in: query
-          description: UserId to get authorize
+          description: username
           schema:
             type: string
       responses:
@@ -113,13 +127,31 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/UserPermission'
+        '400':
+          description: Wrong/Missing query/body field
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ErrorResponse'       
+                $ref: '#/components/schemas/ErrorResponse'    
     post:
       tags:
         - User Authorization
@@ -128,9 +160,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties:
-                type: string
+              $ref: '#/components/schemas/UserPermission'
         required: true
       responses:
         '200':
@@ -138,65 +168,111 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/UserPermission'
+        '400':
+          description: Wrong/Missing query/body field
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /user/permission/delete:
-    post:
+    delete:
       tags:
         - User Authorization
       operationId: DeleteUserPermission
-      requestBody:
-        content:
-          application/json:
-            schema:
-              type: object
-              additionalProperties:
-                type: string
-        required: true
+      parameters:
+        - name: user
+          in: query
+          description: username
+          schema:
+            type: string
+        - name: permission
+          in: query
+          description: permission want to delete
+          schema:
+            type: string    
       responses:
-        '200':
-          description: OK
+        '204':
+          description: Delete Success
+        '400':
+          description: Wrong/Missing query/body field
           content:
-            '*/*':
+            "*/*":
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-
-  /author:
-    post:
+  /users/permission:
+    get:
       tags:
-        - Authorize
-      operationId: authorizeToken
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/RequestCommands'
-        required: true
+        - User Authorization
+      operationId: Get list user permission
       responses:
         '200':
           description: OK
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/CommandResponse'
+                type: array
+                items: 
+                  $ref: '#/components/schemas/UserPermission'
+        '400':
+          description: Wrong/Missing query/body field
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  
   /permission:
     post:
       tags:
@@ -206,7 +282,7 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CliRole'
+              $ref: '#/components/schemas/Permission'
         required: true
       responses:
         '200':
@@ -214,7 +290,25 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/Permission'
+        '400':
+          description: Wrong/Missing query/body field
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
@@ -226,18 +320,32 @@ paths:
         - Permission
       operationId: DeletePermissionCliRole
       parameters:
-        - name: permission_name
+        - name: permission
           in: query
-          description: UserId to get authorize
+          description: Permission name
           schema:
             type: string
       responses:
-        '200':
-          description: OK
+        '204':
+          description: Delete sucess
+        '400':
+          description: Wrong/Missing query/body field
           content:
-            '*/*':
+            "*/*":
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
@@ -253,9 +361,7 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties:
-                type: string
+              $ref: '#/components/schemas/UserAllowedNe'
         required: true
       responses:
         '200':
@@ -263,7 +369,25 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/UserAllowedNe'
+        '400':
+          description: Wrong/Missing query/body field
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
@@ -280,24 +404,39 @@ paths:
           description: User Name to get authorize
           schema:
             type: string
-        - name: ne
+        - name: ne_id
           in: query
-          description: Ne Name to get authorize
+          description: Ne Id want to delete
           schema:
-            type: string    
+            type: number    
       responses:
-        '200':
-          description: OK
+        '204':
+          description: Delete success
+        '400':
+          description: Wrong/Missing query/body field
           content:
-            '*/*':
+            "*/*":
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user or network element
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'                   
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+  /user/network-elements:            
     get:   
       tags:
         - Network Element Authorization
@@ -305,12 +444,7 @@ paths:
       parameters:
         - name: user
           in: query
-          description: User Name to get authorize
-          schema:
-            type: string
-        - name: ne
-          in: query
-          description: Ne Name to get authorize
+          description: User Name to get allowed network elements
           schema:
             type: string    
       responses:
@@ -319,7 +453,25 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/UserAllowedNeList'  
+        '400':
+          description: Wrong/Missing query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
         '500':
           description: Internal Server Error
           content:
@@ -335,9 +487,88 @@ paths:
         content:
           application/json:
             schema:
-              type: object
-              additionalProperties:
-                type: string
+              $ref: '#/components/schemas/UserAllowedNeList'  
+        required: true
+      responses:
+        '200':
+          description: List delete ne success
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/UserAllowedNeList'  
+        '400':
+          description: Wrong/Missing query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+  /users/network-element:              
+    get:   
+      tags:
+        - Network Element Authorization
+      operationId: Get User Network Element Authorize List 
+      responses:
+        '200':
+          description: List ne
+          content:
+            '*/*':
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/UserAllowedNeList'  
+        '400':
+          description: Wrong/Missing query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              
+  /network-element:
+    post:
+      tags:
+        - Network element
+      operationId: Create or Update Network element
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NeData'  
         required: true
       responses:
         '200':
@@ -345,47 +576,151 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Wrong/Missing field body
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
-  /users/network-element/show:              
-    get:   
+    delete:
       tags:
-        - Network Element Authorization
-      operationId: Get User Network Element Authorize List
+        - Network element
+      operationId: Delete Network element
       parameters:
-        - name: user
+        - name: ne_id
           in: query
-          description: User Name to get authorize
+          description: Ne Id want to delete
           schema:
-            type: string
-        - name: ne
+            type: number  
+      responses:
+        '204':
+          description: Delete success
+        '400':
+          description: Wrong/Missing Query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'            
+  /network-element/command-mode:
+    post:
+      tags:
+        - Network element
+      operationId: Create or Update Network element in command mode
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NeCommandData'  
+        required: true
+      responses:
+        '204':
+          description: Delete success
+        '400':
+          description: Wrong/Missing field body
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
+        '500':
+          description: Internal Server Error
+          content:
+            '*/*':
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Network element
+      operationId: Delete Network element in command mode
+      parameters:
+        - name: ne_id
           in: query
-          description: Ne Name to get authorize
+          description: Ne Id want to delete
           schema:
-            type: string    
+            type: number  
       responses:
         '200':
           description: OK
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/ErrorResponse'
+        '400':
+          description: Wrong/Missing Query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-                              
+                $ref: '#/components/schemas/ErrorResponse'              
   /network-elements:
     get:
       tags:
-        - user-controller
+        - Network element
       operationId: getNe
       responses:
         '200':
@@ -394,16 +729,35 @@ paths:
             '*/*':
               schema:
                 $ref: '#/components/schemas/NeResponse'
+        '400':
+          description: Wrong/Missing query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
                 $ref: '#/components/schemas/ErrorResponse'
+                              
   /network-elements/command-mode:
     get:
       tags:
-        - user-controller
+        - Network element
       operationId: getNeMonitor
       responses:
         '200':
@@ -411,7 +765,25 @@ paths:
           content:
             '*/*':
               schema:
-                type: string
+                $ref: '#/components/schemas/NeCommandResponse'
+        '400':
+          description: Wrong/Missing query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
         '500':
           description: Internal Server Error
           content:
@@ -452,13 +824,31 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: '#/components/schemas/LoginHistory'
+                  $ref: '#/components/schemas/LoginHistoryResponse'
+        '400':
+          description: Wrong/Missing Query
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'    
+        '401':
+          description: Unauthorize
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Not found user
+          content:
+            "*/*":
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'        
         '500':
           description: Internal Server Error
           content:
             '*/*':
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: '#/components/schemas/ErrorResponse' 
     post:
       tags:
         - History
@@ -494,49 +884,19 @@ components:
           format: int32
         message:
           type: string
-    RequestCommands:
-      required:
-        - system_type
-      type: object
-      properties:
-        ne:
-          type: string
-        site:
-          type: string
-        system_type:
-          type: string
-    CommandResponse:
-      type: object
-      properties:
-        status:
-          type: string
-        response_code:
-          type: string
-        responseDataList:
-          type: array
-          items:
-            $ref: '#/components/schemas/ResponseData'
-    ResponseData:
-      type: object
-      properties:
-        command:
-          type: string
-    CliRole:
+    Permission:
       type: object
       properties:
         roleId:
           type: integer
           format: int64
-        scope:
-          type: string
-        includeType:
-          type: string
-        neType:
-          type: string
         permission:
           type: string
-        path:
-          type: string
+        priority:
+          type: integer
+          format: int  
+        description:
+          type: string  
     RequestUser:
       type: object
       properties:
@@ -548,57 +908,9 @@ components:
       type: object
       properties:
         status:
+          type: number
+        access_token:
           type: string
-        responseData:
-          type: string
-        response_code:
-          type: string
-        system_type:
-          type: string
-    TblNe:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        ip_address:
-          type: string
-        system_type:
-          type: string
-        name:
-          type: string
-        site_name:
-          type: string
-        description:
-          type: string
-        namespace:
-          type: string
-        port:
-          type: integer
-          format: int32
-        neCommand:
-          type: string
-        tblNeSlaves:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: '#/components/schemas/TblNeSlave'
-    TblNeSlave:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        neId:
-          type: integer
-          format: int64
-        ipAdress:
-          type: string
-        port:
-          type: integer
-          format: int32
-        tblNe:
-          $ref: '#/components/schemas/TblNe'
     User:
       type: object
       properties:
@@ -623,50 +935,11 @@ components:
         created_date:
           type: string
           format: date-time
-        updatedDate:
-          type: string
-          format: date-time
-        updateBy:
-          type: string
-        accountType:
-          type: integer
-          format: int32
-        status:
-          type: integer
-          format: int32
-        tblNes:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: '#/components/schemas/TblNe'
-        userCliRoleMappings:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: '#/components/schemas/UserCliRoleMapping'
-        lockTime:
-          type: string
-          format: date-time
-        userCliRoleMapping:
-          type: string
-    UserCliRoleMapping:
-      type: object
-      properties:
-        userId:
-          type: integer
-          format: int64
-        permission:
-          type: string
-        user:
-          $ref: '#/components/schemas/User'
-        cliRoles:
-          uniqueItems: true
-          type: array
-          items:
-            $ref: '#/components/schemas/CliRole'
     NeData:
       type: object
       properties:
+        ne_id:
+          type: number
         site:
           type: string
         ne:
@@ -680,37 +953,87 @@ components:
         port:
           type: integer
           format: int32
-        urlList:
-          type: array
-          items:
-            $ref: '#/components/schemas/Url'
     NeResponse:
       type: object
       properties:
-        status:
-          type: string
         code:
           type: string
         message:
           type: string
-        neDataList:
+        ne_list:
           type: array
           items:
             $ref: '#/components/schemas/NeData'
-    Url:
+    NeCommandData:
       type: object
       properties:
-        ipAddress:
+        ne_id:
+          type: number
+        ip:
           type: string
         port:
           type: integer
           format: int32
+        base_url:
+          type: string
+    NeCommandResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        ne_command_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/NeCommandData'        
     LoginHistory:
       type: object
       properties:
         username:
           type: string
-        timeLogin:
+        ip:
           type: string
-        ip_address:
+        msg:
           type: string
+        ne_name:
+          type: string  
+        result:
+          type: string  
+    LoginHistoryResponse:
+      type: object
+      properties:
+        limit:
+          type: number
+        from:
+          type: number
+        to:
+          type: number
+        history_list:
+          type: array
+          items:
+            $ref: '#/components/schemas/LoginHistory'     
+    UserPermission:
+      type: object
+      properties:
+        username:
+          type: string
+        permission:
+          type: string
+    UserAllowedNe:
+      type: object
+      properties:
+        username:
+          type: string
+        ne_id:
+          type: integer
+          format: int
+    UserAllowedNeList:
+      type: object
+      properties:
+        username:
+          type: string
+        ne_id:
+          type: array
+          items:
+            type: integer
