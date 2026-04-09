@@ -1,6 +1,6 @@
 module go-aa-server
 
-go 1.21
+go 1.25.3
 
 require (
 	github.com/go-chi/chi v1.5.5
