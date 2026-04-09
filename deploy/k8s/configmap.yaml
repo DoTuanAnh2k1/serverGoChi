@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mgt-service-config
+  namespace: default
+data:
+  SERVER_HOST: "0.0.0.0"
+  SERVER_PORT: "3000"
+  DB_DRIVER: "mysql"
+  MYSQL_HOST: "mysql-service"
+  MYSQL_PORT: "3306"
+  MYSQL_DB_NAME: "cli_db"
+  LOG_LEVEL: "info"
+  DB_LOG_LEVEL: "warn"
+  JWT_EXPIRY_HOURS: "24"
+  CORS_ORIGINS: "*"
+  CORS_METHODS: "GET,POST,DELETE,PUT,OPTIONS"
+  CORS_HEADERS: "Content-Type,Authorization"
+  ROUTER_BASE_PATH: ""
+  # Leader election
+  LEADER_ELECTION_ENABLED: "true"
+  LEASE_LOCK_NAME: "mgt-service-leader"
+  LEASE_LOCK_NAMESPACE: "default"
+  LEASE_DURATION_SECONDS: "15"
+  RENEW_DEADLINE_SECONDS: "10"
+  RETRY_PERIOD_SECONDS: "2"
+  CSV_EXPORT_HOUR: "23"
+  # TCP subscriber server
+  TCP_LISTEN_PORT: "3675"
+  TCP_DATA_DIR: "/data/subscribers"
+  # CSV & history export
+  CLI_LOG_EXPORT_DIR: "/data/csv"
+  CSV_EXPORT_DIR: "/data/csv"
+  # API spec
+  API_SPEC_PATH: "/app/api.yaml"

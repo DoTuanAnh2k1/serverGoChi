@@ -1,33 +1,35 @@
-# Builder Image
-# ---------------------------------------------------
-FROM golang:1.19-alpine AS go-builder
+# ── Build stage ───────────────────────────────────────────────────────────────
+FROM golang:1.21-alpine AS builder
 
-WORKDIR /usr/src/app
+WORKDIR /build
 
-COPY . ./
+# Cache dependencies first
+COPY go.mod go.sum ./
+RUN go mod download
 
-RUN go mod download \
-    && CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -a -o main cmd/main/main.go
+# Build
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -trimpath -o app ./cmd/main/main.go
 
+# ── Final stage ───────────────────────────────────────────────────────────────
+FROM alpine:3.19
 
-# Final Image
-# ---------------------------------------------------
-FROM alpine:latest
-LABEL maintainer="Dimas Restu Hidayanto <dimas.restu@student.upi.edu>"
+RUN apk add --no-cache ca-certificates tzdata curl \
+    && addgroup -S app \
+    && adduser  -S app -G app
 
-ARG SERVICE_NAME="vEmsAuthenticate"
-ENV PATH="$PATH:/usr/app/${SERVICE_NAME}" \
-    CONFIG_ENV="production"
+WORKDIR /app
 
-WORKDIR /usr/app/${SERVICE_NAME}
+COPY --from=builder /build/app     ./app
+COPY --from=builder /build/api.yaml ./api.yaml
 
-COPY --from=go-builder /usr/src/app/config/ ./config
-COPY --from=go-builder /usr/src/app/main ./main
-
-RUN chmod 777 config/stores config/uploads
+RUN chown -R app:app /app
+USER app
 
 EXPOSE 3000
-HEALTHCHECK --interval=5s --timeout=3s CMD curl --fail http://127.0.0.1:3000/health || exit 1
 
-VOLUME ["/usr/app/config/stores","/usr/app/config/uploads"]
-CMD ["main"]
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -sf http://127.0.0.1:${SERVER_PORT:-3000}/health || exit 1
+
+ENTRYPOINT ["./app"]

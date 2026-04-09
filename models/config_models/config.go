@@ -6,6 +6,7 @@ type Config struct {
 	Log    LogConfig
 	Token  TokenConfig
 	Router RouterConfig
+	Leader LeaderConfig
 }
 
 type ServerConfig struct {
@@ -31,6 +32,21 @@ type DatabaseConfig struct {
 	Mysql  MySqlConfig
 }
 
-type TokenConfig struct{}
+type TokenConfig struct {
+	SecretKey   string
+	ExpiryHours int
+}
+
+type LeaderConfig struct {
+	Enabled              bool   // bật/tắt leader election
+	LeaseName            string // tên Lease resource trên K8s
+	Namespace            string // namespace của Lease
+	PodName              string // identity của pod này (thường = metadata.name)
+	LeaseDurationSeconds int    // thời gian giữ lease (default 15s)
+	RenewDeadlineSeconds int    // deadline để renew trước khi mất lease (default 10s)
+	RetryPeriodSeconds   int    // chu kỳ thử acquire lease (default 2s)
+	CSVExportDir         string // thư mục lưu file CSV
+	CSVExportHour        int    // giờ chạy export hàng ngày (0-23)
+}
 
 var DatabaseConfigInit Config

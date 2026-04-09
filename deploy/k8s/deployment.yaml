@@ -1,0 +1,82 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mgt-service
+  namespace: default
+  labels:
+    app: mgt-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mgt-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: mgt-service
+    spec:
+      serviceAccountName: mgt-service
+      terminationGracePeriodSeconds: 30
+
+      containers:
+        - name: mgt-service
+          image: your-registry/mgt-service:latest   # replace with your image
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 3000
+              protocol: TCP
+            - name: tcp-subscriber
+              containerPort: 3675
+              protocol: TCP
+
+          envFrom:
+            - configMapRef:
+                name: mgt-service-config
+            - secretRef:
+                name: mgt-service-secret
+
+          # POD_NAME is injected at runtime so leader election can identify this pod
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+
+          volumeMounts:
+            - name: data
+              mountPath: /data
+
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            failureThreshold: 3
+
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: mgt-service-data

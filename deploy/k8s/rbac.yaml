@@ -1,0 +1,30 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: mgt-service
+  namespace: default
+---
+# Leader election requires read/write access to Lease objects
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: mgt-service-leader-election
+  namespace: default
+rules:
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "create", "update", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: mgt-service-leader-election
+  namespace: default
+subjects:
+  - kind: ServiceAccount
+    name: mgt-service
+    namespace: default
+roleRef:
+  kind: Role
+  name: mgt-service-leader-election
+  apiGroup: rbac.authorization.k8s.io

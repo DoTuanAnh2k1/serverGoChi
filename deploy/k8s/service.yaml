@@ -1,0 +1,35 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: mgt-service
+  namespace: default
+  labels:
+    app: mgt-service
+spec:
+  selector:
+    app: mgt-service
+  type: ClusterIP
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+      protocol: TCP
+---
+# Expose the TCP subscriber port as a separate service (LoadBalancer or NodePort)
+# so external CLI clients can push subscriber data to it.
+apiVersion: v1
+kind: Service
+metadata:
+  name: mgt-service-tcp
+  namespace: default
+  labels:
+    app: mgt-service
+spec:
+  selector:
+    app: mgt-service
+  type: LoadBalancer   # change to NodePort if LoadBalancer is unavailable
+  ports:
+    - name: tcp-subscriber
+      port: 3675
+      targetPort: tcp-subscriber
+      protocol: TCP

@@ -1,27 +1,28 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"serverGoChi/config"
-	"serverGoChi/models/config_models"
-	"serverGoChi/src/logger"
-	"serverGoChi/src/router"
-	"serverGoChi/src/server"
-	"serverGoChi/src/store"
+	"strconv"
 	"syscall"
 
 	"github.com/joho/godotenv"
+
+	"go-aa-server/internal/config"
+	"go-aa-server/internal/handler"
+	"go-aa-server/internal/leader"
+	"go-aa-server/internal/logger"
+	"go-aa-server/internal/server"
+	"go-aa-server/internal/store"
+	"go-aa-server/internal/tcpserver"
+	"go-aa-server/models/config_models"
 )
 
-// Main Function
 func main() {
-	// Init store
 	svr := Initialize()
-
-	// Starting Server
 	svr.Start()
 	stopOrKillServer(svr)
 }
@@ -33,14 +34,19 @@ func stopOrKillServer(svr *server.Server) {
 	fmt.Println("Receive Signal from OS - Release resource")
 	fmt.Println(sig)
 	svr.Stop()
-	os.Exit(1)
+	os.Exit(0)
 }
 
 func Initialize() *server.Server {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: .env file not found, using system environment variables")
 	}
+
+	expiryHours, err := strconv.Atoi(os.Getenv("JWT_EXPIRY_HOURS"))
+	if err != nil || expiryHours <= 0 {
+		expiryHours = 24
+	}
+
 	cfg := &config_models.Config{
 		Svr: config_models.ServerConfig{
 			Host: os.Getenv("SERVER_HOST"),
@@ -60,13 +66,70 @@ func Initialize() *server.Server {
 			Level:   os.Getenv("LOG_LEVEL"),
 			DbLevel: os.Getenv("DB_LOG_LEVEL"),
 		},
+		Token: config_models.TokenConfig{
+			SecretKey:   os.Getenv("JWT_SECRET_KEY"),
+			ExpiryHours: expiryHours,
+		},
+		Router: config_models.RouterConfig{
+			BasePath: os.Getenv("ROUTER_BASE_PATH"),
+			Origins:  getEnvOrDefault("CORS_ORIGINS", "*"),
+			Methods:  getEnvOrDefault("CORS_METHODS", "GET,POST,DELETE,PUT,OPTIONS"),
+			Headers:  getEnvOrDefault("CORS_HEADERS", "Content-Type,Authorization"),
+		},
+		Leader: buildLeaderConfig(),
 	}
-	config.Init(cfg)
-	logger.Init()
 
-	router.Init()
+	config.Init(cfg)
+	logger.Init(cfg.Log.Level, cfg.Log.DbLevel)
+	handler.Init()
 	store.Init()
 
-	// Initialize Server
-	return server.NewServer(router.Router)
+	tcpAddr := ":" + getEnvOrDefault("TCP_LISTEN_PORT", "3675")
+	tcpDataDir := getEnvOrDefault("TCP_DATA_DIR", ".")
+	tcp := tcpserver.New(tcpAddr, tcpDataDir)
+	if err := tcp.Start(); err != nil {
+		log.Fatalf("tcp server: %v", err)
+	}
+
+	if cfg.Leader.Enabled {
+		ctx := context.Background()
+		go leader.Start(ctx, cfg.Leader, func(leaderCtx context.Context) {
+			leader.RunTasks(leaderCtx, cfg.Leader)
+		})
+	} else {
+		logger.Logger.Info("leader election disabled (LEADER_ELECTION_ENABLED=false)")
+	}
+
+	return server.NewServer(handler.Router)
+}
+
+func buildLeaderConfig() config_models.LeaderConfig {
+	enabled := os.Getenv("LEADER_ELECTION_ENABLED") == "true"
+
+	leaseDuration, _ := strconv.Atoi(os.Getenv("LEASE_DURATION_SECONDS"))
+	renewDeadline, _ := strconv.Atoi(os.Getenv("RENEW_DEADLINE_SECONDS"))
+	retryPeriod, _ := strconv.Atoi(os.Getenv("RETRY_PERIOD_SECONDS"))
+	csvExportHour, err := strconv.Atoi(os.Getenv("CSV_EXPORT_HOUR"))
+	if err != nil || csvExportHour < 0 || csvExportHour > 23 {
+		csvExportHour = 23
+	}
+
+	return config_models.LeaderConfig{
+		Enabled:              enabled,
+		LeaseName:            getEnvOrDefault("LEASE_LOCK_NAME", "mgt-service-leader"),
+		Namespace:            getEnvOrDefault("LEASE_LOCK_NAMESPACE", "default"),
+		PodName:              getEnvOrDefault("POD_NAME", "unknown-pod"),
+		LeaseDurationSeconds: leaseDuration,
+		RenewDeadlineSeconds: renewDeadline,
+		RetryPeriodSeconds:   retryPeriod,
+		CSVExportDir:         getEnvOrDefault("CSV_EXPORT_DIR", "/data/csv"),
+		CSVExportHour:        csvExportHour,
+	}
+}
+
+func getEnvOrDefault(key, defaultVal string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return defaultVal
 }

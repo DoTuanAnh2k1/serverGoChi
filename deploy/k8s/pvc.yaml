@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mgt-service-data
+  namespace: default
+spec:
+  accessModes:
+    - ReadWriteMany   # RWX so multiple replicas can write to the same volume
+  resources:
+    requests:
+      storage: 5Gi
+  # storageClassName: "" # set to your storage class; omit to use cluster default
