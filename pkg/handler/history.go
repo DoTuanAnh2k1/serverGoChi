@@ -14,7 +14,7 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// saveHistoryReq là body của POST /aa/history/save.
+// saveHistoryReq is the body for POST /aa/history/save.
 type saveHistoryReq struct {
 	CmdName        string `json:"cmd_name"`
 	NeName         string `json:"ne_name"`
@@ -52,7 +52,7 @@ func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusOK, records)
 }
 
-// HandlerSaveHistory lưu một bản ghi lịch sử lệnh vào database.
+// HandlerSaveHistory saves a command history record to the database.
 func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 	var req saveHistoryReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

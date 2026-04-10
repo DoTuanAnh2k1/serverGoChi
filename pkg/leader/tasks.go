@@ -9,15 +9,13 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
-// RunTasks chạy các tác vụ dành riêng cho leader.
-// Hàm này block cho đến khi ctx bị cancel (pod mất lease).
-// Khi được gọi lần đầu, nó export ngay một lần để tránh bỏ sót
-// nếu pod vừa được khởi động lại sau nửa ngày.
+// RunTasks runs leader-only tasks. Blocks until ctx is cancelled.
+// Exports immediately on first run to avoid gaps.
 func RunTasks(ctx context.Context, cfg config_models.LeaderConfig) {
 	logger.Logger.Infof("leader tasks: started (CSV export dir from CLI_LOG_EXPORT_DIR, daily at %02d:00)",
 		cfg.CSVExportHour)
 
-	// Export ngay khi vừa trở thành leader
+	// Export immediately on becoming leader
 	runCSVExport()
 
 	for {
@@ -67,7 +65,7 @@ func runHistoryCleanupAt(now time.Time) {
 	logger.Logger.Infof("leader tasks: history cleanup done, removed %d records", deleted)
 }
 
-// nextDailyOccurrence trả về khoảng thời gian đến lần kế tiếp của giờ được cấu hình.
+// nextDailyOccurrence returns duration until the next configured hour.
 func nextDailyOccurrence(hour int) time.Duration {
 	now := time.Now()
 	next := time.Date(now.Year(), now.Month(), now.Day(), hour, 0, 0, 0, now.Location())
@@ -77,10 +75,10 @@ func nextDailyOccurrence(hour int) time.Duration {
 	return time.Until(next)
 }
 
-// nextMonthlyCleanup trả về khoảng thời gian đến 00:00 ngày 1 của tháng tiếp theo.
+// nextMonthlyCleanup returns duration until 00:00 on the 1st of next month.
 func nextMonthlyCleanup() time.Duration {
 	now := time.Now()
-	// Ngày đầu tháng sau, lúc 00:00
+	// First day of next month at 00:00
 	next := time.Date(now.Year(), now.Month()+1, 1, 0, 0, 0, 0, now.Location())
 	return time.Until(next)
 }

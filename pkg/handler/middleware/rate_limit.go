@@ -25,7 +25,7 @@ func newRateLimiter(limit int, window time.Duration) *rateLimiter {
 	return rl
 }
 
-// cleanup xóa các entry cũ hơn window theo định kỳ để tránh memory leak
+// cleanup periodically removes entries older than window to prevent memory leaks.
 func (rl *rateLimiter) cleanup() {
 	ticker := time.NewTicker(rl.window)
 	defer ticker.Stop()
@@ -67,10 +67,10 @@ func (rl *rateLimiter) allow(ip string) bool {
 	return true
 }
 
-// LoginRateLimiter giới hạn 10 lần đăng nhập/phút/IP
+// LoginRateLimiter limits to 10 login attempts per minute per IP.
 var LoginRateLimiter = newRateLimiter(10, time.Minute)
 
-// RateLimit trả về middleware áp dụng rate limiter cho route
+// RateLimit returns middleware that applies a rate limiter to a route.
 func RateLimit(rl *rateLimiter) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

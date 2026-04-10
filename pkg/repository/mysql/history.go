@@ -19,7 +19,7 @@ func (c *Client) SaveHistoryCommand(history db_models.CliOperationHistory) error
 	return nil
 }
 
-// GetRecentHistory trả về N bản ghi lịch sử lệnh gần nhất.
+// GetRecentHistory returns the N most recent history records.
 func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
 	var records []db_models.CliOperationHistory
 	tx := c.Db.Order("created_date DESC").Limit(limit).Find(&records)
@@ -29,8 +29,8 @@ func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, e
 	return records, nil
 }
 
-// DeleteHistoryBefore xoá toàn bộ bản ghi cli_operation_history
-// có created_date < cutoff. Trả về số bản ghi đã xoá.
+// DeleteHistoryBefore deletes all cli_operation_history records
+// with created_date < cutoff. Returns deleted count.
 func (c *Client) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
 	tx := c.Db.
 		Where("created_date < ?", cutoff).
@@ -41,8 +41,8 @@ func (c *Client) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
 	return tx.RowsAffected, nil
 }
 
-// GetDailyOperationHistory lấy toàn bộ bản ghi cli_operation_history
-// trong ngày `date` (từ 00:00:00 đến 23:59:59 theo giờ local).
+// GetDailyOperationHistory returns all cli_operation_history records
+// for the given date (00:00:00 to 23:59:59 local time).
 func (c *Client) GetDailyOperationHistory(date time.Time) ([]db_models.CliOperationHistory, error) {
 	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	end := start.Add(24 * time.Hour)

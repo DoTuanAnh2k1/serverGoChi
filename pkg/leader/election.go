@@ -1,6 +1,4 @@
-// Package leader cung cấp cơ chế leader election sử dụng Kubernetes Lease API.
-// Mỗi pod chạy election loop; pod nào giữ được Lease thì trở thành leader
-// và được phép chạy các tác vụ đặc quyền (export CSV, v.v.).
+// Package leader provides leader election using Kubernetes Lease API.
 package leader
 
 import (
@@ -20,9 +18,8 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
-// Start chạy leader election loop cho đến khi ctx bị cancel.
-// onLeader được gọi (trong goroutine riêng) khi pod này trở thành leader;
-// context truyền vào onLeader sẽ bị cancel khi pod mất lease.
+// Start runs the leader election loop until ctx is cancelled.
+// onLeader is called when this pod becomes leader.
 func Start(ctx context.Context, cfg config_models.LeaderConfig, onLeader func(ctx context.Context)) {
 	client, err := buildK8sClient()
 	if err != nil {
@@ -71,7 +68,7 @@ func Start(ctx context.Context, cfg config_models.LeaderConfig, onLeader func(ct
 	})
 }
 
-// buildK8sClient thử in-cluster config trước, fallback sang kubeconfig cho local dev.
+// buildK8sClient tries in-cluster config first, falls back to kubeconfig for local dev.
 func buildK8sClient() (*kubernetes.Clientset, error) {
 	cfg, err := rest.InClusterConfig()
 	if err != nil {

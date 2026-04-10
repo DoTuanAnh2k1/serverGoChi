@@ -3,10 +3,10 @@ info:
   title: mgt-service
   version: "2.0"
   description: |
-    REST API quản lý người dùng, phân quyền và Network Element (NE) trong hệ thống viễn thông.
+    REST API for user management, authorization, and Network Element (NE) management.
 
-    **Authentication:** Hầu hết endpoint yêu cầu header `Authorization: Bearer <jwt_token>`.
-    Token lấy từ `POST /aa/authenticate`.
+    **Authentication:** Most endpoints require an `Authorization: Bearer <jwt_token>` header.
+    Token obtained from `POST /aa/authenticate`.
 
 servers:
   - url: http://localhost:3000
@@ -18,17 +18,17 @@ tags:
   - name: System
     description: Health check, Swagger UI
   - name: Authentication
-    description: Đăng nhập và quản lý tài khoản
+    description: Authentication & account management
   - name: Permission
-    description: Quản lý role / permission
+    description: Role / permission management
   - name: Network Element
-    description: Phân quyền NE cho user và liệt kê NE
+    description: NE authorization & listing
   - name: User Authorization
-    description: Gán / xóa role cho user
+    description: User role assignment
   - name: History
-    description: Lưu lịch sử lệnh
+    description: Command history
   - name: Subscribers
-    description: Xem file dữ liệu nhận từ TCP subscriber server
+    description: View data files from TCP subscriber server
 
 # ─────────────────────────────────────────────────────────────────────────────
 paths:
@@ -78,7 +78,7 @@ paths:
   /aa/authenticate:
     post:
       tags: [Authentication]
-      summary: Đăng nhập, lấy JWT
+      summary: Login, get JWT
       operationId: authenticate
       security: []
       requestBody:
@@ -92,7 +92,7 @@ paths:
               password: secret
       responses:
         "200":
-          description: Đăng nhập thành công
+          description: Login successful
           content:
             application/json:
               schema:
@@ -107,7 +107,7 @@ paths:
   /aa/validate-token:
     post:
       tags: [Authentication]
-      summary: Kiểm tra token hợp lệ
+      summary: Validate token
       operationId: validateToken
       security: []
       requestBody:
@@ -118,7 +118,7 @@ paths:
               $ref: "#/components/schemas/ValidateTokenRequest"
       responses:
         "200":
-          description: Token hợp lệ
+          description: Token valid
           content:
             application/json:
               schema:
@@ -129,7 +129,7 @@ paths:
   /aa/change-password:
     post:
       tags: [Authentication]
-      summary: Đổi mật khẩu
+      summary: Change password
       operationId: changePassword
       security:
         - bearerAuth: []
@@ -141,7 +141,7 @@ paths:
               $ref: "#/components/schemas/ChangePasswordRequest"
       responses:
         "200":
-          description: Đổi mật khẩu thành công
+          description: Password changed
           content:
             application/json:
               schema:
@@ -151,7 +151,7 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
         "403":
-          description: Sai mật khẩu cũ
+          description: Wrong old password
           content:
             application/json:
               schema:
@@ -162,7 +162,7 @@ paths:
   /aa/authenticate/user/set:
     post:
       tags: [Authentication]
-      summary: Tạo hoặc kích hoạt lại user
+      summary: Create or re-enable user
       operationId: userSet
       security:
         - bearerAuth: []
@@ -174,9 +174,9 @@ paths:
               $ref: "#/components/schemas/UserSetRequest"
       responses:
         "201":
-          description: Tạo / kích hoạt thành công
+          description: Created / re-enabled
         "304":
-          description: User đã tồn tại và đang active
+          description: User already active
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -187,7 +187,7 @@ paths:
   /aa/authenticate/user/delete:
     post:
       tags: [Authentication]
-      summary: Vô hiệu hóa user (soft delete)
+      summary: Disable user (soft delete)
       operationId: userDelete
       security:
         - bearerAuth: []
@@ -199,7 +199,7 @@ paths:
               $ref: "#/components/schemas/UsernameRequest"
       responses:
         "200":
-          description: Vô hiệu hóa thành công
+          description: Disabled successfully
         "404":
           $ref: "#/components/responses/NotFound"
         "401":
@@ -210,13 +210,13 @@ paths:
   /aa/authenticate/user/show:
     get:
       tags: [Authentication]
-      summary: Danh sách user kèm NE và role
+      summary: List users with NEs and roles
       operationId: userShow
       security:
         - bearerAuth: []
       responses:
         "302":
-          description: Danh sách user
+          description: User list
           content:
             application/json:
               schema:
@@ -234,7 +234,7 @@ paths:
   /aa/authorize/permission/set:
     post:
       tags: [Permission]
-      summary: Tạo role mới
+      summary: Create new role
       operationId: permissionSet
       security:
         - bearerAuth: []
@@ -246,9 +246,9 @@ paths:
               $ref: "#/components/schemas/CliRole"
       responses:
         "201":
-          description: Tạo thành công
+          description: Created
         "304":
-          description: Role đã tồn tại
+          description: Role already exists
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -257,7 +257,7 @@ paths:
   /aa/authorize/permission/delete:
     post:
       tags: [Permission]
-      summary: Xóa role
+      summary: Delete role
       operationId: permissionDelete
       security:
         - bearerAuth: []
@@ -269,9 +269,9 @@ paths:
               $ref: "#/components/schemas/CliRole"
       responses:
         "200":
-          description: Xóa thành công
+          description: Deleted
         "304":
-          description: Role không tồn tại
+          description: Role not found
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -280,13 +280,13 @@ paths:
   /aa/authorize/permission/show:
     get:
       tags: [Permission]
-      summary: Danh sách tất cả role
+      summary: List all roles
       operationId: permissionShow
       security:
         - bearerAuth: []
       responses:
         "302":
-          description: Danh sách role
+          description: Role list
           content:
             application/json:
               schema:
@@ -304,7 +304,7 @@ paths:
   /aa/authorize/user/set:
     post:
       tags: [User Authorization]
-      summary: Gán permission cho user
+      summary: Assign permission to user
       operationId: authorizeUserSet
       security:
         - bearerAuth: []
@@ -316,13 +316,13 @@ paths:
               $ref: "#/components/schemas/UserPermissionRequest"
       responses:
         "200":
-          description: Gán thành công
+          description: Assigned
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
         "304":
-          description: Permission đã được gán
+          description: Permission already assigned
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -333,7 +333,7 @@ paths:
   /aa/authorize/user/delete:
     post:
       tags: [User Authorization]
-      summary: Xóa permission của user
+      summary: Remove user permission
       operationId: authorizeUserDelete
       security:
         - bearerAuth: []
@@ -345,13 +345,13 @@ paths:
               $ref: "#/components/schemas/UserPermissionRequest"
       responses:
         "200":
-          description: Xóa thành công
+          description: Deleted
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
         "304":
-          description: Permission không tìm thấy
+          description: Permission not found
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -362,13 +362,13 @@ paths:
   /aa/authorize/user/show:
     get:
       tags: [User Authorization]
-      summary: Danh sách permission của tất cả user
+      summary: List all user permissions
       operationId: authorizeUserShow
       security:
         - bearerAuth: []
       responses:
         "302":
-          description: Danh sách
+          description: List
           content:
             application/json:
               schema:
@@ -384,13 +384,13 @@ paths:
   /aa/authorize/ne/show:
     get:
       tags: [Network Element]
-      summary: Danh sách NE hệ thống (5GC)
+      summary: List system NEs (5GC)
       operationId: neShow
       security:
         - bearerAuth: []
       responses:
         "302":
-          description: Danh sách NE
+          description: NE list
           content:
             application/json:
               schema:
@@ -407,7 +407,7 @@ paths:
   /aa/authorize/ne/set:
     post:
       tags: [Network Element]
-      summary: Gán NE cho user
+      summary: Assign NE to user
       operationId: neSet
       security:
         - bearerAuth: []
@@ -419,13 +419,13 @@ paths:
               $ref: "#/components/schemas/UserNeRequest"
       responses:
         "200":
-          description: Gán thành công
+          description: Assigned
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
         "304":
-          description: NE đã được gán cho user
+          description: NE already assigned
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -436,7 +436,7 @@ paths:
   /aa/authorize/ne/delete:
     post:
       tags: [Network Element]
-      summary: Xóa NE khỏi user
+      summary: Remove NE from user
       operationId: neDelete
       security:
         - bearerAuth: []
@@ -448,13 +448,13 @@ paths:
               $ref: "#/components/schemas/UserNeRequest"
       responses:
         "200":
-          description: Xóa thành công
+          description: Deleted
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
         "304":
-          description: Không tìm thấy quan hệ user-NE
+          description: User-NE relationship not found
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -465,13 +465,13 @@ paths:
   /aa/list/ne:
     get:
       tags: [Network Element]
-      summary: NE mà user đang đăng nhập được phép truy cập
+      summary: NEs accessible to logged-in user
       operationId: listNe
       security:
         - bearerAuth: []
       responses:
         "302":
-          description: Danh sách NE
+          description: NE list
           content:
             application/json:
               schema:
@@ -486,13 +486,13 @@ paths:
   /aa/list/ne/monitor:
     get:
       tags: [Network Element]
-      summary: NE monitor URL cho user đang đăng nhập
+      summary: NE monitor URLs for logged-in user
       operationId: listNeMonitor
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Danh sách NE monitor
+          description: NE monitor list
           content:
             application/json:
               schema:
@@ -510,7 +510,7 @@ paths:
   /aa/history/save:
     post:
       tags: [History]
-      summary: Lưu một bản ghi lịch sử lệnh
+      summary: Save a command history record
       operationId: historySave
       security:
         - bearerAuth: []
@@ -522,7 +522,7 @@ paths:
               $ref: "#/components/schemas/HistorySaveRequest"
       responses:
         "201":
-          description: Lưu thành công
+          description: Saved
           content:
             application/json:
               schema:
@@ -538,16 +538,15 @@ paths:
   /aa/subscribers/files:
     get:
       tags: [Subscribers]
-      summary: Danh sách file subscriber đã lưu
+      summary: List saved subscriber files
       description: |
-        Liệt kê tất cả file `list_subscribers_results.<index>` trong thư mục `TCP_DATA_DIR`,
-        sắp xếp theo index tăng dần.
+        Lists all `list_subscribers_results.<index>` files in `TCP_DATA_DIR`, sorted by ascending index.
       operationId: subscriberFileList
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Danh sách file
+          description: File list
           content:
             application/json:
               schema:
@@ -562,7 +561,7 @@ paths:
   /aa/subscribers/files/{index}:
     get:
       tags: [Subscribers]
-      summary: Xem nội dung file subscriber theo index
+      summary: View subscriber file by index
       operationId: subscriberFileView
       security:
         - bearerAuth: []
@@ -570,14 +569,14 @@ paths:
         - name: index
           in: path
           required: true
-          description: Index của file (số nguyên >= 0)
+          description: File index (integer >= 0)
           schema:
             type: integer
             minimum: 0
           example: 0
       responses:
         "200":
-          description: Nội dung file
+          description: File content
           content:
             application/json:
               schema:
@@ -603,25 +602,25 @@ components:
   # ── Reusable responses ───────────────────────────────────────────────────────
   responses:
     BadRequest:
-      description: Request body / param không hợp lệ
+      description: Invalid request body / params
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/MessageResponse"
     Unauthorized:
-      description: Token thiếu hoặc không hợp lệ
+      description: Missing or invalid token
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/MessageResponse"
     NotFound:
-      description: Resource không tồn tại
+      description: Resource not found
       content:
         application/json:
           schema:
             $ref: "#/components/schemas/MessageResponse"
     InternalError:
-      description: Lỗi server
+      description: Server error
       content:
         application/json:
           schema:
@@ -677,7 +676,7 @@ components:
           type: string
         roles:
           type: string
-          description: Danh sách role cách nhau bằng dấu cách
+          description: Space-separated role list
 
     ChangePasswordRequest:
       type: object
@@ -769,7 +768,7 @@ components:
           type: string
         permissions:
           type: string
-          description: Danh sách permission cách nhau bằng dấu cách
+          description: Space-separated permission list
 
     # ── Network Element ───────────────────────────────────────────────────────
     UserNeRequest:
@@ -780,7 +779,7 @@ components:
           type: string
         neid:
           type: string
-          description: ID của NE (dạng chuỗi số)
+          description: NE ID (string number)
 
     NeShowItem:
       type: object
@@ -956,5 +955,5 @@ components:
             type: string
         total:
           type: integer
-          description: Tổng số dòng
+          description: Total line count
           example: 42

@@ -154,7 +154,7 @@ func TestRunHistoryCleanup_CallsDeleteWithCorrectCutoff(t *testing.T) {
 	})
 
 	now := time.Date(2026, 4, 9, 12, 0, 0, 0, time.Local)
-	// cutoff phải là 2026-03-01 00:00:00
+	// cutoff must be 2026-03-01 00:00:00
 	wantCutoff := time.Date(2026, 3, 1, 0, 0, 0, 0, time.Local)
 
 	runHistoryCleanupAt(now)
@@ -173,7 +173,7 @@ func TestRunHistoryCleanup_JanuaryCutsToDecemberPreviousYear(t *testing.T) {
 		},
 	})
 
-	// Tháng 1/2026 → cutoff = 2025-12-01
+	// Jan 2026 → cutoff = 2025-12-01
 	now := time.Date(2026, 1, 15, 0, 0, 0, 0, time.Local)
 	wantCutoff := time.Date(2025, 12, 1, 0, 0, 0, 0, time.Local)
 
@@ -192,6 +192,6 @@ func TestRunHistoryCleanup_DBError(t *testing.T) {
 		},
 	})
 
-	// Không được panic dù DB lỗi
+	// Must not panic even if DB errors
 	runHistoryCleanupAt(time.Now())
 }

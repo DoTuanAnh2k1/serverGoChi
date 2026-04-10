@@ -18,11 +18,11 @@ func TestMain(m *testing.M) {
 	os.Exit(m.Run())
 }
 
-// startTestServer khởi động server trên port ngẫu nhiên và trả về addr + cleanup fn.
+// startTestServer starts a server on a random port and returns addr + data dir.
 func startTestServer(t *testing.T) (addr string, dataDir string) {
 	t.Helper()
 	dataDir = t.TempDir()
-	srv := New("127.0.0.1:0", dataDir) // port 0 = OS tự chọn
+	srv := New("127.0.0.1:0", dataDir) // port 0 = OS picks a free port
 	if err := srv.Start(); err != nil {
 		t.Fatalf("start server: %v", err)
 	}

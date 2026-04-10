@@ -13,11 +13,9 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// DeleteOldHistory xoá toàn bộ lịch sử lệnh cũ hơn tháng trước.
-// Ví dụ: nếu now là tháng 4/2026 thì cutoff = 2026-03-01 00:00:00,
-// tức là chỉ giữ lại dữ liệu từ tháng 3/2026 trở đi.
+// DeleteOldHistory deletes history older than the previous month.
 func DeleteOldHistory(now time.Time) (int64, error) {
-	// Cutoff = ngày đầu tiên của tháng trước
+	// Cutoff = first day of previous month
 	cutoff := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
 	deleted, err := store.GetSingleton().DeleteHistoryBefore(cutoff)
 	if err != nil {
@@ -28,12 +26,12 @@ func DeleteOldHistory(now time.Time) (int64, error) {
 	return deleted, nil
 }
 
-// GetRecentHistory trả về N bản ghi lịch sử lệnh gần nhất.
+// GetRecentHistory returns the N most recent history records.
 func GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
 	return store.GetSingleton().GetRecentHistory(limit)
 }
 
-// SaveHistoryCommand lưu một bản ghi lịch sử lệnh vào database.
+// SaveHistoryCommand saves a history record to the database.
 func SaveHistoryCommand(historyCommand db_models.CliOperationHistory) error {
 	sto := store.GetSingleton()
 	logger.Logger.Debug("Save command")
@@ -45,10 +43,7 @@ func SaveHistoryCommand(historyCommand db_models.CliOperationHistory) error {
 	return nil
 }
 
-// ExportDailyHistoryByNe lấy toàn bộ lịch sử lệnh trong ngày `date`,
-// nhóm theo tên NE và ghi ra các file CSV.
-// Thư mục xuất đọc từ biến môi trường CLI_LOG_EXPORT_DIR.
-// Tên file: cli_log_<ne_site>_YYYYMMDD.csv
+// ExportDailyHistoryByNe exports daily history grouped by NE to CSV files.
 func ExportDailyHistoryByNe(date time.Time) error {
 	exportDir := os.Getenv("CLI_LOG_EXPORT_DIR")
 	if exportDir == "" {
@@ -65,7 +60,7 @@ func ExportDailyHistoryByNe(date time.Time) error {
 		return nil
 	}
 
-	// Nhóm theo NE name
+	// Group by NE name
 	grouped := make(map[string][]db_models.CliOperationHistory)
 	for _, h := range histories {
 		key := h.NeName
@@ -133,7 +128,7 @@ func writeCSV(path string, records []db_models.CliOperationHistory) error {
 	return w.Error()
 }
 
-// sanitizeFilename thay thế các ký tự không hợp lệ trong tên file.
+// sanitizeFilename replaces invalid filename characters.
 func sanitizeFilename(name string) string {
 	invalid := `/\:*?"<>|`
 	result := make([]byte, len(name))

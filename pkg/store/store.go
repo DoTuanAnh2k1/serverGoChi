@@ -19,7 +19,7 @@ func GetSingleton() DatabaseStore {
 	return store
 }
 
-// SetSingleton dùng trong test để inject mock store.
+// SetSingleton is used in tests to inject a mock store.
 func SetSingleton(s DatabaseStore) {
 	store = s
 }
@@ -71,13 +71,12 @@ type DatabaseStore interface {
 	GetNeMonitorById(int64) (*db_models.CliNeMonitor, error)
 	GetAllNeOfUserByUserId(int64) ([]*db_models.CliUserNeMapping, error)
 
-	// GetRecentHistory trả về N bản ghi lịch sử lệnh gần nhất.
+	// GetRecentHistory returns the N most recent history records.
 	GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error)
 
-	// Leader-only: lấy toàn bộ lịch sử lệnh trong ngày để export CSV
+	// Leader-only: get all history for a given day for CSV export
 	GetDailyOperationHistory(date time.Time) ([]db_models.CliOperationHistory, error)
 
-	// Leader-only: xoá toàn bộ lịch sử lệnh có created_date < cutoff,
-	// trả về số bản ghi đã xoá.
+	// Leader-only: delete history before cutoff, returns deleted count.
 	DeleteHistoryBefore(cutoff time.Time) (int64, error)
 }

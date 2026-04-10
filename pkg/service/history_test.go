@@ -13,7 +13,7 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// csvHeader indices — phải đồng bộ với csvHeader trong history.go
+// csvHeader indices — must match csvHeader in history.go
 const (
 	colUser          = 0
 	colCommand       = 1

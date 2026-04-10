@@ -15,7 +15,7 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 )
 
-// tcpDataDir trả về thư mục lưu file từ env TCP_DATA_DIR (giống tcpserver).
+// tcpDataDir returns the data directory from env TCP_DATA_DIR.
 func tcpDataDir() string {
 	if d := os.Getenv("TCP_DATA_DIR"); d != "" {
 		return d
@@ -31,9 +31,8 @@ type subscriberFileInfo struct {
 	Size  int64  `json:"size_bytes"`
 }
 
-// HandlerListSubscriberFiles handles GET /aa/subscribers/files
-// Trả về danh sách các file list_subscribers_results.* đang có trên ổ cứng,
-// sắp xếp theo index tăng dần.
+// HandlerListSubscriberFiles handles GET /aa/subscribers/files.
+// Returns list of list_subscribers_results.* files sorted by index.
 func HandlerListSubscriberFiles(w http.ResponseWriter, r *http.Request) {
 	dir := tcpDataDir()
 
@@ -48,7 +47,7 @@ func HandlerListSubscriberFiles(w http.ResponseWriter, r *http.Request) {
 	var files []subscriberFileInfo
 	for _, path := range matches {
 		base := filepath.Base(path)
-		// tách index từ "list_subscribers_results.<index>"
+		// extract index from "list_subscribers_results.<index>"
 		parts := strings.SplitN(base, ".", 2)
 		if len(parts) != 2 {
 			continue
@@ -86,8 +85,8 @@ type subscriberFileContent struct {
 	Total int      `json:"total"`
 }
 
-// HandlerViewSubscriberFile handles GET /aa/subscribers/files/{index}
-// Trả về nội dung của file list_subscribers_results.<index>.
+// HandlerViewSubscriberFile handles GET /aa/subscribers/files/{index}.
+// Returns contents of list_subscribers_results.<index>.
 func HandlerViewSubscriberFile(w http.ResponseWriter, r *http.Request) {
 	idxStr := chi.URLParam(r, "index")
 	idx, err := strconv.Atoi(idxStr)

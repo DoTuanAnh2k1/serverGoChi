@@ -6,8 +6,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// InitTestLogger khởi tạo logger ở mức Error để test không bị spam log
-// nhưng vẫn thấy các lỗi thực sự. Gọi trong TestMain của từng package test.
+// InitTestLogger sets logger to Error level so tests are not spammed.
 func InitTestLogger() {
 	l := logrus.New()
 	l.SetLevel(logrus.ErrorLevel)

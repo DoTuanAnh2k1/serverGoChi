@@ -1,6 +1,5 @@
-// Package tcpserver cung cấp một TCP server đơn giản:
-// mỗi kết nối được đọc theo từng dòng cho đến khi client ngắt,
-// sau đó toàn bộ dữ liệu nhận được ghi vào file list_subscribers_results.<index>.
+// Package tcpserver provides a simple TCP server that reads lines per connection
+// and writes received data to list_subscribers_results.<index> files.
 package tcpserver
 
 import (
@@ -14,21 +13,21 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 )
 
-// Server lắng nghe TCP và lưu dữ liệu từ mỗi kết nối ra file.
+// Server listens on TCP and saves each connection's data to a file.
 type Server struct {
 	addr    string
 	dataDir string
 
-	mu       sync.Mutex   // bảo vệ việc chọn index file
+	mu       sync.Mutex   // protects file index selection
 	listener net.Listener
 }
 
-// New tạo Server mới. addr ví dụ: ":3675", dataDir là thư mục lưu file.
+// New creates a new Server. addr e.g. ":3675", dataDir is the output directory.
 func New(addr, dataDir string) *Server {
 	return &Server{addr: addr, dataDir: dataDir}
 }
 
-// Start bắt đầu lắng nghe trong goroutine riêng.
+// Start begins listening in a separate goroutine.
 func (s *Server) Start() error {
 	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
 		return fmt.Errorf("tcp: create data dir %q: %w", s.dataDir, err)
@@ -49,7 +48,7 @@ func (s *Server) Start() error {
 	return nil
 }
 
-// Stop đóng listener, các kết nối đang mở sẽ kết thúc tự nhiên.
+// Stop closes the listener; open connections will finish naturally.
 func (s *Server) Stop() {
 	if s.listener != nil {
 		_ = s.listener.Close()
@@ -61,7 +60,7 @@ func (s *Server) acceptLoop(ln net.Listener) {
 	for {
 		conn, err := ln.Accept()
 		if err != nil {
-			// net.ErrClosed xảy ra khi Stop() được gọi — không phải lỗi thực sự
+			// net.ErrClosed occurs when Stop() is called — not a real error
 			if isClosedErr(err) {
 				return
 			}
@@ -103,8 +102,8 @@ func (s *Server) handleConn(conn net.Conn) {
 	log.WithField("file", path).WithField("lines", len(lines)).Infof("tcp: saved %d lines → %s", len(lines), path)
 }
 
-// writeFile lựa chọn index tiếp theo và ghi dữ liệu ra file.
-// Mutex đảm bảo hai kết nối đóng cùng lúc không ghi vào cùng file.
+// writeFile picks the next index and writes data to file.
+// Mutex ensures concurrent connections don't write to the same file.
 func (s *Server) writeFile(lines []string) (string, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -132,8 +131,8 @@ func (s *Server) writeFile(lines []string) (string, error) {
 	return path, nil
 }
 
-// nextAvailablePath tìm index nhỏ nhất chưa được dùng.
-// Phải gọi trong khi giữ s.mu.
+// nextAvailablePath finds the smallest unused index.
+// Must be called while holding s.mu.
 func (s *Server) nextAvailablePath() (string, error) {
 	for idx := 0; ; idx++ {
 		path := filepath.Join(s.dataDir, fmt.Sprintf("list_subscribers_results.%d", idx))
@@ -149,8 +148,7 @@ func isClosedErr(err error) bool {
 	if err == nil {
 		return false
 	}
-	// net package không export ErrClosed trực tiếp, kiểm tra qua string
-	// (Go 1.16+ có net.ErrClosed nhưng dùng string match để tương thích)
+	// net package does not export ErrClosed directly; use string match for compatibility
 	return contains(err.Error(), "use of closed network connection")
 }
 

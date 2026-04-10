@@ -114,7 +114,7 @@ services:
       # CSV & history export
       CLI_LOG_EXPORT_DIR: /data/csv
       CSV_EXPORT_HOUR: ${CSV_EXPORT_HOUR:-23}
-      # Leader election (tắt trong docker-compose, bật khi chạy K8s)
+      # Leader election (disabled in docker-compose, enable in K8s)
       LEADER_ELECTION_ENABLED: "false"
       POD_NAME: mgt-service-local
     volumes:

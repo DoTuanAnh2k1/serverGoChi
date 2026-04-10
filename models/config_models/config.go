@@ -40,15 +40,15 @@ type TokenConfig struct {
 }
 
 type LeaderConfig struct {
-	Enabled              bool   // bật/tắt leader election
-	LeaseName            string // tên Lease resource trên K8s
-	Namespace            string // namespace của Lease
-	PodName              string // identity của pod này (thường = metadata.name)
-	LeaseDurationSeconds int    // thời gian giữ lease (default 15s)
-	RenewDeadlineSeconds int    // deadline để renew trước khi mất lease (default 10s)
-	RetryPeriodSeconds   int    // chu kỳ thử acquire lease (default 2s)
-	CSVExportDir         string // thư mục lưu file CSV
-	CSVExportHour        int    // giờ chạy export hàng ngày (0-23)
+	Enabled              bool   // enable/disable leader election
+	LeaseName            string // Lease resource name in K8s
+	Namespace            string // Lease namespace
+	PodName              string // pod identity (usually metadata.name)
+	LeaseDurationSeconds int    // lease hold duration (default 15s)
+	RenewDeadlineSeconds int    // renew deadline before losing lease (default 10s)
+	RetryPeriodSeconds   int    // lease acquire retry period (default 2s)
+	CSVExportDir         string // CSV export directory
+	CSVExportHour        int    // daily export hour (0-23)
 }
 
 var DatabaseConfigInit Config

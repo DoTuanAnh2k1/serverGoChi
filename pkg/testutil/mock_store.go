@@ -1,5 +1,5 @@
-// Package testutil cung cấp các helper dùng trong unit test.
-// Không được import trong production code.
+// Package testutil provides helpers for unit tests.
+// Do not import in production code.
 package testutil
 
 import (
@@ -9,8 +9,8 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// MockStore là mock đầy đủ của store.DatabaseStore.
-// Mỗi method có một function field tương ứng; nếu không set thì trả về zero value.
+// MockStore is a full mock of store.DatabaseStore.
+// Each method has a corresponding function field; returns zero value if unset.
 type MockStore struct {
 	InitFn                        func(cfg config_models.DatabaseConfig) error
 	GetAllUserFn                  func() ([]*db_models.TblAccount, error)
