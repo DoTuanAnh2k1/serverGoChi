@@ -1,0 +1,74 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mgt-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DB_NAME:-cli_db}
+      MYSQL_USER: ${MYSQL_USER:-mgtuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mgtpassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mgt-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:-3000}:${SERVER_PORT:-3000}"
+      - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
+    environment:
+      # Server
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: ${SERVER_PORT:-3000}
+      # Database — trỏ vào service mysql bên trên
+      DB_DRIVER: mysql
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-mgtuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mgtpassword}
+      MYSQL_DB_NAME: ${MYSQL_DB_NAME:-cli_db}
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_LOG_LEVEL: ${DB_LOG_LEVEL:-warn}
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_METHODS: ${CORS_METHODS:-GET,POST,DELETE,PUT,OPTIONS}
+      CORS_HEADERS: ${CORS_HEADERS:-Content-Type,Authorization}
+      # Router
+      ROUTER_BASE_PATH: ""
+      # Swagger spec
+      API_SPEC_PATH: /app/api.yaml
+      # TCP subscriber server
+      TCP_LISTEN_PORT: ${TCP_LISTEN_PORT:-3675}
+      TCP_DATA_DIR: /data/subscribers
+      # CSV & history export
+      CLI_LOG_EXPORT_DIR: /data/csv
+      CSV_EXPORT_HOUR: ${CSV_EXPORT_HOUR:-23}
+      # Leader election (tắt trong docker-compose, bật khi chạy K8s)
+      LEADER_ELECTION_ENABLED: "false"
+      POD_NAME: mgt-service-local
+    volumes:
+      - app_data:/data
+
+volumes:
+  mysql_data:
+  app_data:
