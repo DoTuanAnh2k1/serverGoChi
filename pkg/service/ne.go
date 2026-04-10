@@ -33,6 +33,22 @@ func GetAllCliNeOfUserByUserId(id int64) ([]*db_models.CliUserNeMapping, error) 
 	return list, nil
 }
 
+func DeleteNeById(id int64) error {
+	if err := store.GetSingleton().DeleteCliNeById(id); err != nil {
+		logger.Logger.WithField("ne_id", id).Errorf("ne: delete: %v", err)
+		return err
+	}
+	return nil
+}
+
+func CreateNe(ne *db_models.CliNe) error {
+	if err := store.GetSingleton().CreateCliNe(ne); err != nil {
+		logger.Logger.WithField("ne_name", ne.Name).Errorf("ne: create: %v", err)
+		return err
+	}
+	return nil
+}
+
 func AddUserCliNe(m *db_models.CliUserNeMapping) error {
 	if err := store.GetSingleton().CreateUserNeMapping(m); err != nil {
 		logger.Logger.WithField("user_id", m.UserID).WithField("ne_id", m.TblNeID).Errorf("ne: add user-ne mapping: %v", err)

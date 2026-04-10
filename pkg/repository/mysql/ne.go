@@ -76,6 +76,22 @@ func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNe
 	return result, nil
 }
 
+func (c *Client) DeleteCliNeById(id int64) error {
+	tx := c.Db.Delete(&db_models.CliNe{}, id)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	return tx.Error
+}
+
+func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
+	tx := c.Db.Create(ne)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	return tx.Error
+}
+
 func (c *Client) CreateUserNeMapping(m *db_models.CliUserNeMapping) error {
 	tx := c.Db.Create(m)
 	if tx == nil {

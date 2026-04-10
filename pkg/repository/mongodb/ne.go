@@ -82,6 +82,16 @@ func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNe
 	return fromMUserNeMapping(&m), nil
 }
 
+func (c *Client) DeleteCliNeById(id int64) error {
+	_, err := c.col(colNe).DeleteOne(context.Background(), bson.M{"id": id})
+	return err
+}
+
+func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
+	_, err := c.col(colNe).InsertOne(context.Background(), toMNe(ne))
+	return err
+}
+
 func (c *Client) CreateUserNeMapping(mapping *db_models.CliUserNeMapping) error {
 	doc := bson.M{"user_id": mapping.UserID, "tbl_ne_id": mapping.TblNeID}
 	_, err := c.col(colUserNeMapping).InsertOne(context.Background(), doc)

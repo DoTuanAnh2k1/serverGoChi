@@ -1,5 +1,6 @@
 # ── Build stage ───────────────────────────────────────────────────────────────
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
+ENV GOTOOLCHAIN=auto
 
 WORKDIR /build
 
@@ -24,7 +25,8 @@ WORKDIR /app
 COPY --from=builder /build/app     ./app
 COPY --from=builder /build/api.yaml ./api.yaml
 
-RUN chown -R app:app /app
+RUN mkdir -p /data/subscribers /data/csv \
+    && chown -R app:app /app /data
 USER app
 
 EXPOSE 3000

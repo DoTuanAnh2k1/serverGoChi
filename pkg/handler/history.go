@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -25,6 +26,30 @@ type saveHistoryReq struct {
 	Session        string `json:"session"`
 	BatchID        string `json:"batch_id"`
 	TimeToComplete int64  `json:"time_to_complete"`
+}
+
+// HandlerListHistory handles GET /aa/history/list
+func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
+	limit := 100
+	if l := r.URL.Query().Get("limit"); l != "" {
+		if n, err := strconv.Atoi(l); err == nil && n > 0 && n <= 500 {
+			limit = n
+		}
+	}
+
+	records, err := service.GetRecentHistory(limit)
+	if err != nil {
+		logger.Logger.Error("list history: db error: ", err)
+		response.InternalError(w, "failed to retrieve history")
+		return
+	}
+
+	if len(records) == 0 {
+		response.Write(w, http.StatusOK, []struct{}{})
+		return
+	}
+
+	response.Write(w, http.StatusOK, records)
 }
 
 // HandlerSaveHistory lưu một bản ghi lịch sử lệnh vào database.

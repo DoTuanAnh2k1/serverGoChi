@@ -19,6 +19,16 @@ func (c *Client) SaveHistoryCommand(history db_models.CliOperationHistory) error
 	return nil
 }
 
+// GetRecentHistory trả về N bản ghi lịch sử lệnh gần nhất.
+func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
+	var records []db_models.CliOperationHistory
+	tx := c.Db.Order("created_date DESC").Limit(limit).Find(&records)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return records, nil
+}
+
 // DeleteHistoryBefore xoá toàn bộ bản ghi cli_operation_history
 // có created_date < cutoff. Trả về số bản ghi đã xoá.
 func (c *Client) DeleteHistoryBefore(cutoff time.Time) (int64, error) {

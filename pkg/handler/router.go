@@ -38,6 +38,7 @@ func Init() {
 	Router.Get("/favicon.ico", handlerFavIcon)
 
 	Router.Get("/health", HealthCheck)
+	Router.Get("/admin", handlerFrontend)
 	Router.Get("/docs", handlerSwaggerUI)
 	Router.Get("/docs/openapi.yaml", handlerOpenAPISpec)
 
@@ -73,6 +74,8 @@ func Init() {
 			})
 
 			r.Route("/ne", func(subRouter chi.Router) {
+				subRouter.Post("/create", HandlerNeCreate)
+				subRouter.Post("/remove", HandlerNeRemove)
 				subRouter.Post("/delete", HandlerNeDelete)
 				subRouter.Post("/set", HandlerNeSet)
 				subRouter.Get("/show", HandlerNeShow)
@@ -87,6 +90,7 @@ func Init() {
 
 		router.Route("/history", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
+			r.Get("/list", HandlerListHistory)
 			r.Post("/save", HandlerSaveHistory)
 		})
 

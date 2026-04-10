@@ -29,12 +29,15 @@ type MockStore struct {
 	GetAllCliRoleFn               func() ([]*db_models.CliRole, error)
 	GetCliNeListBySystemTypeFn    func(systemType string) ([]*db_models.CliNe, error)
 	GetCliNeByNeIdFn              func(id int64) (*db_models.CliNe, error)
+	CreateCliNeFn                 func(ne *db_models.CliNe) error
+	DeleteCliNeByIdFn             func(id int64) error
 	AddRoleFn                     func(role *db_models.CliRoleUserMapping) error
 	DeleteRoleFn                  func(role *db_models.CliRoleUserMapping) error
 	CreateUserNeMappingFn         func(m *db_models.CliUserNeMapping) error
 	DeleteUserNeMappingFn         func(m *db_models.CliUserNeMapping) error
 	GetNeMonitorByIdFn            func(id int64) (*db_models.CliNeMonitor, error)
 	GetAllNeOfUserByUserIdFn      func(userID int64) ([]*db_models.CliUserNeMapping, error)
+	GetRecentHistoryFn            func(limit int) ([]db_models.CliOperationHistory, error)
 	GetDailyOperationHistoryFn    func(date time.Time) ([]db_models.CliOperationHistory, error)
 	DeleteHistoryBeforeFn         func(cutoff time.Time) (int64, error)
 }
@@ -158,6 +161,20 @@ func (m *MockStore) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
 	return nil, nil
 }
 
+func (m *MockStore) CreateCliNe(ne *db_models.CliNe) error {
+	if m.CreateCliNeFn != nil {
+		return m.CreateCliNeFn(ne)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteCliNeById(id int64) error {
+	if m.DeleteCliNeByIdFn != nil {
+		return m.DeleteCliNeByIdFn(id)
+	}
+	return nil
+}
+
 func (m *MockStore) AddRole(role *db_models.CliRoleUserMapping) error {
 	if m.AddRoleFn != nil {
 		return m.AddRoleFn(role)
@@ -196,6 +213,13 @@ func (m *MockStore) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) 
 func (m *MockStore) GetAllNeOfUserByUserId(userID int64) ([]*db_models.CliUserNeMapping, error) {
 	if m.GetAllNeOfUserByUserIdFn != nil {
 		return m.GetAllNeOfUserByUserIdFn(userID)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
+	if m.GetRecentHistoryFn != nil {
+		return m.GetRecentHistoryFn(limit)
 	}
 	return nil, nil
 }

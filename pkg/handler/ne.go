@@ -83,6 +83,81 @@ func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusFound, neShowRespList)
 }
 
+// HandlerNeRemove handles POST /aa/authorize/ne/remove
+func HandlerNeRemove(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		ID int64 `json:"id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == 0 {
+		response.Write(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
+	if !ok {
+		response.InternalError(w, "Internal Server Error")
+		return
+	}
+
+	opHistory := db_models.CliOperationHistory{
+		CmdName:     fmt.Sprintf("authorize ne remove id %v", req.ID),
+		CreatedDate: time.Now(),
+		Scope:       "ext-config",
+		Account:     userMiddleware.Username,
+	}
+
+	if err := service.DeleteNeById(req.ID); err != nil {
+		logger.Logger.Error("authorize/ne/remove: ", err)
+		saveHistory(opHistory, "failure")
+		response.InternalError(w, "failed to delete NE")
+		return
+	}
+
+	saveHistory(opHistory, "success")
+	response.Success(w, "NE deleted")
+}
+
+// HandlerNeCreate handles POST /aa/authorize/ne/create
+func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
+	var req db_models.CliNe
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		logger.Logger.Error("authorize/ne/create: decode request body: ", err)
+		response.Write(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+
+	if req.Name == "" {
+		response.Write(w, http.StatusBadRequest, "name is required")
+		return
+	}
+	if req.SystemType == "" {
+		req.SystemType = "5GC"
+	}
+
+	userMiddleware, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
+	if !ok {
+		response.InternalError(w, "Internal Server Error")
+		return
+	}
+
+	opHistory := db_models.CliOperationHistory{
+		CmdName:     fmt.Sprintf("authorize ne create name %v", req.Name),
+		CreatedDate: time.Now(),
+		Scope:       "ext-config",
+		Account:     userMiddleware.Username,
+	}
+
+	if err := service.CreateNe(&req); err != nil {
+		logger.Logger.Error("authorize/ne/create: ", err)
+		saveHistory(opHistory, "failure")
+		response.InternalError(w, "failed to create NE")
+		return
+	}
+
+	saveHistory(opHistory, "success")
+	response.Created(w)
+}
+
 // HandlerNeSet handles POST /aa/authorize/ne/set
 func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 	logger.Logger.Info("Handler request authorize ne set")

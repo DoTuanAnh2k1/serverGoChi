@@ -258,16 +258,16 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 
 	var result []userShowAuthenticateResp
 	for _, u := range userList {
-		tblId, err := service.GetTblIdByUserId(u.AccountID)
+		mappings, err := service.GetAllCliNeOfUserByUserId(u.AccountID)
 		if err != nil {
-			logger.Logger.WithField("user_id", u.AccountID).Errorf("authenticate/user/show: get tbl_ne_id: %v", err)
-		}
-		neList, err := service.GetNeListById(tblId)
-		if err != nil {
-			logger.Logger.WithField("tbl_ne_id", tblId).Errorf("authenticate/user/show: get ne list: %v", err)
+			logger.Logger.WithField("user_id", u.AccountID).Errorf("authenticate/user/show: get ne mappings: %v", err)
 		}
 		var nes []tblNe
-		for _, ne := range neList {
+		for _, m := range mappings {
+			ne, err := service.GetNeByNeId(m.TblNeID)
+			if err != nil || ne == nil {
+				continue
+			}
 			nes = append(nes, tblNe{Ne: ne.Name, Site: ne.SiteName})
 		}
 		role, err := service.GetRolesById(u.AccountID)

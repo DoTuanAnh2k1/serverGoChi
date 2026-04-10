@@ -28,6 +28,11 @@ func DeleteOldHistory(now time.Time) (int64, error) {
 	return deleted, nil
 }
 
+// GetRecentHistory trả về N bản ghi lịch sử lệnh gần nhất.
+func GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
+	return store.GetSingleton().GetRecentHistory(limit)
+}
+
 // SaveHistoryCommand lưu một bản ghi lịch sử lệnh vào database.
 func SaveHistoryCommand(historyCommand db_models.CliOperationHistory) error {
 	sto := store.GetSingleton()

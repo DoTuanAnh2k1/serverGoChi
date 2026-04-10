@@ -62,12 +62,17 @@ type DatabaseStore interface {
 	GetAllCliRole() ([]*db_models.CliRole, error)
 	GetCliNeListBySystemType(string) ([]*db_models.CliNe, error)
 	GetCliNeByNeId(int64) (*db_models.CliNe, error)
+	CreateCliNe(*db_models.CliNe) error
+	DeleteCliNeById(int64) error
 	AddRole(*db_models.CliRoleUserMapping) error
 	DeleteRole(*db_models.CliRoleUserMapping) error
 	CreateUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteUserNeMapping(*db_models.CliUserNeMapping) error
 	GetNeMonitorById(int64) (*db_models.CliNeMonitor, error)
 	GetAllNeOfUserByUserId(int64) ([]*db_models.CliUserNeMapping, error)
+
+	// GetRecentHistory trả về N bản ghi lịch sử lệnh gần nhất.
+	GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error)
 
 	// Leader-only: lấy toàn bộ lịch sử lệnh trong ngày để export CSV
 	GetDailyOperationHistory(date time.Time) ([]db_models.CliOperationHistory, error)
