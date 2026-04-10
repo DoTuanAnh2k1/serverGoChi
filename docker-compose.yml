@@ -38,6 +38,25 @@ services:
       retries: 5
       start_period: 30s
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: mgt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mgtuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mgtpassword}
+      POSTGRES_DB: ${POSTGRES_DB_NAME:-cli_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mgtuser} -d ${POSTGRES_DB_NAME:-cli_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
   app:
     build:
       context: .
@@ -47,6 +66,10 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
     ports:
       - "${SERVER_PORT:-3000}:${SERVER_PORT:-3000}"
       - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
@@ -54,8 +77,8 @@ services:
       # Server
       SERVER_HOST: "0.0.0.0"
       SERVER_PORT: ${SERVER_PORT:-3000}
-      # Database — trỏ vào service mysql bên trên
-      DB_DRIVER: mysql
+      # Database driver: mysql | mongodb | postgres
+      DB_DRIVER: ${DB_DRIVER:-mysql}
       MYSQL_HOST: mysql
       MYSQL_PORT: 3306
       MYSQL_USER: ${MYSQL_USER:-mgtuser}
@@ -78,6 +101,13 @@ services:
       # MongoDB
       MONGODB_URI: mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD:-rootpassword}@mongodb:27017
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-cli_db}
+      # PostgreSQL
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-mgtuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mgtpassword}
+      POSTGRES_DB_NAME: ${POSTGRES_DB_NAME:-cli_db}
+      POSTGRES_SSLMODE: disable
       # TCP subscriber server
       TCP_LISTEN_PORT: ${TCP_LISTEN_PORT:-3675}
       TCP_DATA_DIR: /data/subscribers
@@ -93,4 +123,5 @@ services:
 volumes:
   mysql_data:
   mongodb_data:
+  postgres_data:
   app_data:

@@ -65,6 +65,14 @@ func Initialize() *server.Server {
 				URI:      getEnvOrDefault("MONGODB_URI", "mongodb://localhost:27017"),
 				Database: getEnvOrDefault("MONGODB_DB_NAME", "cli_db"),
 			},
+			Postgres: config_models.PostgresConfig{
+				Host:     getEnvOrDefault("POSTGRES_HOST", "localhost"),
+				Port:     getEnvOrDefault("POSTGRES_PORT", "5432"),
+				User:     os.Getenv("POSTGRES_USER"),
+				Password: os.Getenv("POSTGRES_PASSWORD"),
+				Name:     getEnvOrDefault("POSTGRES_DB_NAME", "cli_db"),
+				SSLMode:  getEnvOrDefault("POSTGRES_SSLMODE", "disable"),
+			},
 		},
 		Log: config_models.LogConfig{
 			Level:   os.Getenv("LOG_LEVEL"),

@@ -6,6 +6,7 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/config"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/mongodb"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/mysql"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/postgres"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
@@ -30,6 +31,8 @@ func Init() {
 		store = mysql.GetInstance()
 	case "mongodb":
 		store = mongodb.GetInstance()
+	case "postgres":
+		store = postgres.GetInstance()
 	default:
 		panic("unsupported database type")
 	}
