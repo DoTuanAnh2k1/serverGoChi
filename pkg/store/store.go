@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/mongodb"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/mysql"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
@@ -28,7 +29,7 @@ func Init() {
 	case "mysql":
 		store = mysql.GetInstance()
 	case "mongodb":
-		// store = mongodb.GetInstance()
+		store = mongodb.GetInstance()
 	default:
 		panic("unsupported database type")
 	}

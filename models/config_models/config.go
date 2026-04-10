@@ -30,6 +30,7 @@ type LogConfig struct {
 type DatabaseConfig struct {
 	DbType string
 	Mysql  MySqlConfig
+	Mongo  MongoConfig
 }
 
 type TokenConfig struct {

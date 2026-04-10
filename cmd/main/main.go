@@ -61,6 +61,10 @@ func Initialize() *server.Server {
 				Password: os.Getenv("MYSQL_PASSWORD"),
 				Name:     os.Getenv("MYSQL_DB_NAME"),
 			},
+			Mongo: config_models.MongoConfig{
+				URI:      getEnvOrDefault("MONGODB_URI", "mongodb://localhost:27017"),
+				Database: getEnvOrDefault("MONGODB_DB_NAME", "cli_db"),
+			},
 		},
 		Log: config_models.LogConfig{
 			Level:   os.Getenv("LOG_LEVEL"),
