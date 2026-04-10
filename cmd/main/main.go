@@ -11,13 +11,13 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler"
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/leader"
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/server"
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
-	"github.com/DoTuanAnh2k1/serverGoChi/internal/tcpserver"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/leader"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/server"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/tcpserver"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
