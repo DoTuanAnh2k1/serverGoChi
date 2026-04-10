@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"go-aa-server/internal/config"
-	"go-aa-server/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
 
 	"github.com/golang-jwt/jwt/v5"
 )

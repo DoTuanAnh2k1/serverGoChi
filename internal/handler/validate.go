@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/logger"
-	"go-aa-server/internal/token"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/token"
 )
 
 // HandlerValidateToken handles POST /aa/validate-token

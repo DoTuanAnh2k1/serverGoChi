@@ -4,7 +4,7 @@ import (
 	"errors"
 	"time"
 
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 func (c *Client) SaveHistoryCommand(history db_models.CliOperationHistory) error {

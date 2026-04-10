@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"strings"
 
-	"go-aa-server/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
 )
 
 // ResSuccess Struct

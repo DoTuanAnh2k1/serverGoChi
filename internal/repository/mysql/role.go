@@ -3,7 +3,7 @@ package mysql
 import (
 	"errors"
 
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 
 	"gorm.io/gorm"
 )

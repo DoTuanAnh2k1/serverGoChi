@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"go-aa-server/internal/testutil"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/testutil"
 )
 
 func TestMain(m *testing.M) {

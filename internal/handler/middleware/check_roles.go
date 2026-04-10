@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"strings"
 
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
 )
 
 // CheckRole middleware — requires the "admin" role.

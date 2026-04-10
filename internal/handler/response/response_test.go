@@ -7,10 +7,10 @@ import (
 	"os"
 	"testing"
 
-	"go-aa-server/internal/config"
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/testutil"
-	"go-aa-server/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/testutil"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
 func TestMain(m *testing.M) {

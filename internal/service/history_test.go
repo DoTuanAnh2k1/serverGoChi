@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"go-aa-server/internal/store"
-	"go-aa-server/internal/testutil"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/testutil"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 // csvHeader indices — phải đồng bộ với csvHeader trong history.go

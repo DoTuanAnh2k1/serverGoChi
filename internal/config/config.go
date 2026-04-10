@@ -1,6 +1,6 @@
 package config
 
-import "go-aa-server/models/config_models"
+import "github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 
 var config *config_models.Config
 

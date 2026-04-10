@@ -4,10 +4,10 @@ import (
 	"strings"
 	"time"
 
-	"go-aa-server/internal/bcrypt"
-	"go-aa-server/internal/logger"
-	"go-aa-server/internal/store"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/bcrypt"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 func UpdateLoginHistory(username, ipAddress string) error {

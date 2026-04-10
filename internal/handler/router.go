@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"os"
 
-	"go-aa-server/internal/config"
-	"go-aa-server/internal/handler/middleware"
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/middleware"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
 
 	"github.com/go-chi/chi"
 )

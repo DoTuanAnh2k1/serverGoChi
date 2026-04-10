@@ -1,8 +1,8 @@
 package mysql
 
 import (
-	"go-aa-server/internal/logger"
-	"go-aa-server/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"

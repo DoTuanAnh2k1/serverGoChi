@@ -11,14 +11,14 @@ import (
 
 	"github.com/joho/godotenv"
 
-	"go-aa-server/internal/config"
-	"go-aa-server/internal/handler"
-	"go-aa-server/internal/leader"
-	"go-aa-server/internal/logger"
-	"go-aa-server/internal/server"
-	"go-aa-server/internal/store"
-	"go-aa-server/internal/tcpserver"
-	"go-aa-server/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/leader"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/server"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/tcpserver"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
 func main() {

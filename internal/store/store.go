@@ -3,10 +3,10 @@ package store
 import (
 	"time"
 
-	"go-aa-server/internal/config"
-	"go-aa-server/internal/repository/mysql"
-	"go-aa-server/models/config_models"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/repository/mysql"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 var (

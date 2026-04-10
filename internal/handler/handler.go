@@ -3,8 +3,8 @@ package handler
 import (
 	"net/http"
 
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
 )
 
 func handlerNotFound(w http.ResponseWriter, r *http.Request) {

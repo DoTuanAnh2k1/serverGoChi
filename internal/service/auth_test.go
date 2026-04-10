@@ -5,11 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"go-aa-server/internal/service"
-	"go-aa-server/internal/store"
-	"go-aa-server/internal/testutil"
-	appcrypt "go-aa-server/internal/bcrypt"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/service"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/testutil"
+	appcrypt "github.com/DoTuanAnh2k1/serverGoChi/internal/bcrypt"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 // ── Authenticate ──────────────────────────────────────────────────────────────

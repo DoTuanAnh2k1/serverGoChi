@@ -1,4 +1,4 @@
-module go-aa-server
+module github.com/DoTuanAnh2k1/serverGoChi
 
 go 1.25.3
 

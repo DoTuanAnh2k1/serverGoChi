@@ -4,10 +4,10 @@ import (
 	"errors"
 	"testing"
 
-	"go-aa-server/internal/service"
-	"go-aa-server/internal/store"
-	"go-aa-server/internal/testutil"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/service"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/testutil"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 // ── AddUser ───────────────────────────────────────────────────────────────────

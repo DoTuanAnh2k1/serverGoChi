@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"go-aa-server/internal/handler"
-	"go-aa-server/internal/token"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/token"
 )
 
 // ── HandlerValidateToken ──────────────────────────────────────────────────────

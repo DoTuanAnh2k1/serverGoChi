@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"go-aa-server/internal/handler/middleware"
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/logger"
-	"go-aa-server/internal/service"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/middleware"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/service"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 // saveHistoryReq là body của POST /aa/history/save.

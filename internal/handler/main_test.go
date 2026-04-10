@@ -4,9 +4,9 @@ import (
 	"os"
 	"testing"
 
-	"go-aa-server/internal/config"
-	"go-aa-server/internal/logger"
-	"go-aa-server/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/config"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 
 	"github.com/sirupsen/logrus"
 )

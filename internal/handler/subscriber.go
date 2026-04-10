@@ -11,8 +11,8 @@ import (
 	"strings"
 
 	"github.com/go-chi/chi"
-	"go-aa-server/internal/handler/response"
-	"go-aa-server/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
 )
 
 // tcpDataDir trả về thư mục lưu file từ env TCP_DATA_DIR (giống tcpserver).

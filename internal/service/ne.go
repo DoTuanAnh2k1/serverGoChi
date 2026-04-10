@@ -1,9 +1,9 @@
 package service
 
 import (
-	"go-aa-server/internal/logger"
-	"go-aa-server/internal/store"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 func GetNeListBySystemType(systemType string) ([]*db_models.CliNe, error) {

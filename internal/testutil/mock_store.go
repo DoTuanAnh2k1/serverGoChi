@@ -5,8 +5,8 @@ package testutil
 import (
 	"time"
 
-	"go-aa-server/models/config_models"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 // MockStore là mock đầy đủ của store.DatabaseStore.

@@ -10,11 +10,11 @@ import (
 	"strings"
 	"testing"
 
-	"go-aa-server/internal/handler"
-	"go-aa-server/internal/handler/middleware"
-	"go-aa-server/internal/store"
-	"go-aa-server/internal/testutil"
-	"go-aa-server/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/middleware"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/store"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/testutil"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 func reqWithUser(r *http.Request, u *middleware.User) *http.Request {

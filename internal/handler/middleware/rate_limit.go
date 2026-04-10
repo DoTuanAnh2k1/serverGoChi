@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"go-aa-server/internal/handler/response"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/handler/response"
 )
 
 type rateLimiter struct {

@@ -16,8 +16,8 @@ import (
 	"k8s.io/client-go/tools/leaderelection"
 	"k8s.io/client-go/tools/leaderelection/resourcelock"
 
-	"go-aa-server/internal/logger"
-	"go-aa-server/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/internal/logger"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
 // Start chạy leader election loop cho đến khi ctx bị cancel.
