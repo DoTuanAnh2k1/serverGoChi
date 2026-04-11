@@ -38,6 +38,7 @@ func Init() {
 	Router.Get("/favicon.ico", handlerFavIcon)
 
 	Router.Get("/health", HealthCheck)
+	Router.Get("/metrics", HandlerMetrics)
 	Router.Get("/admin", handlerFrontend)
 	Router.Get("/docs", handlerSwaggerUI)
 	Router.Get("/docs/openapi.yaml", handlerOpenAPISpec)
@@ -88,6 +89,12 @@ func Init() {
 			})
 		})
 
+		router.Route("/import", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Use(middleware.CheckRole)
+			r.Post("/", HandlerImport)
+		})
+
 		router.Route("/history", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
 			r.Get("/list", HandlerListHistory)
@@ -128,7 +135,7 @@ func handlerOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := os.ReadFile(specPath)
 	if err != nil {
-		response.InternalError(w, "api spec not found")
+		response.NotFound(w, "api spec not found")
 		return
 	}
 	w.Header().Set("Content-Type", "application/yaml")

@@ -103,6 +103,7 @@ tr:hover td{background:#1e293b80}
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping">NE Mapping</a>
   <a onclick="showSection('role-mapping')" data-section="role-mapping">Role Mapping</a>
   <a onclick="showSection('history')" data-section="history">History</a>
+  <a onclick="showSection('import')" data-section="import">Import</a>
 </div>
 
 <div class="main">
@@ -229,6 +230,45 @@ tr:hover td{background:#1e293b80}
   </div>
 </div>
 
+<!-- Import -->
+<div class="section" id="sec-import">
+  <div class="card">
+    <h3 style="margin-bottom:1rem">Import Data</h3>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem">Upload a file or paste import data below. Format: CSV sections separated by [section_name] headers.</p>
+    <div style="margin-bottom:1rem">
+      <input type="file" id="importFile" accept=".txt,.csv" style="display:none" onchange="handleImportFile(event)">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()">Upload File</button>
+      <button class="btn btn-outline btn-sm" onclick="fillSampleImport()">Load Sample</button>
+    </div>
+    <div class="form-group">
+      <textarea id="importText" rows="20" style="width:100%;padding:.75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem;font-family:monospace;resize:vertical;outline:none" placeholder="[users]
+username,password
+admin,admin123
+
+[nes]
+name,site_name,ip_address,port,namespace,description
+HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
+
+[roles]
+permission,scope,ne_type,include_type,path
+admin,ext-config,5GC,include,/
+
+[user_roles]
+username,permission
+admin,admin
+
+[user_nes]
+username,ne_name
+admin,HTSMF01"></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="runImport()">Import</button>
+  </div>
+  <div class="card" id="importResultsCard" style="display:none">
+    <h3 style="margin-bottom:1rem">Import Results</h3>
+    <div id="importResults"></div>
+  </div>
+</div>
+
 </div><!-- main -->
 </div><!-- app -->
 
@@ -319,7 +359,7 @@ function showSection(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
   document.getElementById('sec-' + name).classList.add('active');
   document.querySelectorAll('.sidebar a').forEach(a => a.classList.toggle('active', a.dataset.section === name));
-  const titles = {dashboard:'Dashboard',users:'Users',permissions:'Permissions',nes:'Network Elements','ne-mapping':'NE Mapping','role-mapping':'Role Mapping',history:'History'};
+  const titles = {dashboard:'Dashboard',users:'Users',permissions:'Permissions',nes:'Network Elements','ne-mapping':'NE Mapping','role-mapping':'Role Mapping',history:'History','import':'Import'};
   document.getElementById('pageTitle').textContent = titles[name] || name;
   if (name === 'dashboard') loadDashboard();
   if (name === 'users') loadUsers();
@@ -600,6 +640,60 @@ async function loadHistory() {
   });
   html += '</tbody></table>';
   document.getElementById('historyTable').innerHTML = html;
+}
+
+// ── Import ──
+function handleImportFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => { document.getElementById('importText').value = e.target.result; };
+  reader.readAsText(file);
+}
+
+function fillSampleImport() {
+  document.getElementById('importText').value = '[users]\nusername,password\nadmin,admin123\noperator1,Pass@123\n\n[nes]\nname,site_name,ip_address,port,namespace,description\nHTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01\nHTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01\n\n[roles]\npermission,scope,ne_type,include_type,path\nadmin,ext-config,5GC,include,/\noperator,ext-config,5GC,include,/\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,operator\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01';
+}
+
+async function runImport() {
+  const text = document.getElementById('importText').value;
+  if (!text.trim()) { toast('Paste or upload import data first', 'error'); return; }
+
+  const res = await fetch(API + '/import/', {
+    method: 'POST',
+    headers: {'Content-Type': 'text/plain', 'Authorization': TOKEN},
+    body: text
+  });
+  let data;
+  try { data = await res.json(); } catch { data = null; }
+
+  if (!Array.isArray(data) || data.length === 0) {
+    toast('No results returned', 'error');
+    return;
+  }
+
+  const card = document.getElementById('importResultsCard');
+  card.style.display = 'block';
+  let html = '<table><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Detail</th></tr></thead><tbody>';
+  let okCount = 0, errCount = 0, skipCount = 0;
+  data.forEach(r => {
+    const badge = r.status === 'ok' ? '<span class="badge badge-green">ok</span>'
+      : r.status === 'skip' ? '<span class="badge badge-blue">skip</span>'
+      : '<span class="badge badge-red">error</span>';
+    if (r.status === 'ok') okCount++;
+    else if (r.status === 'skip') skipCount++;
+    else errCount++;
+    html += '<tr><td>' + esc(r.type) + '</td><td>' + esc(r.name) + '</td><td>' + badge + '</td><td style="font-size:.8rem">' + esc(r.detail) + '</td></tr>';
+  });
+  html += '</tbody></table>';
+  html += '<p style="margin-top:.75rem;font-size:.85rem;color:#94a3b8">'
+    + '<span class="badge badge-green">' + okCount + ' ok</span> '
+    + '<span class="badge badge-blue">' + skipCount + ' skipped</span> '
+    + '<span class="badge badge-red">' + errCount + ' errors</span></p>';
+  document.getElementById('importResults').innerHTML = html;
+
+  await refreshCaches();
+  toast('Import complete: ' + okCount + ' ok, ' + skipCount + ' skipped, ' + errCount + ' errors');
 }
 
 // ── Init ──

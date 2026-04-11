@@ -16,7 +16,7 @@ type CliOperationHistory struct {
 	IsOssType      int32     `gorm:"column:is_oss_type" json:"is_oss_type"`
 	CmdName        string    `gorm:"column:cmd_name;not null" json:"cmd_name"`
 	FunctionName   string    `gorm:"column:function_name;default:Configuration Management" json:"function_name"`
-	CreatedDate    time.Time `gorm:"column:created_date;default:CURRENT_TIMESTAMP" json:"created_date"`
+	CreatedDate    time.Time `gorm:"column:created_date;not null" json:"created_date"`
 	ExecutedTime   time.Time `gorm:"column:executed_time" json:"executed_time"`
 	NeIP           string    `gorm:"column:ne_ip" json:"ne_ip"`
 	NeName         string    `gorm:"column:ne_name" json:"ne_name"`

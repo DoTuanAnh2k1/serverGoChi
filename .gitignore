@@ -8,3 +8,6 @@ config/uploads/*
 .vscode*
 .env
 .claude/*
+bin/
+/import
+/main

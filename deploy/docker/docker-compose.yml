@@ -1,0 +1,127 @@
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mgt-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpassword}
+      MYSQL_DATABASE: ${MYSQL_DB_NAME:-cli_db}
+      MYSQL_USER: ${MYSQL_USER:-mgtuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mgtpassword}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mgt-mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-root}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:-rootpassword}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: mgt-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-mgtuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mgtpassword}
+      POSTGRES_DB: ${POSTGRES_DB_NAME:-cli_db}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mgtuser} -d ${POSTGRES_DB_NAME:-cli_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  app:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile
+    container_name: mgt-service
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+      mongodb:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${SERVER_PORT:-3000}:${SERVER_PORT:-3000}"
+      - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
+    environment:
+      # Server
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: ${SERVER_PORT:-3000}
+      # Database driver: mysql | mongodb | postgres
+      DB_DRIVER: ${DB_DRIVER:-mysql}
+      MYSQL_HOST: mysql
+      MYSQL_PORT: 3306
+      MYSQL_USER: ${MYSQL_USER:-mgtuser}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-mgtpassword}
+      MYSQL_DB_NAME: ${MYSQL_DB_NAME:-cli_db}
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:?JWT_SECRET_KEY is required}
+      JWT_EXPIRY_HOURS: ${JWT_EXPIRY_HOURS:-24}
+      # Logging
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      DB_LOG_LEVEL: ${DB_LOG_LEVEL:-warn}
+      # CORS
+      CORS_ORIGINS: ${CORS_ORIGINS:-*}
+      CORS_METHODS: ${CORS_METHODS:-GET,POST,DELETE,PUT,OPTIONS}
+      CORS_HEADERS: ${CORS_HEADERS:-Content-Type,Authorization}
+      # Router
+      ROUTER_BASE_PATH: ""
+      # Swagger spec
+      API_SPEC_PATH: /app/api.yaml
+      # MongoDB
+      MONGODB_URI: mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD:-rootpassword}@mongodb:27017
+      MONGODB_DB_NAME: ${MONGODB_DB_NAME:-cli_db}
+      # PostgreSQL
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-mgtuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mgtpassword}
+      POSTGRES_DB_NAME: ${POSTGRES_DB_NAME:-cli_db}
+      POSTGRES_SSLMODE: disable
+      # TCP subscriber server
+      TCP_LISTEN_PORT: ${TCP_LISTEN_PORT:-3675}
+      TCP_DATA_DIR: /data/subscribers
+      # CSV & history export
+      CLI_LOG_EXPORT_DIR: /data/csv
+      CSV_EXPORT_HOUR: ${CSV_EXPORT_HOUR:-23}
+      # Leader election (disabled in docker-compose, enable in K8s)
+      LEADER_ELECTION_ENABLED: "false"
+      POD_NAME: mgt-service-local
+    volumes:
+      - app_data:/data
+
+volumes:
+  mysql_data:
+  mongodb_data:
+  postgres_data:
+  app_data:

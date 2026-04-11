@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"net/http"
+	_ "net/http/pprof"
 	"os"
 	"os/signal"
 	"strconv"
@@ -11,6 +13,7 @@ import (
 
 	"github.com/joho/godotenv"
 
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/config"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/leader"
@@ -18,7 +21,6 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/server"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/tcpserver"
-	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
 func main() {
@@ -101,6 +103,17 @@ func Initialize() *server.Server {
 	tcp := tcpserver.New(tcpAddr, tcpDataDir)
 	if err := tcp.Start(); err != nil {
 		log.Fatalf("tcp server: %v", err)
+	}
+
+	// pprof server on port 6060 (only if PPROF_ENABLED=true)
+	if os.Getenv("PPROF_ENABLED") == "true" {
+		pprofAddr := getEnvOrDefault("PPROF_ADDR", ":6060")
+		go func() {
+			logger.Logger.Infof("pprof: listening on %s", pprofAddr)
+			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
+				logger.Logger.Errorf("pprof: %v", err)
+			}
+		}()
 	}
 
 	if cfg.Leader.Enabled {

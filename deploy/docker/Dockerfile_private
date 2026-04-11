@@ -1,0 +1,42 @@
+# ── Build stage ───────────────────────────────────────────────────────────────
+FROM 172.20.1.22/5gcore/redhat8-golang:1.26.0 AS builder
+
+RUN mkdir -p /build
+WORKDIR /build
+
+ARG APP_GOPROXY='http://172.20.1.22:8081/repository/golang-proxy/,direct'
+ENV GOPROXY=$APP_GOPROXY
+ENV GONOSUMDB=*
+ENV GONOSUMCHECK=off
+ENV GOTOOLCHAIN=auto
+
+COPY go.mod go.sum ./
+RUN \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/root/go/pkg/mod \
+    go mod download
+
+COPY . .
+RUN \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/root/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -trimpath -o /tmp/app ./cmd/main/main.go
+
+# ── Final stage ───────────────────────────────────────────────────────────────
+FROM 172.20.1.22/5gcore/redhat8-base:v1.0
+
+RUN mkdir -p /app /data/subscribers /data/csv
+WORKDIR /app
+
+COPY --from=builder /tmp/app       ./app
+
+RUN chown -R app:app /app /data
+USER app
+
+EXPOSE 3000
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -sf http://127.0.0.1:${SERVER_PORT:-3000}/health || exit 1
+
+ENTRYPOINT ["./app"]

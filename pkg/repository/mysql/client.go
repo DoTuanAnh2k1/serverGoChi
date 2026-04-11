@@ -1,8 +1,9 @@
 package mysql
 
 import (
-	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
@@ -43,7 +44,27 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	}
 	logger.Logger.WithField("host", DbHost+":"+DbPort).WithField("db", DbName).Info("mysql: connected")
 	c.Db = db
+
+	if err := c.autoMigrate(); err != nil {
+		logger.Logger.Errorf("mysql: auto-migrate: %v", err)
+		return err
+	}
+
 	return nil
+}
+
+func (c *Client) autoMigrate() error {
+	return c.Db.AutoMigrate(
+		&db_models.TblAccount{},
+		&db_models.CliNe{},
+		&db_models.CliNeMonitor{},
+		&db_models.CliNeSlave{},
+		&db_models.CliRole{},
+		&db_models.CliRoleUserMapping{},
+		&db_models.CliUserNeMapping{},
+		&db_models.CliOperationHistory{},
+		&db_models.CliLoginHistory{},
+	)
 }
 
 func (c *Client) Ping() error {

@@ -35,7 +35,7 @@ type TblAccount struct {
 	CreatedBy         string    `gorm:"column:created_by" json:"created_by"`
 	UpdatedBy         string    `gorm:"column:updated_by" json:"updated_by"`
 	LockedTime        time.Time `gorm:"column:locked_time" json:"locked_time"`
-	FirstLogin        []uint8   `gorm:"column:first_login;default:b'0'" json:"first_login"`
+	FirstLogin        []uint8   `gorm:"column:first_login" json:"first_login"`
 	OnlyAD            bool      `gorm:"column:onlyAD" json:"onlyAD"`
 }
 

@@ -1,0 +1,44 @@
+# Sample import file for MGT Service
+# Usage: go run ./cmd/import -file sample_import.txt
+
+[users]
+username,password
+admin,admin123
+operator1,Pass@123
+operator2,Pass@123
+viewer1,Pass@123
+
+[nes]
+name,site_name,ip_address,port,namespace,description
+HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
+HTSMF02,HCM,10.10.1.2,22,hcm-5gc,HCM SMF Node 02
+HTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01
+HTAMF02,HCM,10.10.2.2,22,hcm-5gc,HCM AMF Node 02
+HNSMF01,HN,10.20.1.1,22,hn-5gc,Ha Noi SMF Node 01
+HNAMF01,HN,10.20.2.1,22,hn-5gc,Ha Noi AMF Node 01
+DNUPF01,DN,10.30.3.1,22,dn-5gc,Da Nang UPF Node 01
+
+[roles]
+permission,scope,ne_type,include_type,path
+admin,ext-config,5GC,include,/
+operator,ext-config,5GC,include,/
+viewer,ext-config,5GC,include,/
+
+[user_roles]
+username,permission
+admin,admin
+operator1,operator
+operator2,operator
+viewer1,viewer
+
+[user_nes]
+username,ne_name
+admin,HTSMF01
+admin,HTSMF02
+admin,HTAMF01
+admin,HTAMF02
+operator1,HNSMF01
+operator1,HNAMF01
+operator2,DNUPF01
+viewer1,DNUPF01
+viewer1,HNAMF01
