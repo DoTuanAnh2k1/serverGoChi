@@ -73,6 +73,7 @@ services:
     ports:
       - "${SERVER_PORT:-3000}:${SERVER_PORT:-3000}"
       - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
+      - "${PPROF_PORT:-6060}:${PPROF_PORT:-6060}"
     environment:
       # Server
       SERVER_HOST: "0.0.0.0"
@@ -114,6 +115,9 @@ services:
       # CSV & history export
       CLI_LOG_EXPORT_DIR: /data/csv
       CSV_EXPORT_HOUR: ${CSV_EXPORT_HOUR:-23}
+      # Profiling
+      PPROF_ENABLED: ${PPROF_ENABLED:-true}
+      PPROF_ADDR: ":${PPROF_PORT:-6060}"
       # Leader election (disabled in docker-compose, enable in K8s)
       LEADER_ELECTION_ENABLED: "false"
       POD_NAME: mgt-service-local
