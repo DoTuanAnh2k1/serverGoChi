@@ -31,6 +31,10 @@ func GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
 	return store.GetSingleton().GetRecentHistory(limit)
 }
 
+func GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error) {
+	return store.GetSingleton().GetRecentHistoryFiltered(limit, scope, neName)
+}
+
 // SaveHistoryCommand saves a history record to the database.
 func SaveHistoryCommand(historyCommand db_models.CliOperationHistory) error {
 	sto := store.GetSingleton()

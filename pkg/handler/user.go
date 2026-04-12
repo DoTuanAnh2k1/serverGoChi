@@ -40,7 +40,7 @@ func HandlerChangePassword(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("change-password for user %v", req.Username),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 
@@ -106,7 +106,7 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize-user set username %v permission %v", req.Username, req.Permission),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 
@@ -179,7 +179,7 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize-user delete username %v permission %v", req.Username, req.Permission),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 
@@ -243,7 +243,7 @@ func HandlerAuthorizeUserShow(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     "authorize-user show",
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 

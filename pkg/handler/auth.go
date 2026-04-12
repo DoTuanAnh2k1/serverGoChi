@@ -109,7 +109,7 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authenticate-user set username %v password xxx", userInfo.AccountName),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 
@@ -190,7 +190,7 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authenticate-user delete username %v", userInfo.AccountName),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 
@@ -239,7 +239,7 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     "authenticate-user show",
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}
 

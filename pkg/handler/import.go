@@ -168,7 +168,7 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 	saveHistory(db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("import (%d items)", len(results)),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     actor.Username,
 	}, "success")
 

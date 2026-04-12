@@ -33,7 +33,7 @@ func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize ne show"),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
@@ -102,7 +102,7 @@ func HandlerNeRemove(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize ne remove id %v", req.ID),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
@@ -143,7 +143,7 @@ func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
 	opHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize ne create name %v", req.Name),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
@@ -177,7 +177,7 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize ne set"),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
@@ -311,7 +311,7 @@ func HandlerNeDelete(w http.ResponseWriter, r *http.Request) {
 	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize ne delete"),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 

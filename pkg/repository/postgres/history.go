@@ -29,6 +29,22 @@ func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, e
 	return records, nil
 }
 
+func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error) {
+	var records []db_models.CliOperationHistory
+	q := c.Db.Order("created_date DESC").Limit(limit)
+	if scope != "" {
+		q = q.Where("scope = ?", scope)
+	}
+	if neName != "" {
+		q = q.Where("ne_name = ?", neName)
+	}
+	tx := q.Find(&records)
+	if tx.Error != nil {
+		return nil, tx.Error
+	}
+	return records, nil
+}
+
 // DeleteHistoryBefore deletes all cli_operation_history records
 // with created_date < cutoff. Returns deleted count.
 func (c *Client) DeleteHistoryBefore(cutoff time.Time) (int64, error) {

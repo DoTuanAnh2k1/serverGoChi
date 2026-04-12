@@ -132,7 +132,21 @@ File mẫu: `deploy/local/sample_import.txt`
 
 ## Admin Frontend
 
-Giao diện quản trị tại `http://localhost:3000/admin`:
+Hỗ trợ song ngữ Tiếng Việt / English, chuyển đổi ở sidebar.
+
+### Chế độ embedded (chạy chung với server)
+
+```
+http://localhost:3000/admin
+```
+
+### Chế độ standalone (chạy riêng)
+
+```bash
+MGT_API_URL=http://10.10.1.100:3000/aa FRONTEND_PORT=8080 go run ./cmd/frontend
+```
+
+### Các tab
 
 - **Dashboard** — tổng quan users, permissions, NEs
 - **Users** — tạo / vô hiệu hóa user
@@ -140,8 +154,9 @@ Giao diện quản trị tại `http://localhost:3000/admin`:
 - **Network Elements** — tạo / xóa NE (5GC core nodes)
 - **NE Mapping** — gán / xóa NE cho user (autocomplete search)
 - **Role Mapping** — gán / xóa role cho user (autocomplete search)
-- **History** — xem lịch sử thao tác
+- **History** — xem lịch sử thao tác, filter theo scope và NE
 - **Import** — upload file hoặc paste data để import hàng loạt
+- **Guide** — hướng dẫn sử dụng toàn bộ hệ thống
 
 ---
 
@@ -205,7 +220,10 @@ Hoặc truy cập trực tiếp: `http://localhost:6060/debug/pprof/`
 mgt-service/
 ├── cmd/
 │   ├── main/                   # Entry point (server)
+│   ├── frontend/               # Standalone frontend server
 │   └── import/                 # CLI import tool
+├── web/
+│   └── index.html              # Frontend HTML (source, dùng cho standalone)
 ├── models/
 │   ├── config_models/          # Struct cấu hình
 │   └── db_models/              # GORM model (generated)
@@ -228,12 +246,14 @@ mgt-service/
 │   ├── testutil/               # Mock store cho test
 │   └── token/                  # JWT create/parse
 ├── deploy/
-│   ├── docker/                 # Dockerfile, docker-compose
-│   │   ├── Dockerfile
-│   │   ├── Dockerfile_private
+│   ├── docker/
+│   │   ├── Dockerfile                      # mgt-service (public)
+│   │   ├��─ Dockerfile_private              # mgt-service (private registry)
+│   │   ├── Dockerfile_frontend             # frontend (public)
+│   │   ├── Dockerfile_frontend_private     # frontend (private registry)
 │   │   ├── docker-compose.yml
 │   │   └── docker-compose-private.yaml
-│   ├── k8s/                    # Kubernetes manifests
+│   ├── k8s/                    # Kubernetes manifests (service + frontend)
 │   └── local/                  # Local dev files
 │       ├── .env.example
 │       ├── sample_import.txt
@@ -362,8 +382,18 @@ Authorization: Basic <jwt_token>
 
 | Method | Path | Mô tả |
 |---|---|---|
-| `GET`  | `/aa/history/list` | Danh sách lịch sử lệnh gần nhất (`?limit=N`) |
+| `GET`  | `/aa/history/list` | Danh sách lịch sử lệnh (`?limit=N&scope=X&ne_name=Y`) |
 | `POST` | `/aa/history/save` | Lưu một bản ghi lịch sử lệnh |
+
+**Scope types:**
+
+| Scope | Nguồn | Mô tả |
+|---|---|---|
+| `cli-config` | mgt-service (AA server) | Audit thao tác quản trị (tạo/xóa user, NE, role...) |
+| `ne-command` | SSH CLI app (ne-command) | Lịch sử lệnh chạy trên NE |
+| `ne-config` | SSH CLI app (ne-config) | Lịch sử cấu hình NE |
+
+Filter ví dụ: `GET /aa/history/list?limit=100&scope=ne-command&ne_name=HTSMF01`
 
 ### Subscriber files
 
@@ -412,15 +442,21 @@ docker compose -f deploy/docker/docker-compose-private.yaml up -d
 ### Kubernetes
 
 ```bash
+# mgt-service
 kubectl apply -f deploy/k8s/rbac.yaml
 kubectl apply -f deploy/k8s/pvc.yaml
 kubectl apply -f deploy/k8s/configmap.yaml
 kubectl apply -f deploy/k8s/secret.yaml
 kubectl apply -f deploy/k8s/deployment.yaml
 kubectl apply -f deploy/k8s/service.yaml
+
+# frontend (standalone, optional)
+kubectl apply -f deploy/k8s/frontend-deployment.yaml
+kubectl apply -f deploy/k8s/frontend-service.yaml
 ```
 
-> Pod cần `ServiceAccount` có quyền ghi `coordination.k8s.io/leases` — đã cấu hình sẵn trong `rbac.yaml`.
+> Pod mgt-service cần `ServiceAccount` có quyền ghi `coordination.k8s.io/leases` — đã cấu hình sẵn trong `rbac.yaml`.  
+> Frontend trỏ `MGT_API_URL=http://mgt-service/aa` qua ClusterIP.
 
 ---
 

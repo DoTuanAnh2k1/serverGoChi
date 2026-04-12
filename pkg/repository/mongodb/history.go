@@ -64,6 +64,32 @@ func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, e
 	return results, cur.Err()
 }
 
+func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error) {
+	filter := bson.M{}
+	if scope != "" {
+		filter["scope"] = scope
+	}
+	if neName != "" {
+		filter["ne_name"] = neName
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "created_date", Value: -1}}).SetLimit(int64(limit))
+	ctx := context.Background()
+	cur, err := c.col(colOperationHistory).Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var results []db_models.CliOperationHistory
+	for cur.Next(ctx) {
+		var m mOperationHistory
+		if err := cur.Decode(&m); err != nil {
+			return nil, err
+		}
+		results = append(results, fromMOperationHistory(&m))
+	}
+	return results, cur.Err()
+}
+
 func (c *Client) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
 	filter := bson.M{"created_date": bson.M{"$lt": cutoff}}
 	result, err := c.col(colOperationHistory).DeleteMany(context.Background(), filter)

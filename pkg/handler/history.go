@@ -37,7 +37,16 @@ func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	records, err := service.GetRecentHistory(limit)
+	scope := r.URL.Query().Get("scope")
+	neName := r.URL.Query().Get("ne_name")
+
+	var records []db_models.CliOperationHistory
+	var err error
+	if scope != "" || neName != "" {
+		records, err = service.GetRecentHistoryFiltered(limit, scope, neName)
+	} else {
+		records, err = service.GetRecentHistory(limit)
+	}
 	if err != nil {
 		logger.Logger.Error("list history: db error: ", err)
 		response.InternalError(w, "failed to retrieve history")

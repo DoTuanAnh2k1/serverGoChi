@@ -73,6 +73,7 @@ services:
     ports:
       - "${SERVER_PORT:-3000}:${SERVER_PORT:-3000}"
       - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
+      - "${PPROF_PORT:-6060}:${PPROF_PORT:-6060}"
     environment:
       # Server
       SERVER_HOST: "0.0.0.0"
@@ -102,9 +103,6 @@ services:
       # Router
       ROUTER_BASE_PATH: ""
 
-      # Swagger spec
-      API_SPEC_PATH: /app/api.yaml
-
       # MongoDB
       MONGODB_URI:     mongodb://${MONGO_ROOT_USER:-root}:${MONGO_ROOT_PASSWORD:-rootpassword}@mongodb:27017
       MONGODB_DB_NAME: ${MONGODB_DB_NAME:-mgt_db}
@@ -125,12 +123,30 @@ services:
       CLI_LOG_EXPORT_DIR: /data/csv
       CSV_EXPORT_HOUR:    ${CSV_EXPORT_HOUR:-23}
 
+      # Profiling
+      PPROF_ENABLED: ${PPROF_ENABLED:-true}
+      PPROF_ADDR: ":${PPROF_PORT:-6060}"
+
       # Leader election (disabled in docker-compose, enable in K8s)
       LEADER_ELECTION_ENABLED: "false"
       POD_NAME: mgt-service-local
 
     volumes:
       - app_data:/data
+
+  frontend:
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile_frontend_private
+    container_name: mgt-frontend
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${FRONTEND_PORT:-8080}:${FRONTEND_PORT:-8080}"
+    environment:
+      MGT_API_URL: http://app:${SERVER_PORT:-3000}/aa
+      FRONTEND_PORT: ${FRONTEND_PORT:-8080}
 
 volumes:
   mysql_data:

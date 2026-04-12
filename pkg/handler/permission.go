@@ -39,7 +39,7 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize-permission set permission %v scope %v ne %v include type %v path %v", cliRole.Permission, cliRole.Scope, cliRole.NeType, cliRole.IncludeType, cliRole.Path),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
@@ -112,7 +112,7 @@ func HandlerPermissionDelete(w http.ResponseWriter, r *http.Request) {
 	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize-permission delete permission %v scope %v ne %v include type %v path %v", cliRole.Permission, cliRole.Scope, cliRole.NeType, cliRole.IncludeType, cliRole.Path),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
@@ -177,7 +177,7 @@ func HandlerPermissionShow(w http.ResponseWriter, r *http.Request) {
 	loggerOperationHistory := db_models.CliOperationHistory{
 		CmdName:     fmt.Sprintf("authorize-permission show"),
 		CreatedDate: time.Now(),
-		Scope:       "ext-config",
+		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
 	}
 
