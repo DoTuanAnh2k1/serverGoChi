@@ -1044,13 +1044,13 @@ components:
 
   securitySchemes:
     bearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
+      type: apiKey
+      in: header
+      name: Authorization
       description: |
-        Pass the `response_data` value from `POST /aa/authenticate` as-is.
-        The token already contains the `Basic ` prefix — do NOT add `Bearer ` manually.
-        Example header: `Authorization: Basic eyJhbGciOiJIUzI1NiJ9...`
+        Paste the `response_data` value from `POST /aa/authenticate` directly.
+        The token already contains the `Basic ` prefix — paste it as-is.
+        Example: `Basic eyJhbGciOiJIUzI1NiJ9...`
 
   # ── Reusable responses ───────────────────────────────────────────────────────
   responses:
