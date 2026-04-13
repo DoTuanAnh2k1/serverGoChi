@@ -13,6 +13,8 @@ services:
       - "3306:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    networks:
+      - mgt-net
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpassword}"]
       interval: 10s
@@ -31,6 +33,8 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+    networks:
+      - mgt-net
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s
@@ -50,6 +54,8 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mgt-net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-mgtuser} -d ${POSTGRES_DB_NAME:-mgt_db}"]
       interval: 10s
@@ -71,13 +77,17 @@ services:
       postgres:
         condition: service_healthy
     ports:
-      - "${SERVER_PORT:-3000}:${SERVER_PORT:-3000}"
+      - "${SERVER_PORT:-9233}:${SERVER_PORT:-9233}"
       - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
       - "${PPROF_PORT:-6060}:${PPROF_PORT:-6060}"
+    networks:
+      mgt-net:
+        aliases:
+          - ems-aaservice
     environment:
       # Server
       SERVER_HOST: "0.0.0.0"
-      SERVER_PORT: ${SERVER_PORT:-3000}
+      SERVER_PORT: ${SERVER_PORT:-9233}
 
       # Database driver: mysql | mongodb | postgres
       DB_DRIVER:      ${DB_DRIVER:-mysql}
@@ -147,8 +157,10 @@ services:
       - cli-mgt-svc
     ports:
       - "${FRONTEND_PORT:-8080}:${FRONTEND_PORT:-8080}"
+    networks:
+      - mgt-net
     environment:
-      MGT_API_URL: http://cli-mgt-svc:${SERVER_PORT:-3000}/aa
+      MGT_API_URL: http://cli-mgt-svc:${SERVER_PORT:-9233}/aa
       FRONTEND_PORT: ${FRONTEND_PORT:-8080}
 
   cli-command-svc:
@@ -160,6 +172,8 @@ services:
         condition: service_healthy
     ports:
       - "${NE_COMMAND_PORT:-8030}:8030"
+    networks:
+      - mgt-net
 
   cli-netconf-svc:
     build:
@@ -182,7 +196,7 @@ services:
       SSH_HOST_KEY_PATH: /etc/ssh-keys/host_key
 
       # URL of mgt-service (serverGoChi) — used for user auth and NE list
-      MGT_SERVICE_URL: http://cli-mgt-svc:${SERVER_PORT:-3000}
+      MGT_SERVICE_URL: http://cli-mgt-svc:${SERVER_PORT:-9233}
 
       # Credentials used to connect to actual NETCONF devices
       NETCONF_USERNAME: ${NETCONF_USERNAME:-admin}
@@ -190,6 +204,8 @@ services:
       NETCONF_TIMEOUT:  ${NETCONF_TIMEOUT:-30s}
     volumes:
       - netconf_host_key:/etc/ssh-keys
+    networks:
+      - mgt-net
     healthcheck:
       test: ["CMD-SHELL", "nc -z 127.0.0.1 2222 || exit 1"]
       interval: 15s
@@ -203,3 +219,7 @@ volumes:
   postgres_data:
   app_data:
   netconf_host_key:
+
+networks:
+  mgt-net:
+    driver: bridge
