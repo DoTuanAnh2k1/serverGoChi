@@ -19,6 +19,7 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/leader"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/server"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/service"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/tcpserver"
 )
@@ -97,6 +98,7 @@ func Initialize() *server.Server {
 	logger.Init(cfg.Log.Level, cfg.Log.DbLevel)
 	handler.Init()
 	store.Init()
+	service.SeedDefaultUser()
 
 	tcpAddr := ":" + getEnvOrDefault("TCP_LISTEN_PORT", "3675")
 	tcpDataDir := getEnvOrDefault("TCP_DATA_DIR", ".")

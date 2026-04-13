@@ -59,7 +59,7 @@ services:
 
   cli-mgt-svc:
     build:
-      context: ../..
+      context: .
       dockerfile: deploy/docker/Dockerfile_private
     container_name: cli-mgt-svc
     restart: unless-stopped
@@ -123,7 +123,7 @@ services:
       CLI_LOG_EXPORT_DIR: /data/csv
       CSV_EXPORT_HOUR:    ${CSV_EXPORT_HOUR:-23}
 
-      # NETCONF config backup (XML files from cli-netconf commits)
+      # NETCONF config backup (XML files from cli-netconf-svc commits)
       CLI_CONFIG_BACKUP_DIR: /data/config-backups
 
       # Profiling
@@ -139,7 +139,7 @@ services:
 
   frontend:
     build:
-      context: ../..
+      context: .
       dockerfile: deploy/docker/Dockerfile_frontend_private
     container_name: mgt-frontend
     restart: unless-stopped
@@ -153,7 +153,9 @@ services:
 
   cli-netconf-svc:
     build:
-      context: ../../../cli-netconf
+      # Clone cli-netconf next to this repo before running:
+      #   git clone https://github.com/DoTuanAnh2k1/cli-netconf ../cli-netconf
+      context: ../cli-netconf
       dockerfile: ../serverGoChi/deploy/docker/Dockerfile_cli_netconf_private
     container_name: cli-netconf-svc
     restart: unless-stopped
@@ -163,18 +165,9 @@ services:
     ports:
       - "${NETCONF_SSH_PORT:-2222}:2222"
     environment:
-      # SSH listen address
       SSH_ADDR: ":2222"
-
-      # Path to persistent SSH host key (mounted via volume).
-      # If not set, an ephemeral key is generated — clients will see a
-      # host-key-changed warning after every container restart.
       SSH_HOST_KEY_PATH: /etc/ssh-keys/host_key
-
-      # URL of mgt-service (serverGoChi) — used for user auth and NE list
       MGT_SERVICE_URL: http://cli-mgt-svc:${SERVER_PORT:-3000}
-
-      # Credentials used to connect to actual NETCONF devices
       NETCONF_USERNAME: ${NETCONF_USERNAME:-admin}
       NETCONF_PASSWORD: ${NETCONF_PASSWORD:-admin}
       NETCONF_TIMEOUT:  ${NETCONF_TIMEOUT:-30s}
