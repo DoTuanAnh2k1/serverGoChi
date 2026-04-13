@@ -1047,6 +1047,10 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
+      description: |
+        Pass the `response_data` value from `POST /aa/authenticate` as-is.
+        The token already contains the `Basic ` prefix — do NOT add `Bearer ` manually.
+        Example header: `Authorization: Basic eyJhbGciOiJIUzI1NiJ9...`
 
   # ── Reusable responses ───────────────────────────────────────────────────────
   responses:
@@ -1110,7 +1114,8 @@ components:
           example: success
         response_data:
           type: string
-          description: JWT token
+          description: "Token string including 'Basic ' prefix (e.g. 'Basic eyJ...'). Use this value directly as the Authorization header."
+          example: "Basic eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
         response_code:
           type: string
           example: "200"
@@ -1124,7 +1129,7 @@ components:
       properties:
         token:
           type: string
-          description: "Format: Basic <jwt>"
+          description: "The value of response_data from /aa/authenticate (already includes 'Basic ' prefix)"
 
     ValidateTokenResponse:
       type: object
