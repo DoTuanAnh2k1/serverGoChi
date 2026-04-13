@@ -150,8 +150,13 @@ services:
 
   cli-netconf:
     build:
-      context: ../../cli-netconf
-      dockerfile: Dockerfile_private
+      # Build context = cli-netconf repo cloned as a sibling of serverGoChi.
+      # Clone it with: git clone https://github.com/DoTuanAnh2k1/cli-netconf ../cli-netconf
+      # (relative to deploy/docker/ → go up 3 levels to reach the parent dir of serverGoChi,
+      #  then into cli-netconf)
+      context: ../../../cli-netconf
+      # Dockerfile lives in serverGoChi/deploy/docker/ — path is relative to context above.
+      dockerfile: ../serverGoChi/deploy/docker/Dockerfile_cli_netconf_private
     container_name: cli-netconf
     restart: unless-stopped
     depends_on:

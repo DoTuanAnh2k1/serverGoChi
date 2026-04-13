@@ -1,0 +1,57 @@
+# ── Build stage ───────────────────────────────────────────────────────────────
+FROM 172.20.1.22/5gcore/redhat8-golang:1.26.0 AS builder
+
+RUN mkdir -p /build
+WORKDIR /build
+
+ARG APP_GOPROXY='http://172.20.1.22:8081/repository/golang-proxy/,direct'
+ENV GOPROXY=$APP_GOPROXY
+ENV GONOSUMDB=*
+ENV GONOSUMCHECK=off
+ENV GOTOOLCHAIN=auto
+
+COPY go.mod go.sum ./
+RUN \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/root/go/pkg/mod \
+    go mod download
+
+COPY . .
+RUN \
+    --mount=type=cache,target=/root/.cache/go-build \
+    --mount=type=cache,target=/root/go/pkg/mod \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -trimpath -o /tmp/app ./cmd/netconf
+
+# ── Final stage ───────────────────────────────────────────────────────────────
+FROM 172.20.1.22/5gcore/redhat8-base:v1.0
+
+RUN mkdir -p /app /etc/ssh-keys
+WORKDIR /app
+
+COPY --from=builder /tmp/app ./app
+
+# Entrypoint: generate SSH host key on first start if the key file is missing.
+# On subsequent restarts the existing key is reused (stable client fingerprint).
+RUN printf '%s\n' \
+    '#!/bin/sh' \
+    'set -e' \
+    'if [ -n "${SSH_HOST_KEY_PATH}" ] && [ ! -f "${SSH_HOST_KEY_PATH}" ]; then' \
+    '    mkdir -p "$(dirname "${SSH_HOST_KEY_PATH}")"' \
+    '    if command -v ssh-keygen >/dev/null 2>&1; then' \
+    '        ssh-keygen -t ed25519 -f "${SSH_HOST_KEY_PATH}" -N "" -q' \
+    '        echo "Generated SSH host key at ${SSH_HOST_KEY_PATH}"' \
+    '    else' \
+    '        export SSH_HOST_KEY_PATH=""' \
+    '        echo "ssh-keygen not found; using ephemeral host key"' \
+    '    fi' \
+    'fi' \
+    'exec ./app "$@"' \
+    > /app/entrypoint.sh && chmod +x /app/entrypoint.sh
+
+EXPOSE 2222
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD nc -z 127.0.0.1 2222 || exit 1
+
+ENTRYPOINT ["/app/entrypoint.sh"]
