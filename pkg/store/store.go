@@ -68,8 +68,19 @@ type DatabaseStore interface {
 	DeleteRole(*db_models.CliRoleUserMapping) error
 	CreateUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteUserNeMapping(*db_models.CliUserNeMapping) error
+	DeleteAllUserNeMappingByNeId(neId int64) error
 	GetNeMonitorById(int64) (*db_models.CliNeMonitor, error)
+	DeleteNeMonitorByNeId(neId int64) error
 	GetAllNeOfUserByUserId(int64) ([]*db_models.CliUserNeMapping, error)
+	DeleteCliNeSlaveByNeId(neId int64) error
+
+	// cli_ne_config — IP/connection config for ne-config mode
+	CreateCliNeConfig(*db_models.CliNeConfig) error
+	GetCliNeConfigByNeId(neId int64) ([]*db_models.CliNeConfig, error)
+	GetCliNeConfigById(id int64) (*db_models.CliNeConfig, error)
+	UpdateCliNeConfig(*db_models.CliNeConfig) error
+	DeleteCliNeConfigById(id int64) error
+	DeleteCliNeConfigByNeId(neId int64) error
 
 	// GetRecentHistory returns the N most recent history records.
 	GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error)

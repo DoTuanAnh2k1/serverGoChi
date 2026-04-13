@@ -144,6 +144,32 @@ func fromMRoleUserMapping(m *mRoleUserMapping) *db_models.CliRoleUserMapping {
 	return &db_models.CliRoleUserMapping{UserID: m.UserID, Permission: m.Permission}
 }
 
+// mNeConfig mirrors db_models.CliNeConfig.
+type mNeConfig struct {
+	ID          int64  `bson:"id"`
+	NeID        int64  `bson:"ne_id"`
+	IPAddress   string `bson:"ip_address"`
+	Port        int32  `bson:"port"`
+	Username    string `bson:"username"`
+	Password    string `bson:"password"`
+	Protocol    string `bson:"protocol"`
+	Description string `bson:"description"`
+}
+
+func toMNeConfig(c *db_models.CliNeConfig) *mNeConfig {
+	return &mNeConfig{
+		ID: c.ID, NeID: c.NeID, IPAddress: c.IPAddress, Port: c.Port,
+		Username: c.Username, Password: c.Password, Protocol: c.Protocol, Description: c.Description,
+	}
+}
+
+func fromMNeConfig(m *mNeConfig) *db_models.CliNeConfig {
+	return &db_models.CliNeConfig{
+		ID: m.ID, NeID: m.NeID, IPAddress: m.IPAddress, Port: m.Port,
+		Username: m.Username, Password: m.Password, Protocol: m.Protocol, Description: m.Description,
+	}
+}
+
 // mOperationHistory mirrors db_models.CliOperationHistory.
 type mOperationHistory struct {
 	ID             int32     `bson:"id"`

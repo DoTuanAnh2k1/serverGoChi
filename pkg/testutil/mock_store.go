@@ -33,14 +33,23 @@ type MockStore struct {
 	DeleteCliNeByIdFn             func(id int64) error
 	AddRoleFn                     func(role *db_models.CliRoleUserMapping) error
 	DeleteRoleFn                  func(role *db_models.CliRoleUserMapping) error
-	CreateUserNeMappingFn         func(m *db_models.CliUserNeMapping) error
-	DeleteUserNeMappingFn         func(m *db_models.CliUserNeMapping) error
-	GetNeMonitorByIdFn            func(id int64) (*db_models.CliNeMonitor, error)
-	GetAllNeOfUserByUserIdFn      func(userID int64) ([]*db_models.CliUserNeMapping, error)
-	GetRecentHistoryFn            func(limit int) ([]db_models.CliOperationHistory, error)
-	GetRecentHistoryFilteredFn    func(limit int, scope, neName string) ([]db_models.CliOperationHistory, error)
-	GetDailyOperationHistoryFn    func(date time.Time) ([]db_models.CliOperationHistory, error)
-	DeleteHistoryBeforeFn         func(cutoff time.Time) (int64, error)
+	CreateUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
+	DeleteUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
+	DeleteAllUserNeMappingByNeIdFn   func(neId int64) error
+	GetNeMonitorByIdFn               func(id int64) (*db_models.CliNeMonitor, error)
+	DeleteNeMonitorByNeIdFn          func(neId int64) error
+	GetAllNeOfUserByUserIdFn         func(userID int64) ([]*db_models.CliUserNeMapping, error)
+	DeleteCliNeSlaveByNeIdFn         func(neId int64) error
+	CreateCliNeConfigFn              func(cfg *db_models.CliNeConfig) error
+	GetCliNeConfigByNeIdFn           func(neId int64) ([]*db_models.CliNeConfig, error)
+	GetCliNeConfigByIdFn             func(id int64) (*db_models.CliNeConfig, error)
+	UpdateCliNeConfigFn              func(cfg *db_models.CliNeConfig) error
+	DeleteCliNeConfigByIdFn          func(id int64) error
+	DeleteCliNeConfigByNeIdFn        func(neId int64) error
+	GetRecentHistoryFn               func(limit int) ([]db_models.CliOperationHistory, error)
+	GetRecentHistoryFilteredFn       func(limit int, scope, neName string) ([]db_models.CliOperationHistory, error)
+	GetDailyOperationHistoryFn       func(date time.Time) ([]db_models.CliOperationHistory, error)
+	DeleteHistoryBeforeFn            func(cutoff time.Time) (int64, error)
 }
 
 func (m *MockStore) Init(cfg config_models.DatabaseConfig) error {
@@ -204,6 +213,13 @@ func (m *MockStore) DeleteUserNeMapping(mapping *db_models.CliUserNeMapping) err
 	return nil
 }
 
+func (m *MockStore) DeleteAllUserNeMappingByNeId(neId int64) error {
+	if m.DeleteAllUserNeMappingByNeIdFn != nil {
+		return m.DeleteAllUserNeMappingByNeIdFn(neId)
+	}
+	return nil
+}
+
 func (m *MockStore) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
 	if m.GetNeMonitorByIdFn != nil {
 		return m.GetNeMonitorByIdFn(id)
@@ -211,11 +227,67 @@ func (m *MockStore) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) 
 	return nil, nil
 }
 
+func (m *MockStore) DeleteNeMonitorByNeId(neId int64) error {
+	if m.DeleteNeMonitorByNeIdFn != nil {
+		return m.DeleteNeMonitorByNeIdFn(neId)
+	}
+	return nil
+}
+
 func (m *MockStore) GetAllNeOfUserByUserId(userID int64) ([]*db_models.CliUserNeMapping, error) {
 	if m.GetAllNeOfUserByUserIdFn != nil {
 		return m.GetAllNeOfUserByUserIdFn(userID)
 	}
 	return nil, nil
+}
+
+func (m *MockStore) DeleteCliNeSlaveByNeId(neId int64) error {
+	if m.DeleteCliNeSlaveByNeIdFn != nil {
+		return m.DeleteCliNeSlaveByNeIdFn(neId)
+	}
+	return nil
+}
+
+func (m *MockStore) CreateCliNeConfig(cfg *db_models.CliNeConfig) error {
+	if m.CreateCliNeConfigFn != nil {
+		return m.CreateCliNeConfigFn(cfg)
+	}
+	return nil
+}
+
+func (m *MockStore) GetCliNeConfigByNeId(neId int64) ([]*db_models.CliNeConfig, error) {
+	if m.GetCliNeConfigByNeIdFn != nil {
+		return m.GetCliNeConfigByNeIdFn(neId)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetCliNeConfigById(id int64) (*db_models.CliNeConfig, error) {
+	if m.GetCliNeConfigByIdFn != nil {
+		return m.GetCliNeConfigByIdFn(id)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) UpdateCliNeConfig(cfg *db_models.CliNeConfig) error {
+	if m.UpdateCliNeConfigFn != nil {
+		return m.UpdateCliNeConfigFn(cfg)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteCliNeConfigById(id int64) error {
+	if m.DeleteCliNeConfigByIdFn != nil {
+		return m.DeleteCliNeConfigByIdFn(id)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteCliNeConfigByNeId(neId int64) error {
+	if m.DeleteCliNeConfigByNeIdFn != nil {
+		return m.DeleteCliNeConfigByNeIdFn(neId)
+	}
+	return nil
 }
 
 func (m *MockStore) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {

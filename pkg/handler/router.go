@@ -80,6 +80,13 @@ func Init() {
 				subRouter.Post("/delete", HandlerNeDelete)
 				subRouter.Post("/set", HandlerNeSet)
 				subRouter.Get("/show", HandlerNeShow)
+
+				subRouter.Route("/config", func(cfgRouter chi.Router) {
+					cfgRouter.Post("/create", HandlerNeConfigCreate)
+					cfgRouter.Get("/list", HandlerNeConfigList)
+					cfgRouter.Post("/update", HandlerNeConfigUpdate)
+					cfgRouter.Post("/delete", HandlerNeConfigDelete)
+				})
 			})
 
 			r.Route("/user", func(subRouter chi.Router) {
@@ -106,6 +113,7 @@ func Init() {
 
 			r.Get("/ne", HandlerListNe)
 			r.Get("/ne/monitor", HandlerListNeMonitor)
+			r.Get("/ne/config", HandlerListNeConfig)
 		})
 
 		router.Route("/subscribers", func(r chi.Router) {
