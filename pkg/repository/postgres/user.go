@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
+	"gorm.io/gorm"
 )
 
 func (c *Client) GetAllUser() ([]*db_models.TblAccount, error) {
@@ -27,6 +28,9 @@ func (c *Client) GetUserByUserName(username string) (*db_models.TblAccount, erro
 		return nil, errors.New("no database connection")
 	}
 	if tx.Error != nil {
+		if errors.Is(tx.Error, gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
 		return nil, tx.Error
 	}
 	return result, nil

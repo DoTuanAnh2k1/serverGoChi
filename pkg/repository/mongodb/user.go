@@ -32,7 +32,7 @@ func (c *Client) GetUserByUserName(username string) (*db_models.TblAccount, erro
 	var m mAccount
 	err := c.col(colAccounts).FindOne(context.Background(), bson.M{"account_name": username}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
-		return nil, mongo.ErrNoDocuments
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

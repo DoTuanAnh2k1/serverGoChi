@@ -1,0 +1,25 @@
+FROM harbor.vht.hn/emsapps/openjdk:11
+
+ARG USERNAME=cli_dev
+ARG USER_UID=3317
+ARG USER_GID=3642
+RUN groupadd --gid $USER_GID $USERNAME \
+ && useradd  --uid $USER_UID --gid $USER_GID -m $USERNAME
+RUN mkdir src
+
+COPY ./build/libs/vEMS_CLI-1.0-SNAPSHOT.jar src/vEMS_CLI-1.0-SNAPSHOT.jar
+
+RUN mkdir src/config
+COPY ./src/main/resources/* src/config/
+COPY ./src/main/resources/id_rsa    src/id_rsa
+COPY ./src/main/resources/id_ecdsa  src/id_ecdsa
+
+RUN ln -snf /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
+
+RUN chown -R cli_dev:cli_dev src
+WORKDIR src
+USER cli_dev
+
+EXPOSE 8030
+
+CMD ["java", "-jar", "vEMS_CLI-1.0-SNAPSHOT.jar"]

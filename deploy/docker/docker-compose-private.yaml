@@ -151,6 +151,16 @@ services:
       MGT_API_URL: http://cli-mgt-svc:${SERVER_PORT:-3000}/aa
       FRONTEND_PORT: ${FRONTEND_PORT:-8080}
 
+  cli-command-svc:
+    image: cli # TODO: điền image name vào đây
+    container_name: cli-command-svc
+    restart: unless-stopped
+    depends_on:
+      cli-mgt-svc:
+        condition: service_healthy
+    ports:
+      - "${NE_COMMAND_PORT:-8030}:8030"
+
   cli-netconf-svc:
     build:
       context: ../../../cli-netconf
