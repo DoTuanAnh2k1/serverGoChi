@@ -11,6 +11,7 @@ type CliNeMonitor struct {
 	NeID   int64  `gorm:"column:ne_id;primaryKey" json:"ne_id"`
 	NeName string `gorm:"column:ne_name;not null" json:"ne_name"`
 	NeIP   string `gorm:"column:ne_ip" json:"ne_ip"`
+	Namespace string `gorm:"column:namespace" json:"namespace"`
 }
 
 // TableName CliNeMonitor's table name
