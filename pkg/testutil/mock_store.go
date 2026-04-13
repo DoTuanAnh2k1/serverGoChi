@@ -30,6 +30,7 @@ type MockStore struct {
 	GetCliNeListBySystemTypeFn    func(systemType string) ([]*db_models.CliNe, error)
 	GetCliNeByNeIdFn              func(id int64) (*db_models.CliNe, error)
 	CreateCliNeFn                 func(ne *db_models.CliNe) error
+	UpdateCliNeFn                 func(ne *db_models.CliNe) error
 	DeleteCliNeByIdFn             func(id int64) error
 	AddRoleFn                     func(role *db_models.CliRoleUserMapping) error
 	DeleteRoleFn                  func(role *db_models.CliRoleUserMapping) error
@@ -177,6 +178,13 @@ func (m *MockStore) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
 func (m *MockStore) CreateCliNe(ne *db_models.CliNe) error {
 	if m.CreateCliNeFn != nil {
 		return m.CreateCliNeFn(ne)
+	}
+	return nil
+}
+
+func (m *MockStore) UpdateCliNe(ne *db_models.CliNe) error {
+	if m.UpdateCliNeFn != nil {
+		return m.UpdateCliNeFn(ne)
 	}
 	return nil
 }
