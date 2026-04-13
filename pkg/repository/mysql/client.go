@@ -59,11 +59,13 @@ func (c *Client) autoMigrate() error {
 		&db_models.CliNe{},
 		&db_models.CliNeMonitor{},
 		&db_models.CliNeSlave{},
+		&db_models.CliNeConfig{},
 		&db_models.CliRole{},
 		&db_models.CliRoleUserMapping{},
 		&db_models.CliUserNeMapping{},
 		&db_models.CliOperationHistory{},
 		&db_models.CliLoginHistory{},
+		&db_models.CliConfigBackup{},
 	)
 }
 
