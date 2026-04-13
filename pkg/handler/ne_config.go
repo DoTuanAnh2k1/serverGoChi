@@ -48,13 +48,26 @@ func HandlerNeConfigCreate(w http.ResponseWriter, r *http.Request) {
 	response.Created(w)
 }
 
+// neConfigResp is the response shape for a single NE config entry, including ne_name.
+type neConfigResp struct {
+	ID          int64  `json:"id"`
+	NeID        int64  `json:"ne_id"`
+	NeName      string `json:"ne_name"`
+	IPAddress   string `json:"ip_address"`
+	Port        int32  `json:"port"`
+	Username    string `json:"username"`
+	Password    string `json:"password"`
+	Protocol    string `json:"protocol"`
+	Description string `json:"description"`
+}
+
 // HandlerNeConfigList lấy danh sách cấu hình kết nối của một NE cụ thể.
 //
 // Input : GET query param ?ne_id=<int64>
-// Output: 200 [ ...CliNeConfig ] (mảng rỗng nếu chưa có cấu hình)
+// Output: 200 [ ...neConfigResp ] với ne_name và password plaintext
 //         400 nếu ne_id không hợp lệ hoặc bằng 0
 //         500 nếu lỗi DB
-// Flow  : parse ne_id từ query → GetNeConfigByNeId → trả danh sách
+// Flow  : parse ne_id từ query → GetNeByNeId → GetNeConfigByNeId → trả danh sách
 func HandlerNeConfigList(w http.ResponseWriter, r *http.Request) {
 	neIdStr := r.URL.Query().Get("ne_id")
 	neId, err := strconv.ParseInt(neIdStr, 10, 64)
@@ -63,15 +76,37 @@ func HandlerNeConfigList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ne, err := service.GetNeByNeId(neId)
+	if err != nil {
+		response.InternalError(w, "failed to get NE")
+		return
+	}
+	neName := ""
+	if ne != nil {
+		neName = ne.Name
+	}
+
 	list, err := service.GetNeConfigByNeId(neId)
 	if err != nil {
 		response.InternalError(w, "failed to get NE config list")
 		return
 	}
-	if list == nil {
-		list = []*db_models.CliNeConfig{}
+
+	result := make([]neConfigResp, 0, len(list))
+	for _, c := range list {
+		result = append(result, neConfigResp{
+			ID:          c.ID,
+			NeID:        c.NeID,
+			NeName:      neName,
+			IPAddress:   c.IPAddress,
+			Port:        c.Port,
+			Username:    c.Username,
+			Password:    c.Password,
+			Protocol:    c.Protocol,
+			Description: c.Description,
+		})
 	}
-	response.Write(w, http.StatusOK, list)
+	response.Write(w, http.StatusOK, result)
 }
 
 // HandlerNeConfigUpdate cập nhật thông tin một bản ghi cấu hình kết nối NE.

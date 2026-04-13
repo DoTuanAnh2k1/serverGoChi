@@ -78,6 +78,7 @@ func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 			Port:        cliNe.Port,
 			Description: cliNe.Description,
 			Id:          cliNe.ID,
+			Namespace:   cliNe.Namespace,
 		})
 	}
 
@@ -663,6 +664,7 @@ type neShowResp struct {
 	Port        int32  `json:"port"`
 	Description string `json:"description"`
 	Id          int64  `json:"id"`
+	Namespace   string `json:"namespace"`
 }
 
 type neResponse struct {

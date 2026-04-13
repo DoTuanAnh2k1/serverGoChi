@@ -6,8 +6,8 @@ info:
     REST API for user management, RBAC, Network Element (NE) management,
     NE connection config, NETCONF config backup, command history, and bulk import.
 
-    **Authentication:** Most endpoints require `Authorization: Bearer <jwt_token>`.
-    Token obtained from `POST /aa/authenticate`.
+    **Authentication:** Most endpoints require `Authorization: Basic <jwt_token>`.
+    Token obtained from `POST /aa/authenticate` — the `response_data` field already includes the `Basic ` prefix, paste it as-is.
 
 servers:
   - url: http://localhost:3000
@@ -669,7 +669,7 @@ paths:
   /aa/authorize/ne/config/list:
     get:
       tags: [NE Config]
-      summary: List config entries for a NE
+      summary: List config entries for a NE (includes ne_name and password)
       operationId: neConfigList
       security:
         - bearerAuth: []
@@ -689,7 +689,7 @@ paths:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CliNeConfig"
+                  $ref: "#/components/schemas/NeConfigItem"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -754,19 +754,19 @@ paths:
   /aa/list/ne/config:
     get:
       tags: [NE Config]
-      summary: All config entries for NEs belonging to logged-in user
+      summary: All config entries for NEs belonging to logged-in user (grouped by NE)
       operationId: listNeConfig
       security:
         - bearerAuth: []
       responses:
         "200":
-          description: Config list
+          description: Config list grouped by NE
           content:
             application/json:
               schema:
                 type: array
                 items:
-                  $ref: "#/components/schemas/CliNeConfig"
+                  $ref: "#/components/schemas/NeConfigGroupEntry"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -1312,6 +1312,8 @@ components:
         port:
           type: integer
           format: int32
+        namespace:
+          type: string
         description:
           type: string
 
@@ -1393,11 +1395,58 @@ components:
           format: int32
         username:
           type: string
+        password:
+          type: string
+          description: Plaintext password as stored
         protocol:
           type: string
           enum: [SSH, TELNET, NETCONF, RESTCONF]
         description:
           type: string
+
+    NeConfigItem:
+      description: NE config entry with resolved ne_name — returned by GET /aa/authorize/ne/config/list
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+        ne_id:
+          type: integer
+          format: int64
+        ne_name:
+          type: string
+          description: Name of the parent NE
+        ip_address:
+          type: string
+        port:
+          type: integer
+          format: int32
+        username:
+          type: string
+        password:
+          type: string
+          description: Plaintext password as stored
+        protocol:
+          type: string
+          enum: [SSH, TELNET, NETCONF, RESTCONF]
+        description:
+          type: string
+
+    NeConfigGroupEntry:
+      description: Config entries grouped by NE — returned by GET /aa/list/ne/config
+      type: object
+      properties:
+        ne_name:
+          type: string
+        ne_ip:
+          type: string
+        site_name:
+          type: string
+        config_list:
+          type: array
+          items:
+            $ref: "#/components/schemas/CliNeConfig"
 
     NeConfigCreateRequest:
       type: object

@@ -714,12 +714,12 @@ async function loadNeConfigList(){
   if(status!==200){document.getElementById('neConfigTable').innerHTML='<div class="empty">Failed to load</div>';return;}
   const list=data||[];
   if(!list.length){document.getElementById('neConfigTable').innerHTML='<div class="empty">No configs for this NE</div>';return;}
-  let html='<table><thead><tr><th>ID</th><th>IP Address</th><th>Port</th><th>Username</th><th>Protocol</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
+  let html='<table><thead><tr><th>ID</th><th>NE Name</th><th>IP Address</th><th>Port</th><th>Username</th><th>Password</th><th>Protocol</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
   const cfgMap={};
   list.forEach(c=>{cfgMap[c.id]=c;});
   window._neConfigMap=cfgMap;
   list.forEach(c=>{
-    html+='<tr><td>'+c.id+'</td><td>'+esc(c.ip_address)+'</td><td>'+c.port+'</td><td>'+esc(c.username)+'</td><td><span class="badge badge-blue">'+esc(c.protocol)+'</span></td><td>'+esc(c.description)+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openEditNeConfig('+c.id+')">'+t('edit_btn')+'</button><button class="btn btn-danger btn-sm" onclick="deleteNeConfig('+c.id+')">'+t('delete_btn')+'</button></td></tr>';
+    html+='<tr><td>'+c.id+'</td><td>'+esc(c.ne_name||'-')+'</td><td>'+esc(c.ip_address)+'</td><td>'+c.port+'</td><td>'+esc(c.username)+'</td><td><code>'+esc(c.password||'')+'</code></td><td><span class="badge badge-blue">'+esc(c.protocol)+'</span></td><td>'+esc(c.description)+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openEditNeConfig('+c.id+')">'+t('edit_btn')+'</button><button class="btn btn-danger btn-sm" onclick="deleteNeConfig('+c.id+')">'+t('delete_btn')+'</button></td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('neConfigTable').innerHTML=html;
@@ -779,7 +779,7 @@ function openEditNeConfig(id){
   document.getElementById('editCfgIP').value=c.ip_address||'';
   document.getElementById('editCfgPort').value=c.port||'';
   document.getElementById('editCfgUser').value=c.username||'';
-  document.getElementById('editCfgPass').value='';
+  document.getElementById('editCfgPass').value=c.password||'';
   document.getElementById('editCfgProto').value=c.protocol||'SSH';
   document.getElementById('editCfgDesc').value=c.description||'';
   document.getElementById('modalEditNeConfig').classList.add('show');
