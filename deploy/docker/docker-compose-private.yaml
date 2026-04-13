@@ -148,8 +148,45 @@ services:
       MGT_API_URL: http://app:${SERVER_PORT:-3000}/aa
       FRONTEND_PORT: ${FRONTEND_PORT:-8080}
 
+  cli-netconf:
+    build:
+      context: ../../cli-netconf
+      dockerfile: Dockerfile_private
+    container_name: cli-netconf
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    ports:
+      - "${NETCONF_SSH_PORT:-2222}:2222"
+    environment:
+      # SSH listen address
+      SSH_ADDR: ":2222"
+
+      # Path to persistent SSH host key (mounted via volume).
+      # If not set, an ephemeral key is generated — clients will see a
+      # host-key-changed warning after every container restart.
+      SSH_HOST_KEY_PATH: /etc/ssh-keys/host_key
+
+      # URL of mgt-service (serverGoChi) — used for user auth and NE list
+      MGT_SERVICE_URL: http://app:${SERVER_PORT:-3000}
+
+      # Credentials used to connect to actual NETCONF devices
+      NETCONF_USERNAME: ${NETCONF_USERNAME:-admin}
+      NETCONF_PASSWORD: ${NETCONF_PASSWORD:-admin}
+      NETCONF_TIMEOUT:  ${NETCONF_TIMEOUT:-30s}
+    volumes:
+      - netconf_host_key:/etc/ssh-keys
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 2222 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
 volumes:
   mysql_data:
   mongodb_data:
   postgres_data:
   app_data:
+  netconf_host_key:
