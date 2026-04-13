@@ -362,7 +362,7 @@ func TestHandlerListNeConfig_Success(t *testing.T) {
 			}, nil
 		},
 		GetCliNeByNeIdFn: func(id int64) (*db_models.CliNe, error) {
-			return &db_models.CliNe{ID: id, Name: "NE-HCM-01", IPAddress: "10.0.0.1", SiteName: "HCM"}, nil
+			return &db_models.CliNe{ID: id, NeName: "NE-HCM-01", ConfMasterIP: "10.0.0.1", SiteName: "HCM"}, nil
 		},
 		GetCliNeConfigByNeIdFn: func(_ int64) ([]*db_models.CliNeConfig, error) {
 			return []*db_models.CliNeConfig{

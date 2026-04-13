@@ -202,7 +202,7 @@ func TestGetTblIdByUserId_Success(t *testing.T) {
 func TestGetNeListById_Success(t *testing.T) {
 	store.SetSingleton(&testutil.MockStore{
 		GetNeListByIdFn: func(id int64) ([]*db_models.CliNe, error) {
-			return []*db_models.CliNe{{ID: id, Name: "NE-HCM-01"}}, nil
+			return []*db_models.CliNe{{ID: id, NeName: "NE-HCM-01"}}, nil
 		},
 	})
 
@@ -210,7 +210,7 @@ func TestGetNeListById_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(list) != 1 || list[0].Name != "NE-HCM-01" {
+	if len(list) != 1 || list[0].NeName != "NE-HCM-01" {
 		t.Errorf("unexpected result: %v", list)
 	}
 }

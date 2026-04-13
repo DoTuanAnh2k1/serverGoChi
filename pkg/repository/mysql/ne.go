@@ -47,10 +47,10 @@ func (c *Client) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
 	return cliNe, nil
 }
 
+// GetNeMonitorById derives monitor info from CliNe — CommandURL is used as the monitor URL.
 func (c *Client) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
-	cond := &db_models.CliNeMonitor{NeID: id}
-	result := &db_models.CliNeMonitor{}
-	tx := c.Db.First(result, cond)
+	var ne db_models.CliNe
+	tx := c.Db.First(&ne, id)
 	if tx == nil {
 		return nil, errors.New("no database connection")
 	}
@@ -60,7 +60,12 @@ func (c *Client) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
 		}
 		return nil, tx.Error
 	}
-	return result, nil
+	return &db_models.CliNeMonitor{
+		NeID:      ne.ID,
+		NeName:    ne.NeName,
+		NeIP:      ne.CommandURL,
+		Namespace: ne.Namespace,
+	}, nil
 }
 
 func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNeMapping, error) {
@@ -88,21 +93,7 @@ func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
 	if c.Db == nil {
 		return errors.New("no database connection")
 	}
-
-	return c.Db.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Create(ne).Error; err != nil {
-			return err
-		}
-
-		monitor := &db_models.CliNeMonitor{
-			NeID:      ne.ID,
-			NeName:    ne.Name,
-			NeIP:      ne.IPAddress,
-			Namespace: ne.Namespace,
-		}
-
-		return tx.Create(monitor).Error
-	})
+	return c.Db.Create(ne).Error
 }
 
 func (c *Client) UpdateCliNe(ne *db_models.CliNe) error {

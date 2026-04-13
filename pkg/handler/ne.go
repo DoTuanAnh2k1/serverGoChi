@@ -72,10 +72,10 @@ func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 	var neShowRespList []neShowResp
 	for _, cliNe := range cliNeList {
 		neShowRespList = append(neShowRespList, neShowResp{
-			Name:        cliNe.Name,
+			Name:        cliNe.NeName,
 			SiteName:    cliNe.SiteName,
-			IpAddress:   cliNe.IPAddress,
-			Port:        cliNe.Port,
+			IpAddress:   cliNe.ConfMasterIP,
+			Port:        cliNe.ConfPortMasterSSH,
 			Description: cliNe.Description,
 			Id:          cliNe.ID,
 			Namespace:   cliNe.Namespace,
@@ -107,7 +107,7 @@ func HandlerNeUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	user := mustUser(r)
-	op := opHistory("ne update", fmt.Sprintf("id=%d name=%s", req.ID, req.Name), user.Username)
+	op := opHistory("ne update", fmt.Sprintf("id=%d name=%s", req.ID, req.NeName), user.Username)
 
 	if err := service.UpdateNe(&req); err != nil {
 		logger.Logger.Error("authorize/ne/update: ", err)
@@ -180,7 +180,7 @@ func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.Name == "" {
+	if req.NeName == "" {
 		response.Write(w, http.StatusBadRequest, "name is required")
 		return
 	}
@@ -195,7 +195,7 @@ func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	opHistory := db_models.CliOperationHistory{
-		CmdName:     fmt.Sprintf("authorize ne create name %v", req.Name),
+		CmdName:     fmt.Sprintf("authorize ne create name %v", req.NeName),
 		CreatedDate: time.Now(),
 		Scope:       "cli-config",
 		Account:     userMiddleware.Username,
@@ -548,11 +548,11 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 		}
 		neDataList = append(neDataList, neData{
 			Site:        cliNe.SiteName,
-			Ne:          cliNe.Name,
-			Ip:          cliNe.IPAddress,
+			Ne:          cliNe.NeName,
+			Ip:          cliNe.ConfMasterIP,
 			Description: cliNe.Description,
 			Namespace:   cliNe.Namespace,
-			Port:        cliNe.Port,
+			Port:        cliNe.ConfPortMasterSSH,
 			UrlList:     nil,
 		})
 	}
@@ -633,11 +633,11 @@ func HandlerListNeMonitor(w http.ResponseWriter, r *http.Request) {
 		}
 		neMonitorInfoList = append(neMonitorInfoList, neMonitorInfo{
 			Site:         cliNe.SiteName,
-			Ne:           cliNe.Name,
-			Ip:           cliNe.IPAddress,
+			Ne:           cliNe.NeName,
+			Ip:           cliNe.ConfMasterIP,
 			Description:  cliNe.Description,
 			Namespace:    cliNe.Namespace,
-			Port:         cliNe.Port,
+			Port:         cliNe.ConfPortMasterSSH,
 			NeMonitorURL: neMonitor.NeIP,
 		})
 	}

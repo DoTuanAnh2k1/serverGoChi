@@ -60,44 +60,46 @@ func fromMAccount(m *mAccount) *db_models.TblAccount {
 	}
 }
 
-// mNe mirrors db_models.CliNe.
+// mNe mirrors db_models.CliNe with new conf_* fields.
 type mNe struct {
-	ID          int64  `bson:"id"`
-	Description string `bson:"description"`
-	IPAddress   string `bson:"ip_address"`
-	Name        string `bson:"name"`
-	Namespace   string `bson:"namespace"`
-	SiteName    string `bson:"site_name"`
-	SystemType  string `bson:"system_type"`
-	Port        int32  `bson:"port"`
-	MetaData    string `bson:"meta_data"`
+	ID                int64  `bson:"id"`
+	NeName            string `bson:"ne_name"`
+	Namespace         string `bson:"namespace"`
+	SiteName          string `bson:"site_name"`
+	SystemType        string `bson:"system_type"`
+	Description       string `bson:"description"`
+	CommandURL        string `bson:"command_url"`
+	ConfMode          string `bson:"conf_mode"`
+	ConfMasterIP      string `bson:"conf_master_ip"`
+	ConfSlaveIP       string `bson:"conf_slave_ip"`
+	ConfPortMasterSSH int32  `bson:"conf_port_master_ssh"`
+	ConfPortSlaveSSH  int32  `bson:"conf_port_slave_ssh"`
+	ConfPortMasterTCP int32  `bson:"conf_port_master_tcp"`
+	ConfPortSlaveTCP  int32  `bson:"conf_port_slave_tcp"`
+	ConfUsername      string `bson:"conf_username"`
+	ConfPassword      string `bson:"conf_password"`
 }
 
 func toMNe(n *db_models.CliNe) *mNe {
 	return &mNe{
-		ID: n.ID, Description: n.Description, IPAddress: n.IPAddress, Name: n.Name,
-		Namespace: n.Namespace, SiteName: n.SiteName, SystemType: n.SystemType,
-		Port: n.Port, MetaData: n.MetaData,
+		ID: n.ID, NeName: n.NeName, Namespace: n.Namespace, SiteName: n.SiteName,
+		SystemType: n.SystemType, Description: n.Description, CommandURL: n.CommandURL,
+		ConfMode: n.ConfMode, ConfMasterIP: n.ConfMasterIP, ConfSlaveIP: n.ConfSlaveIP,
+		ConfPortMasterSSH: n.ConfPortMasterSSH, ConfPortSlaveSSH: n.ConfPortSlaveSSH,
+		ConfPortMasterTCP: n.ConfPortMasterTCP, ConfPortSlaveTCP: n.ConfPortSlaveTCP,
+		ConfUsername: n.ConfUsername, ConfPassword: n.ConfPassword,
 	}
 }
 
 func fromMNe(m *mNe) *db_models.CliNe {
 	return &db_models.CliNe{
-		ID: m.ID, Description: m.Description, IPAddress: m.IPAddress, Name: m.Name,
-		Namespace: m.Namespace, SiteName: m.SiteName, SystemType: m.SystemType,
-		Port: m.Port, MetaData: m.MetaData,
+		ID: m.ID, NeName: m.NeName, Namespace: m.Namespace, SiteName: m.SiteName,
+		SystemType: m.SystemType, Description: m.Description, CommandURL: m.CommandURL,
+		ConfMode: m.ConfMode, ConfMasterIP: m.ConfMasterIP, ConfSlaveIP: m.ConfSlaveIP,
+		ConfPortMasterSSH: m.ConfPortMasterSSH, ConfPortSlaveSSH: m.ConfPortSlaveSSH,
+		ConfPortMasterTCP: m.ConfPortMasterTCP, ConfPortSlaveTCP: m.ConfPortSlaveTCP,
+		ConfUsername: m.ConfUsername, ConfPassword: m.ConfPassword,
 	}
-}
-
-// mNeMonitor mirrors db_models.CliNeMonitor.
-type mNeMonitor struct {
-	NeID   int64  `bson:"ne_id"`
-	NeName string `bson:"ne_name"`
-	NeIP   string `bson:"ne_ip"`
-}
-
-func fromMNeMonitor(m *mNeMonitor) *db_models.CliNeMonitor {
-	return &db_models.CliNeMonitor{NeID: m.NeID, NeName: m.NeName, NeIP: m.NeIP}
 }
 
 // mUserNeMapping mirrors db_models.CliUserNeMapping.
@@ -144,32 +146,6 @@ func fromMRoleUserMapping(m *mRoleUserMapping) *db_models.CliRoleUserMapping {
 	return &db_models.CliRoleUserMapping{UserID: m.UserID, Permission: m.Permission}
 }
 
-// mNeConfig mirrors db_models.CliNeConfig.
-type mNeConfig struct {
-	ID          int64  `bson:"id"`
-	NeID        int64  `bson:"ne_id"`
-	IPAddress   string `bson:"ip_address"`
-	Port        int32  `bson:"port"`
-	Username    string `bson:"username"`
-	Password    string `bson:"password"`
-	Protocol    string `bson:"protocol"`
-	Description string `bson:"description"`
-}
-
-func toMNeConfig(c *db_models.CliNeConfig) *mNeConfig {
-	return &mNeConfig{
-		ID: c.ID, NeID: c.NeID, IPAddress: c.IPAddress, Port: c.Port,
-		Username: c.Username, Password: c.Password, Protocol: c.Protocol, Description: c.Description,
-	}
-}
-
-func fromMNeConfig(m *mNeConfig) *db_models.CliNeConfig {
-	return &db_models.CliNeConfig{
-		ID: m.ID, NeID: m.NeID, IPAddress: m.IPAddress, Port: m.Port,
-		Username: m.Username, Password: m.Password, Protocol: m.Protocol, Description: m.Description,
-	}
-}
-
 // mConfigBackup mirrors db_models.CliConfigBackup.
 type mConfigBackup struct {
 	ID        int64     `bson:"id"`
@@ -194,43 +170,34 @@ func fromMConfigBackup(m *mConfigBackup) *db_models.CliConfigBackup {
 	}
 }
 
-// mOperationHistory mirrors db_models.CliOperationHistory.
+// mOperationHistory mirrors db_models.CliOperationHistory (simplified fields).
 type mOperationHistory struct {
-	ID             int32     `bson:"id"`
-	IsOssType      int32     `bson:"is_oss_type"`
-	CmdName        string    `bson:"cmd_name"`
-	FunctionName   string    `bson:"function_name"`
-	CreatedDate    time.Time `bson:"created_date"`
-	ExecutedTime   time.Time `bson:"executed_time"`
-	NeIP           string    `bson:"ne_ip"`
-	NeName         string    `bson:"ne_name"`
-	Scope          string    `bson:"scope"`
-	Result         string    `bson:"result"`
-	Account        string    `bson:"account"`
-	IPAddress      string    `bson:"ip_address"`
-	InputType      string    `bson:"input_type"`
-	TimeToComplete int64     `bson:"time_to_complete"`
-	NeID           int32     `bson:"ne_id"`
-	Session        string    `bson:"session"`
-	BatchID        string    `bson:"batch_id"`
+	ID           int32     `bson:"id"`
+	Account      string    `bson:"account"`
+	CmdName      string    `bson:"cmd_name"`
+	NeName       string    `bson:"ne_name"`
+	NeIP         string    `bson:"ne_ip"`
+	IPAddress    string    `bson:"ip_address"`
+	Scope        string    `bson:"scope"`
+	Result       string    `bson:"result"`
+	CreatedDate  time.Time `bson:"created_date"`
+	ExecutedTime time.Time `bson:"executed_time"`
 }
 
 func toMOperationHistory(h db_models.CliOperationHistory) *mOperationHistory {
 	return &mOperationHistory{
-		ID: h.ID, IsOssType: h.IsOssType, CmdName: h.CmdName, FunctionName: h.FunctionName,
-		CreatedDate: h.CreatedDate, ExecutedTime: h.ExecutedTime, NeIP: h.NeIP, NeName: h.NeName,
-		Scope: h.Scope, Result: h.Result, Account: h.Account, IPAddress: h.IPAddress,
-		InputType: h.InputType, TimeToComplete: h.TimeToComplete, NeID: h.NeID,
-		Session: h.Session, BatchID: h.BatchID,
+		ID: h.ID, Account: h.Account, CmdName: h.CmdName,
+		NeName: h.NeName, NeIP: h.NeIP, IPAddress: h.IPAddress,
+		Scope: h.Scope, Result: h.Result,
+		CreatedDate: h.CreatedDate, ExecutedTime: h.ExecutedTime,
 	}
 }
 
 func fromMOperationHistory(m *mOperationHistory) db_models.CliOperationHistory {
 	return db_models.CliOperationHistory{
-		ID: m.ID, IsOssType: m.IsOssType, CmdName: m.CmdName, FunctionName: m.FunctionName,
-		CreatedDate: m.CreatedDate, ExecutedTime: m.ExecutedTime, NeIP: m.NeIP, NeName: m.NeName,
-		Scope: m.Scope, Result: m.Result, Account: m.Account, IPAddress: m.IPAddress,
-		InputType: m.InputType, TimeToComplete: m.TimeToComplete, NeID: m.NeID,
-		Session: m.Session, BatchID: m.BatchID,
+		ID: m.ID, Account: m.Account, CmdName: m.CmdName,
+		NeName: m.NeName, NeIP: m.NeIP, IPAddress: m.IPAddress,
+		Scope: m.Scope, Result: m.Result,
+		CreatedDate: m.CreatedDate, ExecutedTime: m.ExecutedTime,
 	}
 }

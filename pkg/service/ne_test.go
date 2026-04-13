@@ -16,8 +16,8 @@ func TestGetNeListBySystemType_Success(t *testing.T) {
 	store.SetSingleton(&testutil.MockStore{
 		GetCliNeListBySystemTypeFn: func(systemType string) ([]*db_models.CliNe, error) {
 			return []*db_models.CliNe{
-				{ID: 1, Name: "NE-01", SystemType: systemType},
-				{ID: 2, Name: "NE-02", SystemType: systemType},
+				{ID: 1, NeName: "NE-01", SystemType: systemType},
+				{ID: 2, NeName: "NE-02", SystemType: systemType},
 			}, nil
 		},
 	})
@@ -69,7 +69,7 @@ func TestGetNeListBySystemType_DBError(t *testing.T) {
 func TestGetNeByNeId_Success(t *testing.T) {
 	store.SetSingleton(&testutil.MockStore{
 		GetCliNeByNeIdFn: func(id int64) (*db_models.CliNe, error) {
-			return &db_models.CliNe{ID: id, Name: "NE-HCM-01", IPAddress: "10.0.0.1"}, nil
+			return &db_models.CliNe{ID: id, NeName: "NE-HCM-01", ConfMasterIP: "10.0.0.1"}, nil
 		},
 	})
 
@@ -80,8 +80,8 @@ func TestGetNeByNeId_Success(t *testing.T) {
 	if ne.ID != 7 {
 		t.Errorf("ID: got %d, want 7", ne.ID)
 	}
-	if ne.Name != "NE-HCM-01" {
-		t.Errorf("name: got %q, want %q", ne.Name, "NE-HCM-01")
+	if ne.NeName != "NE-HCM-01" {
+		t.Errorf("name: got %q, want %q", ne.NeName, "NE-HCM-01")
 	}
 }
 

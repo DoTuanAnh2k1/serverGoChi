@@ -83,13 +83,13 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 			}
 			port, _ := strconv.Atoi(cols[3])
 			ne := &db_models.CliNe{
-				Name:        cols[0],
-				SiteName:    cols[1],
-				IPAddress:   cols[2],
-				Port:        int32(port),
-				Namespace:   cols[4],
-				Description: cols[5],
-				SystemType:  "5GC",
+				NeName:            cols[0],
+				SiteName:          cols[1],
+				ConfMasterIP:      cols[2],
+				ConfPortMasterSSH: int32(port),
+				Namespace:         cols[4],
+				Description:       cols[5],
+				SystemType:        "5GC",
 			}
 			if err := db.CreateCliNe(ne); err != nil {
 				results = append(results, importResult{"ne", cols[0], "error", err.Error()})
@@ -150,7 +150,7 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 		neMap := map[string]int64{}
 		allNes, _ := db.GetCliNeListBySystemType("5GC")
 		for _, ne := range allNes {
-			neMap[ne.Name] = ne.ID
+			neMap[ne.NeName] = ne.ID
 		}
 		for _, cols := range rows {
 			if len(cols) < 2 {
@@ -180,7 +180,7 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 		neMap := map[string]int64{}
 		allNes, _ := db.GetCliNeListBySystemType("5GC")
 		for _, ne := range allNes {
-			neMap[ne.Name] = ne.ID
+			neMap[ne.NeName] = ne.ID
 		}
 		for _, cols := range rows {
 			if len(cols) < 2 {

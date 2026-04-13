@@ -50,7 +50,7 @@ func (c *Client) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
 	var m mNe
 	err := c.col(colNe).FindOne(context.Background(), bson.M{"id": id}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
-		return nil, mongo.ErrNoDocuments
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err
@@ -58,23 +58,30 @@ func (c *Client) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
 	return fromMNe(&m), nil
 }
 
+// GetNeMonitorById derives monitor info from CliNe — CommandURL is used as the monitor URL.
 func (c *Client) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
-	var m mNeMonitor
-	err := c.col(colNeMonitor).FindOne(context.Background(), bson.M{"ne_id": id}).Decode(&m)
+	var m mNe
+	err := c.col(colNe).FindOne(context.Background(), bson.M{"id": id}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	return fromMNeMonitor(&m), nil
+	ne := fromMNe(&m)
+	return &db_models.CliNeMonitor{
+		NeID:      ne.ID,
+		NeName:    ne.NeName,
+		NeIP:      ne.CommandURL,
+		Namespace: ne.Namespace,
+	}, nil
 }
 
 func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNeMapping, error) {
 	var m mUserNeMapping
 	err := c.col(colUserNeMapping).FindOne(context.Background(), bson.M{"user_id": userId}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
-		return nil, mongo.ErrNoDocuments
+		return nil, nil
 	}
 	if err != nil {
 		return nil, err

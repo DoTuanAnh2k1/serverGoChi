@@ -65,7 +65,7 @@ func DeleteNeById(id int64) error {
 
 func CreateNe(ne *db_models.CliNe) error {
 	if err := store.GetSingleton().CreateCliNe(ne); err != nil {
-		logger.Logger.WithField("ne_name", ne.Name).Errorf("ne: create: %v", err)
+		logger.Logger.WithField("ne_name", ne.NeName).Errorf("ne: create: %v", err)
 		return err
 	}
 	return nil

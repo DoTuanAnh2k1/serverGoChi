@@ -16,16 +16,11 @@ import (
 
 // saveHistoryReq is the body for POST /aa/history/save.
 type saveHistoryReq struct {
-	CmdName        string `json:"cmd_name"`
-	NeName         string `json:"ne_name"`
-	NeIP           string `json:"ne_ip"`
-	NeID           int32  `json:"ne_id"`
-	Scope          string `json:"scope"`
-	Result         string `json:"result"`
-	InputType      string `json:"input_type"`
-	Session        string `json:"session"`
-	BatchID        string `json:"batch_id"`
-	TimeToComplete int64  `json:"time_to_complete"`
+	CmdName string `json:"cmd_name"`
+	NeName  string `json:"ne_name"`
+	NeIP    string `json:"ne_ip"`
+	Scope   string `json:"scope"`
+	Result  string `json:"result"`
 }
 
 // HandlerListHistory trả về lịch sử thao tác gần đây, có hỗ trợ lọc.
@@ -106,19 +101,14 @@ func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 
 	now := time.Now()
 	record := db_models.CliOperationHistory{
-		CmdName:        req.CmdName,
-		NeName:         req.NeName,
-		NeIP:           req.NeIP,
-		NeID:           req.NeID,
-		Scope:          req.Scope,
-		Result:         req.Result,
-		InputType:      req.InputType,
-		Session:        req.Session,
-		BatchID:        req.BatchID,
-		TimeToComplete: req.TimeToComplete,
-		Account:        userCtx.Username,
-		CreatedDate:    now,
-		ExecutedTime:   now,
+		CmdName:      req.CmdName,
+		NeName:       req.NeName,
+		NeIP:         req.NeIP,
+		Scope:        req.Scope,
+		Result:       req.Result,
+		Account:      userCtx.Username,
+		CreatedDate:  now,
+		ExecutedTime: now,
 	}
 
 	if err := service.SaveHistoryCommand(record); err != nil {

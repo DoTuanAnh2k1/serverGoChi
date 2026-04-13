@@ -302,7 +302,7 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 			if err != nil || ne == nil {
 				continue
 			}
-			nes = append(nes, tblNe{Ne: ne.Name, Site: ne.SiteName})
+			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName})
 		}
 		role, err := service.GetRolesById(u.AccountID)
 		if err != nil {

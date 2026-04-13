@@ -83,7 +83,7 @@ func HandlerNeConfigList(w http.ResponseWriter, r *http.Request) {
 	}
 	neName := ""
 	if ne != nil {
-		neName = ne.Name
+		neName = ne.NeName
 	}
 
 	list, err := service.GetNeConfigByNeId(neId)
@@ -215,8 +215,8 @@ func HandlerListNeConfig(w http.ResponseWriter, r *http.Request) {
 			cfgList = []*db_models.CliNeConfig{}
 		}
 		result = append(result, neConfigEntry{
-			NeName:     ne.Name,
-			NeIP:       ne.IPAddress,
+			NeName:     ne.NeName,
+			NeIP:       ne.ConfMasterIP,
 			SiteName:   ne.SiteName,
 			ConfigList: cfgList,
 		})
