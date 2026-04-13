@@ -85,11 +85,24 @@ func (c *Client) DeleteCliNeById(id int64) error {
 }
 
 func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
-	tx := c.Db.Create(ne)
-	if tx == nil {
+	if c.Db == nil {
 		return errors.New("no database connection")
 	}
-	return tx.Error
+
+	return c.Db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(ne).Error; err != nil {
+			return err
+		}
+
+		monitor := &db_models.CliNeMonitor{
+			NeID:      ne.ID,
+			NeName:    ne.Name,
+			NeIP:      ne.IPAddress,
+			Namespace: ne.Namespace,
+		}
+
+		return tx.Create(monitor).Error
+	})
 }
 
 func (c *Client) UpdateCliNe(ne *db_models.CliNe) error {
