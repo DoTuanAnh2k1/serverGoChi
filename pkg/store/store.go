@@ -63,6 +63,7 @@ type DatabaseStore interface {
 	GetCliNeListBySystemType(string) ([]*db_models.CliNe, error)
 	GetCliNeByNeId(int64) (*db_models.CliNe, error)
 	CreateCliNe(*db_models.CliNe) error
+	UpdateCliNe(*db_models.CliNe) error
 	DeleteCliNeById(int64) error
 	AddRole(*db_models.CliRoleUserMapping) error
 	DeleteRole(*db_models.CliRoleUserMapping) error

@@ -33,6 +33,14 @@ func GetAllCliNeOfUserByUserId(id int64) ([]*db_models.CliUserNeMapping, error) 
 	return list, nil
 }
 
+func UpdateNe(ne *db_models.CliNe) error {
+	if err := store.GetSingleton().UpdateCliNe(ne); err != nil {
+		logger.Logger.WithField("ne_id", ne.ID).Errorf("ne: update: %v", err)
+		return err
+	}
+	return nil
+}
+
 // DeleteNeById cascades: removes all relations before deleting the NE itself.
 func DeleteNeById(id int64) error {
 	s := store.GetSingleton()

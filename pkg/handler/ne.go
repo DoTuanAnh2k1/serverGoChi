@@ -90,6 +90,35 @@ func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusFound, neShowRespList)
 }
 
+// HandlerNeUpdate cập nhật thông tin một NE (site, IP, port, namespace, description).
+//
+// Input : POST body JSON { "id": int64 (bắt buộc), cùng các trường CliNe muốn cập nhật }
+// Output: 200 "NE updated" nếu thành công
+//         400 nếu thiếu id hoặc body không hợp lệ
+//         500 nếu lỗi DB
+// Flow  : decode body → validate id > 0 → lấy actor từ context →
+//         UpdateNe → ghi operation history
+func HandlerNeUpdate(w http.ResponseWriter, r *http.Request) {
+	var req db_models.CliNe
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == 0 {
+		response.Write(w, http.StatusBadRequest, "id is required")
+		return
+	}
+
+	user := mustUser(r)
+	op := opHistory("ne update", fmt.Sprintf("id=%d name=%s", req.ID, req.Name), user.Username)
+
+	if err := service.UpdateNe(&req); err != nil {
+		logger.Logger.Error("authorize/ne/update: ", err)
+		saveHistory(op, "failure")
+		response.InternalError(w, "failed to update NE")
+		return
+	}
+
+	saveHistory(op, "success")
+	response.Success(w, "NE updated")
+}
+
 // HandlerNeRemove xoá một NE và toàn bộ dữ liệu liên quan (cascade).
 //
 // Input : POST body JSON { "id": int64 }

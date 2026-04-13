@@ -302,6 +302,64 @@ func HandlerAuthorizeUserShow(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusFound, result)
 }
 
+// HandlerAdminResetPassword cho phép admin đặt lại mật khẩu của bất kỳ user nào.
+//
+// Input : POST body JSON { "username": string, "new_password": string }
+// Output: 200 "password reset" nếu thành công
+//         400 nếu thiếu username/new_password
+//         404 nếu user không tồn tại
+//         500 nếu lỗi DB
+// Flow  : decode body → lấy actor từ context → GetUserByUserName →
+//         hash new_password → UpdateUser → ghi operation history
+func HandlerAdminResetPassword(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Username    string `json:"username"`
+		NewPassword string `json:"new_password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.Username == "" || req.NewPassword == "" {
+		response.Write(w, http.StatusBadRequest, "username and new_password are required")
+		return
+	}
+
+	actor, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
+	if !ok {
+		response.InternalError(w, "Internal Server Error")
+		return
+	}
+
+	op := db_models.CliOperationHistory{
+		CmdName:     fmt.Sprintf("admin reset-password for user %v", req.Username),
+		CreatedDate: time.Now(),
+		Scope:       "cli-config",
+		Account:     actor.Username,
+	}
+
+	u, err := service.GetUserByUserName(req.Username)
+	if err != nil {
+		logger.Logger.Errorf("admin reset-password: get user: %v", err)
+		saveHistory(op, "failure")
+		response.InternalError(w, "failed to retrieve user")
+		return
+	}
+	if u == nil {
+		saveHistory(op, "failure")
+		response.NotFound(w, "user not found")
+		return
+	}
+
+	u.Password = bcrypt.Encode(req.Username + req.NewPassword)
+	u.LockedTime = time.Now()
+	if err := service.UpdateUser(u); err != nil {
+		logger.Logger.Errorf("admin reset-password: update user: %v", err)
+		saveHistory(op, "failure")
+		response.InternalError(w, "failed to reset password")
+		return
+	}
+
+	saveHistory(op, "success")
+	response.Success(w, "password reset")
+}
+
 // ── local types ───────────────────────────────────────────────────────────────
 
 type userChangePasswordReq struct {

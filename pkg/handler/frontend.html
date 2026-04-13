@@ -64,6 +64,12 @@ tr:hover td{background:#1e293b80}
 .guide ul{padding-left:1.2rem;margin:.5rem 0}
 .guide code{background:#334155;padding:.1rem .4rem;border-radius:3px;font-size:.82rem;color:#e2e8f0}
 .guide table{margin:.5rem 0}.guide th,.guide td{padding:.4rem .6rem;font-size:.82rem}
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
+.modal-overlay.show{display:flex}
+.modal{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.5rem;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto}
+.modal h3{margin-bottom:1.25rem;color:#f1f5f9;font-size:1rem}
+.modal-footer{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.25rem}
+.btn-secondary{background:#334155;color:#e2e8f0;border:none}.btn-secondary:hover{background:#475569}
 </style>
 </head>
 <body>
@@ -301,6 +307,82 @@ tr:hover td{background:#1e293b80}
 </div><!-- main -->
 </div><!-- app -->
 
+<!-- Modal: Edit NE -->
+<div class="modal-overlay" id="modalEditNe" onclick="if(event.target===this)closeModal('modalEditNe')">
+<div class="modal">
+  <h3 data-i18n="edit_ne">Edit Network Element</h3>
+  <input type="hidden" id="editNeId">
+  <div class="form-row">
+    <div class="form-group"><label data-i18n="ne_name">Name</label><input id="editNeName" placeholder="HTSMF01"></div>
+    <div class="form-group"><label>Site</label><input id="editNeSite" placeholder="HCM"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>IP Address</label><input id="editNeIP" placeholder="10.10.1.1"></div>
+    <div class="form-group"><label>Port</label><input id="editNePort" type="number" placeholder="22"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Namespace</label><input id="editNeNS" placeholder="hcm-5gc"></div>
+    <div class="form-group"><label data-i18n="description">Description</label><input id="editNeDesc" placeholder=""></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('modalEditNe')" data-i18n="cancel">Cancel</button>
+    <button class="btn btn-primary" onclick="submitEditNe()" data-i18n="save">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal: Edit NE Config -->
+<div class="modal-overlay" id="modalEditNeConfig" onclick="if(event.target===this)closeModal('modalEditNeConfig')">
+<div class="modal">
+  <h3 data-i18n="edit_ne_config">Edit NE Config</h3>
+  <input type="hidden" id="editCfgId">
+  <div class="form-row">
+    <div class="form-group"><label>IP Address</label><input id="editCfgIP" placeholder="10.10.1.1"></div>
+    <div class="form-group"><label>Port</label><input id="editCfgPort" type="number" placeholder="22"></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group"><label>Username</label><input id="editCfgUser" placeholder="admin"></div>
+    <div class="form-group"><label>Password</label><input id="editCfgPass" type="password" placeholder=""></div>
+  </div>
+  <div class="form-row">
+    <div class="form-group">
+      <label>Protocol</label>
+      <select id="editCfgProto" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
+        <option value="SSH">SSH</option>
+        <option value="TELNET">TELNET</option>
+        <option value="NETCONF">NETCONF</option>
+        <option value="RESTCONF">RESTCONF</option>
+      </select>
+    </div>
+    <div class="form-group"><label data-i18n="description">Description</label><input id="editCfgDesc" placeholder=""></div>
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('modalEditNeConfig')" data-i18n="cancel">Cancel</button>
+    <button class="btn btn-primary" onclick="submitEditNeConfig()" data-i18n="save">Save</button>
+  </div>
+</div>
+</div>
+
+<!-- Modal: Reset Password -->
+<div class="modal-overlay" id="modalResetPass" onclick="if(event.target===this)closeModal('modalResetPass')">
+<div class="modal">
+  <h3 data-i18n="reset_password">Reset Password</h3>
+  <input type="hidden" id="resetPassUser">
+  <div class="form-group">
+    <label data-i18n="username">Username</label>
+    <input id="resetPassUserDisplay" disabled style="opacity:.6">
+  </div>
+  <div class="form-group">
+    <label data-i18n="new_password">New Password</label>
+    <input id="resetPassNew" type="password" placeholder="">
+  </div>
+  <div class="modal-footer">
+    <button class="btn btn-secondary" onclick="closeModal('modalResetPass')" data-i18n="cancel">Cancel</button>
+    <button class="btn btn-primary" onclick="submitResetPass()" data-i18n="save">Save</button>
+  </div>
+</div>
+</div>
+
 <script>
 // ── Config ──
 // {{API_BASE}} is replaced by the server. For embedded mode it's '/aa', for standalone it's configured via env.
@@ -318,7 +400,9 @@ const I18N = {
     nav_ne_config:'NE Config', nav_ne_mapping:'NE Mapping', nav_role_mapping:'Role Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     // common
     username:'Username', password:'Password', login:'Login', logout:'Logout', create:'Create', assign:'Assign',
-    refresh:'Refresh', delete_btn:'Delete', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
+    refresh:'Refresh', delete_btn:'Delete', edit_btn:'Edit', save:'Save', cancel:'Cancel', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
+    new_password:'New Password', reset_password:'Reset Password',
+    edit_ne:'Edit Network Element', edit_ne_config:'Edit NE Config',
     // sections
     create_user:'Create User', all_users:'All Users',
     create_permission:'Create Permission', all_permissions:'All Permissions',
@@ -387,7 +471,9 @@ const I18N = {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_permissions:'Phân quyền', nav_nes:'Phần tử mạng',
     nav_ne_config:'Cấu hình NE', nav_ne_mapping:'Gán NE', nav_role_mapping:'Gán Role', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
     username:'Tên đăng nhập', password:'Mật khẩu', login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', assign:'Gán',
-    refresh:'Làm mới', delete_btn:'Xóa', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
+    refresh:'Làm mới', delete_btn:'Xóa', edit_btn:'Sửa', save:'Lưu', cancel:'Hủy', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
+    new_password:'Mật khẩu mới', reset_password:'Đặt lại mật khẩu',
+    edit_ne:'Sửa phần tử mạng', edit_ne_config:'Sửa cấu hình NE',
     create_user:'Tạo người dùng', all_users:'Tất cả người dùng',
     create_permission:'Tạo quyền', all_permissions:'Tất cả quyền',
     create_ne:'Tạo phần tử mạng', all_nes:'Tất cả phần tử mạng',
@@ -600,7 +686,7 @@ async function loadDashboard() {
 }
 
 // ── Users ──
-async function loadUsers() { const data=cachedUsers; if(!data.length){document.getElementById('usersTable').innerHTML='<div class="empty">No users found</div>';return;} let html='<table><thead><tr><th>'+t('username')+'</th><th>Role</th><th>NEs</th><th>Actions</th></tr></thead><tbody>'; data.forEach(u=>{const nes=(u.tblNes||[]).map(n=>'<span class="badge badge-blue">'+esc(n.ne)+'</span>').join(' ')||'-';const role=u.role?'<span class="badge badge-green">'+esc(u.role)+'</span>':'-';html+='<tr><td>'+esc(u.username)+'</td><td>'+role+'</td><td>'+nes+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.username)+'\')">'+t('disable')+'</button></td></tr>';}); html+='</tbody></table>'; document.getElementById('usersTable').innerHTML=html; }
+async function loadUsers() { const data=cachedUsers; if(!data.length){document.getElementById('usersTable').innerHTML='<div class="empty">No users found</div>';return;} let html='<table><thead><tr><th>'+t('username')+'</th><th>Role</th><th>NEs</th><th>Actions</th></tr></thead><tbody>'; data.forEach(u=>{const nes=(u.tblNes||[]).map(n=>'<span class="badge badge-blue">'+esc(n.ne)+'</span>').join(' ')||'-';const role=u.role?'<span class="badge badge-green">'+esc(u.role)+'</span>':'-';html+='<tr><td>'+esc(u.username)+'</td><td>'+role+'</td><td>'+nes+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openResetPass(\''+esc(u.username)+'\')">'+t('reset_password')+'</button><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.username)+'\')">'+t('disable')+'</button></td></tr>';}); html+='</tbody></table>'; document.getElementById('usersTable').innerHTML=html; }
 async function createUser(){const username=document.getElementById('newUsername').value;const password=document.getElementById('newPassword').value;if(!username||!password){toast('Fill in all fields','error');return;}const{status}=await api('POST','/authenticate/user/set',{account_name:username,password});if(status===201){toast('User created');document.getElementById('newUsername').value='';document.getElementById('newPassword').value='';await refreshCaches();loadUsers();}else toast('Failed','error');}
 async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const{status}=await api('POST','/authenticate/user/delete',{account_name:username});if(status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast('Failed','error');}
 
@@ -610,7 +696,7 @@ async function createPermission(){const permission=document.getElementById('newP
 async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const{status}=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast('Failed','error');}
 
 // ── NEs ──
-async function loadNes(){const data=cachedNes;if(!data.length){document.getElementById('nesTable').innerHTML='<div class="empty">No NEs</div>';return;}let html='<table><thead><tr><th>ID</th><th>'+t('ne_name')+'</th><th>Site</th><th>IP</th><th>Port</th><th>Namespace</th><th>'+t('description')+'</th><th>Actions</th></tr></thead><tbody>';data.forEach(n=>{html+='<tr><td>'+n.id+'</td><td><span class="badge badge-blue">'+esc(n.name)+'</span></td><td>'+esc(n.site_name||'-')+'</td><td>'+esc(n.ip_address||'-')+'</td><td>'+(n.port||'-')+'</td><td>'+esc(n.namespace||'-')+'</td><td>'+esc(n.description||'-')+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.name)+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('nesTable').innerHTML=html;}
+async function loadNes(){const data=cachedNes;if(!data.length){document.getElementById('nesTable').innerHTML='<div class="empty">No NEs</div>';return;}let html='<table><thead><tr><th>ID</th><th>'+t('ne_name')+'</th><th>Site</th><th>IP</th><th>Port</th><th>Namespace</th><th>'+t('description')+'</th><th>Actions</th></tr></thead><tbody>';data.forEach(n=>{html+='<tr><td>'+n.id+'</td><td><span class="badge badge-blue">'+esc(n.name)+'</span></td><td>'+esc(n.site_name||'-')+'</td><td>'+esc(n.ip_address||'-')+'</td><td>'+(n.port||'-')+'</td><td>'+esc(n.namespace||'-')+'</td><td>'+esc(n.description||'-')+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openEditNe('+JSON.stringify(n)+')">'+t('edit_btn')+'</button><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.name)+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('nesTable').innerHTML=html;}
 async function deleteNe(id,name){if(!confirm(t('delete_btn')+' '+name+'?'))return;const{status}=await api('POST','/authorize/ne/remove',{id});if(status===200){toast('Deleted');await refreshCaches();loadNes();}else toast('Failed','error');}
 async function createNe(){const name=document.getElementById('neCreateName').value;const site_name=document.getElementById('neCreateSite').value;const ip_address=document.getElementById('neCreateIP').value;const port=parseInt(document.getElementById('neCreatePort').value)||22;const namespace=document.getElementById('neCreateNS').value;const description=document.getElementById('neCreateDesc').value;if(!name){toast('Name required','error');return;}const{status}=await api('POST','/authorize/ne/create',{name,site_name,ip_address,port,namespace,description,system_type:'5GC'});if(status===201){toast('Created');['neCreateName','neCreateSite','neCreateIP','neCreatePort','neCreateNS','neCreateDesc'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadNes();}else toast('Failed','error');}
 
@@ -629,7 +715,7 @@ async function loadNeConfigList(){
   if(!list.length){document.getElementById('neConfigTable').innerHTML='<div class="empty">No configs for this NE</div>';return;}
   let html='<table><thead><tr><th>ID</th><th>IP Address</th><th>Port</th><th>Username</th><th>Protocol</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
   list.forEach(c=>{
-    html+='<tr><td>'+c.id+'</td><td>'+esc(c.ip_address)+'</td><td>'+c.port+'</td><td>'+esc(c.username)+'</td><td><span class="badge badge-blue">'+esc(c.protocol)+'</span></td><td>'+esc(c.description)+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteNeConfig('+c.id+')">'+t('delete_btn')+'</button></td></tr>';
+    html+='<tr><td>'+c.id+'</td><td>'+esc(c.ip_address)+'</td><td>'+c.port+'</td><td>'+esc(c.username)+'</td><td><span class="badge badge-blue">'+esc(c.protocol)+'</span></td><td>'+esc(c.description)+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openEditNeConfig('+JSON.stringify(c)+')">'+t('edit_btn')+'</button><button class="btn btn-danger btn-sm" onclick="deleteNeConfig('+c.id+')">'+t('delete_btn')+'</button></td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('neConfigTable').innerHTML=html;
@@ -651,6 +737,77 @@ async function deleteNeConfig(id){
   if(!confirm(t('delete_btn')+' config #'+id+'?'))return;
   const{status}=await api('POST','/authorize/ne/config/delete',{id});
   if(status===200){toast('Deleted');loadNeConfigList();}else toast('Failed','error');
+}
+
+// ── Modal helpers ──
+function closeModal(id){document.getElementById(id).classList.remove('show');}
+
+// ── Edit NE ──
+function openEditNe(n){
+  document.getElementById('editNeId').value=n.id;
+  document.getElementById('editNeName').value=n.name||'';
+  document.getElementById('editNeSite').value=n.site_name||'';
+  document.getElementById('editNeIP').value=n.ip_address||'';
+  document.getElementById('editNePort').value=n.port||'';
+  document.getElementById('editNeNS').value=n.namespace||'';
+  document.getElementById('editNeDesc').value=n.description||'';
+  document.getElementById('modalEditNe').classList.add('show');
+}
+async function submitEditNe(){
+  const id=parseInt(document.getElementById('editNeId').value);
+  const name=document.getElementById('editNeName').value;
+  const site_name=document.getElementById('editNeSite').value;
+  const ip_address=document.getElementById('editNeIP').value;
+  const port=parseInt(document.getElementById('editNePort').value)||22;
+  const namespace=document.getElementById('editNeNS').value;
+  const description=document.getElementById('editNeDesc').value;
+  if(!id){toast('Missing NE id','error');return;}
+  const{status}=await api('POST','/authorize/ne/update',{id,name,site_name,ip_address,port,namespace,description,system_type:'5GC'});
+  if(status===200){toast('NE updated');closeModal('modalEditNe');await refreshCaches();loadNes();}
+  else toast('Failed','error');
+}
+
+// ── Edit NE Config ──
+function openEditNeConfig(c){
+  document.getElementById('editCfgId').value=c.id;
+  document.getElementById('editCfgIP').value=c.ip_address||'';
+  document.getElementById('editCfgPort').value=c.port||'';
+  document.getElementById('editCfgUser').value=c.username||'';
+  document.getElementById('editCfgPass').value='';
+  document.getElementById('editCfgProto').value=c.protocol||'SSH';
+  document.getElementById('editCfgDesc').value=c.description||'';
+  document.getElementById('modalEditNeConfig').classList.add('show');
+}
+async function submitEditNeConfig(){
+  const id=parseInt(document.getElementById('editCfgId').value);
+  const ip_address=document.getElementById('editCfgIP').value;
+  const port=parseInt(document.getElementById('editCfgPort').value)||22;
+  const username=document.getElementById('editCfgUser').value;
+  const password=document.getElementById('editCfgPass').value;
+  const protocol=document.getElementById('editCfgProto').value||'SSH';
+  const description=document.getElementById('editCfgDesc').value;
+  if(!id){toast('Missing config id','error');return;}
+  const body={id,ip_address,port,username,protocol,description};
+  if(password) body.password=password;
+  const{status}=await api('POST','/authorize/ne/config/update',body);
+  if(status===200){toast('Config updated');closeModal('modalEditNeConfig');loadNeConfigList();}
+  else toast('Failed','error');
+}
+
+// ── Reset Password ──
+function openResetPass(username){
+  document.getElementById('resetPassUser').value=username;
+  document.getElementById('resetPassUserDisplay').value=username;
+  document.getElementById('resetPassNew').value='';
+  document.getElementById('modalResetPass').classList.add('show');
+}
+async function submitResetPass(){
+  const username=document.getElementById('resetPassUser').value;
+  const new_password=document.getElementById('resetPassNew').value;
+  if(!new_password){toast('New password required','error');return;}
+  const{status}=await api('POST','/authenticate/user/reset-password',{username,new_password});
+  if(status===200){toast('Password reset');closeModal('modalResetPass');}
+  else toast('Failed','error');
 }
 
 // ── NE Mapping ──

@@ -92,6 +92,14 @@ func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
 	return tx.Error
 }
 
+func (c *Client) UpdateCliNe(ne *db_models.CliNe) error {
+	tx := c.Db.Save(ne)
+	if tx == nil {
+		return errors.New("no database connection")
+	}
+	return tx.Error
+}
+
 func (c *Client) CreateUserNeMapping(m *db_models.CliUserNeMapping) error {
 	tx := c.Db.Create(m)
 	if tx == nil {

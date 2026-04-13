@@ -92,6 +92,13 @@ func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
 	return err
 }
 
+func (c *Client) UpdateCliNe(ne *db_models.CliNe) error {
+	filter := bson.M{"id": ne.ID}
+	update := bson.M{"$set": toMNe(ne)}
+	_, err := c.col(colNe).UpdateOne(context.Background(), filter, update)
+	return err
+}
+
 func (c *Client) CreateUserNeMapping(mapping *db_models.CliUserNeMapping) error {
 	doc := bson.M{"user_id": mapping.UserID, "tbl_ne_id": mapping.TblNeID}
 	_, err := c.col(colUserNeMapping).InsertOne(context.Background(), doc)

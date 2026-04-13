@@ -62,6 +62,7 @@ func Init() {
 			r.Post("/set", HandlerAuthenticateUserSet)
 			r.Post("/delete", HandlerAuthenticateUserDelete)
 			r.Get("/show", HandlerAuthenticateUserShow)
+			r.Post("/reset-password", HandlerAdminResetPassword)
 		})
 
 		router.Route("/authorize", func(r chi.Router) {
@@ -76,6 +77,7 @@ func Init() {
 
 			r.Route("/ne", func(subRouter chi.Router) {
 				subRouter.Post("/create", HandlerNeCreate)
+				subRouter.Post("/update", HandlerNeUpdate)
 				subRouter.Post("/remove", HandlerNeRemove)
 				subRouter.Post("/delete", HandlerNeDelete)
 				subRouter.Post("/set", HandlerNeSet)
