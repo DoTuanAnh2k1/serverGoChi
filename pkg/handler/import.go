@@ -175,6 +175,45 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// NE configs (cli_ne_config): ne_name, ip_address, port, username, password, protocol, description
+	if rows, ok := sections["ne_configs"]; ok {
+		neMap := map[string]int64{}
+		allNes, _ := db.GetCliNeListBySystemType("5GC")
+		for _, ne := range allNes {
+			neMap[ne.Name] = ne.ID
+		}
+		for _, cols := range rows {
+			if len(cols) < 2 {
+				continue
+			}
+			neName := cols[0]
+			neID, found := neMap[neName]
+			if !found {
+				results = append(results, importResult{"ne_config", neName, "error", "ne not found"})
+				continue
+			}
+			port, _ := strconv.Atoi(safeCol(cols, 2))
+			protocol := safeCol(cols, 5)
+			if protocol == "" {
+				protocol = "SSH"
+			}
+			cfg := &db_models.CliNeConfig{
+				NeID:        neID,
+				IPAddress:   safeCol(cols, 1),
+				Port:        int32(port),
+				Username:    safeCol(cols, 3),
+				Password:    safeCol(cols, 4),
+				Protocol:    protocol,
+				Description: safeCol(cols, 6),
+			}
+			if err := db.CreateCliNeConfig(cfg); err != nil {
+				results = append(results, importResult{"ne_config", neName, "error", err.Error()})
+			} else {
+				results = append(results, importResult{"ne_config", neName, "ok", fmt.Sprintf("created (id=%d)", cfg.ID)})
+			}
+		}
+	}
+
 	logger.Logger.WithField("actor", actor.Username).Infof("import: %d results", len(results))
 
 	saveHistory(db_models.CliOperationHistory{
@@ -192,6 +231,14 @@ type importResult struct {
 	Name   string `json:"name"`
 	Status string `json:"status"`
 	Detail string `json:"detail"`
+}
+
+// safeCol returns cols[i] if i is within bounds, otherwise empty string.
+func safeCol(cols []string, i int) string {
+	if i < len(cols) {
+		return cols[i]
+	}
+	return ""
 }
 
 // parseSections reads import.txt format from an io.Reader.

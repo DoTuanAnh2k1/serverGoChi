@@ -368,8 +368,9 @@ const I18N = {
         <tr><td><code>[roles]</code></td><td>permission, scope, ne_type, include_type, path</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
+        <tr><td><code>[ne_configs]</code></td><td>ne_name, ip_address, port, username, password, protocol, description</td></tr>
       </tbody></table>
-      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated).</p>
+      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated). NE configs are always inserted as new entries.</p>
 
       <h3>History</h3>
       <p>View operation audit log. All create/delete/assign actions are recorded with timestamp, user, and result.</p>
@@ -434,8 +435,9 @@ const I18N = {
         <tr><td><code>[roles]</code></td><td>permission, scope, ne_type, include_type, path</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
+        <tr><td><code>[ne_configs]</code></td><td>ne_name, ip_address, port, username, password, protocol, description</td></tr>
       </tbody></table>
-      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng).</p>
+      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng). Cấu hình NE luôn được thêm mới.</p>
 
       <h3>Lịch sử</h3>
       <p>Xem nhật ký thao tác. Tất cả hành động tạo/xóa/gán đều được ghi lại với thời gian, người dùng và kết quả.</p>
@@ -684,7 +686,7 @@ async function loadHistory(){
 
 // ── Import ──
 function handleImportFile(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{document.getElementById('importText').value=e.target.result;};reader.readAsText(file);}
-function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password\nadmin,admin123\noperator1,Pass@123\n\n[nes]\nname,site_name,ip_address,port,namespace,description\nHTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01\nHTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01\n\n[roles]\npermission,scope,ne_type,include_type,path\nadmin,ext-config,5GC,include,/\noperator,ext-config,5GC,include,/\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,operator\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01';}
+function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password\nadmin,admin123\noperator1,Pass@123\n\n[nes]\nname,site_name,ip_address,port,namespace,description\nHTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01\nHTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01\n\n[roles]\npermission,scope,ne_type,include_type,path\nadmin,ext-config,5GC,include,/\noperator,ext-config,5GC,include,/\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,operator\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01\n\n[ne_configs]\nne_name,ip_address,port,username,password,protocol,description\nHTSMF01,10.10.1.1,830,netconf,netconf123,NETCONF,SMF NETCONF interface\nHTSMF01,10.10.1.1,22,admin,admin123,SSH,SMF SSH fallback\nHTAMF01,10.10.2.1,830,netconf,netconf123,NETCONF,AMF NETCONF interface';}
 async function runImport(){const text=document.getElementById('importText').value;if(!text.trim()){toast('Paste or upload data first','error');return;}const res=await fetch(API+'/import/',{method:'POST',headers:{'Content-Type':'text/plain','Authorization':TOKEN},body:text});let data;try{data=await res.json();}catch{data=null;}if(!Array.isArray(data)||!data.length){toast('No results','error');return;}const card=document.getElementById('importResultsCard');card.style.display='block';let html='<table><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Detail</th></tr></thead><tbody>';let ok=0,err=0,skip=0;data.forEach(r=>{const badge=r.status==='ok'?'<span class="badge badge-green">ok</span>':r.status==='skip'?'<span class="badge badge-blue">skip</span>':'<span class="badge badge-red">error</span>';if(r.status==='ok')ok++;else if(r.status==='skip')skip++;else err++;html+='<tr><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td><td>'+badge+'</td><td style="font-size:.8rem">'+esc(r.detail)+'</td></tr>';});html+='</tbody></table><p style="margin-top:.75rem;font-size:.85rem;color:#94a3b8"><span class="badge badge-green">'+ok+' ok</span> <span class="badge badge-blue">'+skip+' skipped</span> <span class="badge badge-red">'+err+' errors</span></p>';document.getElementById('importResults').innerHTML=html;await refreshCaches();toast('Import: '+ok+' ok, '+skip+' skipped, '+err+' errors');}
 
 // ── Init ──
