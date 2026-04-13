@@ -26,13 +26,10 @@ RUN \
 # ── Final stage ───────────────────────────────────────────────────────────────
 FROM 172.20.1.22/5gcore/redhat8-base:v1.0
 
-RUN mkdir -p /app /data/subscribers /data/csv
+RUN mkdir -p /app /data/subscribers /data/csv /data/config-backups
 WORKDIR /app
 
 COPY --from=builder /tmp/app       ./app
-
-RUN chown -R app:app /app /data
-USER app
 
 EXPOSE 3000
 

@@ -123,6 +123,9 @@ services:
       CLI_LOG_EXPORT_DIR: /data/csv
       CSV_EXPORT_HOUR:    ${CSV_EXPORT_HOUR:-23}
 
+      # NETCONF config backup (XML files from cli-netconf commits)
+      CLI_CONFIG_BACKUP_DIR: /data/config-backups
+
       # Profiling
       PPROF_ENABLED: ${PPROF_ENABLED:-true}
       PPROF_ADDR: ":${PPROF_PORT:-6060}"

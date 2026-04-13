@@ -67,6 +67,7 @@ func (c *Client) autoMigrate() error {
 		&db_models.CliUserNeMapping{},
 		&db_models.CliOperationHistory{},
 		&db_models.CliLoginHistory{},
+		&db_models.CliConfigBackup{},
 	)
 }
 

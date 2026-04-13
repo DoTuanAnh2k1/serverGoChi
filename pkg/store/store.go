@@ -93,4 +93,9 @@ type DatabaseStore interface {
 
 	// Leader-only: delete history before cutoff, returns deleted count.
 	DeleteHistoryBefore(cutoff time.Time) (int64, error)
+
+	// config-backup — NETCONF commit backup (metadata in DB, XML on disk)
+	SaveConfigBackup(b *db_models.CliConfigBackup) error
+	ListConfigBackups(neName string) ([]*db_models.CliConfigBackup, error)
+	GetConfigBackupById(id int64) (*db_models.CliConfigBackup, error)
 }

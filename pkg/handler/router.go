@@ -122,6 +122,14 @@ func Init() {
 			r.Get("/files", HandlerListSubscriberFiles)
 			r.Get("/files/{index}", HandlerViewSubscriberFile)
 		})
+
+		router.Route("/config-backup", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+
+			r.Post("/save", HandlerConfigBackupSave)
+			r.Get("/list", HandlerConfigBackupList)
+			r.Get("/{id}", HandlerConfigBackupGet)
+		})
 	})
 }
 

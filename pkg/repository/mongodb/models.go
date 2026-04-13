@@ -170,6 +170,30 @@ func fromMNeConfig(m *mNeConfig) *db_models.CliNeConfig {
 	}
 }
 
+// mConfigBackup mirrors db_models.CliConfigBackup.
+type mConfigBackup struct {
+	ID        int64     `bson:"id"`
+	NeName    string    `bson:"ne_name"`
+	NeIP      string    `bson:"ne_ip"`
+	FilePath  string    `bson:"file_path"`
+	Size      int64     `bson:"size"`
+	CreatedAt time.Time `bson:"created_at"`
+}
+
+func toMConfigBackup(b *db_models.CliConfigBackup) *mConfigBackup {
+	return &mConfigBackup{
+		ID: b.ID, NeName: b.NeName, NeIP: b.NeIP,
+		FilePath: b.FilePath, Size: b.Size, CreatedAt: b.CreatedAt,
+	}
+}
+
+func fromMConfigBackup(m *mConfigBackup) *db_models.CliConfigBackup {
+	return &db_models.CliConfigBackup{
+		ID: m.ID, NeName: m.NeName, NeIP: m.NeIP,
+		FilePath: m.FilePath, Size: m.Size, CreatedAt: m.CreatedAt,
+	}
+}
+
 // mOperationHistory mirrors db_models.CliOperationHistory.
 type mOperationHistory struct {
 	ID             int32     `bson:"id"`

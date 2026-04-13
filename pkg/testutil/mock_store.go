@@ -50,6 +50,9 @@ type MockStore struct {
 	GetRecentHistoryFilteredFn       func(limit int, scope, neName string) ([]db_models.CliOperationHistory, error)
 	GetDailyOperationHistoryFn       func(date time.Time) ([]db_models.CliOperationHistory, error)
 	DeleteHistoryBeforeFn            func(cutoff time.Time) (int64, error)
+	SaveConfigBackupFn               func(b *db_models.CliConfigBackup) error
+	ListConfigBackupsFn              func(neName string) ([]*db_models.CliConfigBackup, error)
+	GetConfigBackupByIdFn            func(id int64) (*db_models.CliConfigBackup, error)
 }
 
 func (m *MockStore) Init(cfg config_models.DatabaseConfig) error {
@@ -316,4 +319,25 @@ func (m *MockStore) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
 		return m.DeleteHistoryBeforeFn(cutoff)
 	}
 	return 0, nil
+}
+
+func (m *MockStore) SaveConfigBackup(b *db_models.CliConfigBackup) error {
+	if m.SaveConfigBackupFn != nil {
+		return m.SaveConfigBackupFn(b)
+	}
+	return nil
+}
+
+func (m *MockStore) ListConfigBackups(neName string) ([]*db_models.CliConfigBackup, error) {
+	if m.ListConfigBackupsFn != nil {
+		return m.ListConfigBackupsFn(neName)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetConfigBackupById(id int64) (*db_models.CliConfigBackup, error) {
+	if m.GetConfigBackupByIdFn != nil {
+		return m.GetConfigBackupByIdFn(id)
+	}
+	return nil, nil
 }
