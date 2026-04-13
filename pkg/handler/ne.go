@@ -14,7 +14,14 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// HandlerNeShow handles GET /aa/authorize/ne/show
+// HandlerNeShow liệt kê tất cả NE thuộc hệ thống 5GC.
+//
+// Input : GET (không có body/query params)
+// Output: 302 [ { name, site_name, ip_address, port, description, id } ]
+//         404 nếu danh sách NE rỗng
+//         500 nếu lỗi DB
+// Flow  : lấy actor từ context → GetNeListBySystemType("5GC") →
+//         map sang neShowResp → ghi operation history → trả danh sách
 func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 	logger.Logger.Info("Handler request authorize ne show")
 	if r.Method != http.MethodGet {
@@ -83,7 +90,15 @@ func HandlerNeShow(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusFound, neShowRespList)
 }
 
-// HandlerNeRemove handles POST /aa/authorize/ne/remove
+// HandlerNeRemove xoá một NE và toàn bộ dữ liệu liên quan (cascade).
+//
+// Input : POST body JSON { "id": int64 }
+// Output: 200 "NE deleted" nếu thành công
+//         400 nếu body không hợp lệ hoặc id == 0
+//         500 nếu lỗi DB khi xoá cascade
+// Flow  : decode body → kiểm tra id > 0 → lấy actor từ context →
+//         DeleteNeById (cascade: user_ne_mapping → ne_monitor → ne_config → ne_slave → ne) →
+//         ghi operation history
 func HandlerNeRemove(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		ID int64 `json:"id"`
@@ -117,7 +132,16 @@ func HandlerNeRemove(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, "NE deleted")
 }
 
-// HandlerNeCreate handles POST /aa/authorize/ne/create
+// HandlerNeCreate tạo mới một NE trong hệ thống.
+//
+// Input : POST body JSON { "name": string (bắt buộc), "site_name", "ip_address",
+//         "port", "namespace", "description", "system_type" } — các trường CliNe
+// Output: 201 nếu tạo thành công
+//         400 nếu thiếu name hoặc body không hợp lệ
+//         500 nếu lỗi DB
+// Flow  : decode body → validate name không rỗng →
+//         mặc định system_type="5GC" nếu không có → lấy actor từ context →
+//         CreateNe → ghi operation history
 func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
 	var req db_models.CliNe
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -158,7 +182,16 @@ func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
 	response.Created(w)
 }
 
-// HandlerNeSet handles POST /aa/authorize/ne/set
+// HandlerNeSet gán một NE cho user (tạo user-NE mapping).
+//
+// Input : POST body JSON { "username": string, "neid": string (ID dạng số) }
+// Output: 200 "Add cli ne to user" nếu thành công
+//         304 nếu NE đã được gán cho user này rồi
+//         404 nếu user hoặc NE không tồn tại
+//         500 nếu lỗi parse/DB
+// Flow  : decode body → parse neId sang int64 → lấy actor từ context →
+//         GetUserByUserName → GetNeByNeId → kiểm tra mapping chưa tồn tại →
+//         AddUserCliNe → ghi operation history
 func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 	logger.Logger.Info("Handler request authorize ne set")
 	if r.Method != http.MethodPost {
@@ -292,7 +325,16 @@ func HandlerNeSet(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusOK, "Add cli ne to user")
 }
 
-// HandlerNeDelete handles POST /aa/authorize/ne/delete
+// HandlerNeDelete gỡ bỏ mapping giữa user và một NE.
+//
+// Input : POST body JSON { "username": string, "neid": string (ID dạng số) }
+// Output: 200 "Delete cli ne to user" nếu thành công
+//         304 nếu mapping không tồn tại
+//         404 nếu user hoặc NE không tồn tại
+//         500 nếu lỗi parse/DB
+// Flow  : decode body → parse neId sang int64 → lấy actor từ context →
+//         GetUserByUserName → GetNeByNeId → tìm mapping tương ứng →
+//         DeleteCliNe → ghi operation history
 func HandlerNeDelete(w http.ResponseWriter, r *http.Request) {
 	logger.Logger.Info("Handler request authorize ne delete")
 	if r.Method != http.MethodPost {
@@ -428,7 +470,14 @@ func HandlerNeDelete(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusNotModified, "Not found user and ne relationship")
 }
 
-// HandlerListNe handles GET /aa/list/ne
+// HandlerListNe trả về danh sách NE mà user hiện tại được phép truy cập.
+//
+// Input : GET (không có body/query params; user lấy từ JWT context)
+// Output: 302 { status, code, message, neDataList: [{site, ne, ip, description, namespace, port}] }
+//         404 nếu user không có NE nào được gán
+//         500 nếu lỗi DB
+// Flow  : lấy actor từ context → GetUserByUserName → GetAllCliNeOfUserByUserId →
+//         với mỗi mapping lấy GetNeByNeId → gộp danh sách neData
 func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		logger.Logger.Error("Method not allowed")
@@ -495,7 +544,15 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusFound, neResp)
 }
 
-// HandlerListNeMonitor handles GET /aa/list/ne/monitor
+// HandlerListNeMonitor trả về thông tin monitor URL của các NE thuộc user (mode command).
+//
+// Input : GET (không có body/query params; user lấy từ JWT context)
+// Output: 200 [ { site, ne, ip, description, namespace, port, ne_monitor_url } ]
+//         404 nếu user không có NE nào được gán
+//         500 nếu lỗi DB
+// Flow  : lấy actor từ context → GetUserByUserName → GetAllCliNeOfUserByUserId →
+//         với mỗi NE: GetNeByNeId → GetNeMonitorById → lấy NeMonitor.NeIP làm URL →
+//         gộp danh sách neMonitorInfo
 func HandlerListNeMonitor(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		logger.Logger.Error("Method not allowed")

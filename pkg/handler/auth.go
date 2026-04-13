@@ -16,7 +16,16 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// HandlerAuthenticate handles POST /aa/authenticate
+// HandlerAuthenticate xác thực user và cấp JWT token.
+//
+// Input : POST body JSON { "username": string, "password": string }
+// Output: 200 { status, response_data (JWT), response_code, system_type }
+//         400 nếu thiếu username/password hoặc body không hợp lệ
+//         401 nếu sai thông tin đăng nhập hoặc DB lỗi khi verify
+//         500 nếu không lấy được roles, tạo token thất bại, hoặc ghi login history lỗi
+// Flow  : decode body → validate username/password không rỗng →
+//         Authenticate (bcrypt check) → GetRolesById → CreateToken →
+//         UpdateLoginHistory → trả JWT token
 func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -74,7 +83,16 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandlerAuthenticateUserSet handles POST /aa/authenticate/user/set
+// HandlerAuthenticateUserSet tạo mới hoặc kích hoạt lại một tài khoản.
+//
+// Input : POST body JSON { "account_name": string, "password": string, ...TblAccount fields }
+// Output: 201 nếu tạo mới hoặc re-enable thành công
+//         400 nếu thiếu username/password hoặc body không hợp lệ
+//         304 nếu user đã tồn tại và đang active
+//         500 nếu lỗi DB khi tạo hoặc cập nhật user
+// Flow  : decode body → validate username/password → lấy actor từ context →
+//         GetUserByUserName → nếu không tồn tại thì AddUser (hash password, set defaults) →
+//         nếu đang bị disable thì re-enable → ghi operation history
 func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -164,7 +182,15 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusNotModified, "user already exists")
 }
 
-// HandlerAuthenticateUserDelete handles POST /aa/authenticate/user/delete
+// HandlerAuthenticateUserDelete vô hiệu hoá (soft-delete) một tài khoản.
+//
+// Input : POST body JSON { "account_name": string }
+// Output: 200 nếu disable thành công
+//         404 nếu user không tồn tại hoặc đã bị disable
+//         500 nếu lỗi DB khi tìm hoặc cập nhật user
+// Flow  : decode body → lấy actor từ context → GetUserByUserName →
+//         nếu user active thì set IsEnable=false, cập nhật LockedTime → UpdateUser →
+//         ghi operation history
 func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -222,7 +248,15 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusNotFound, "user not found")
 }
 
-// HandlerAuthenticateUserShow handles GET /aa/authenticate/user/show
+// HandlerAuthenticateUserShow liệt kê tất cả user cùng NE và role tương ứng.
+//
+// Input : GET (không có body/query params)
+// Output: 302 [ { username, tblNes: [{ne, site}], role } ]
+//         404 nếu không có user nào
+//         500 nếu lỗi DB
+// Flow  : lấy actor từ context → GetAllUser → với mỗi user:
+//         GetAllCliNeOfUserByUserId → GetNeByNeId (lấy tên NE/site) →
+//         GetRolesById → gộp kết quả → ghi operation history
 func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")

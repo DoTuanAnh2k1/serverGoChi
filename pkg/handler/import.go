@@ -16,8 +16,20 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
 )
 
-// HandlerImport handles POST /aa/import
-// Accepts import.txt content as plain text body.
+// HandlerImport nhập hàng loạt dữ liệu cấu hình từ file text có cấu trúc section.
+//
+// Input : POST body plain text theo định dạng import.txt:
+//         [users]       username,password
+//         [nes]         name,site_name,ip_address,port,namespace,description
+//         [roles]       permission,scope,ne_type,include_type,path
+//         [user_roles]  username,permission
+//         [user_nes]    username,ne_name
+//         (dòng đầu mỗi section là header — bị bỏ qua; dòng bắt đầu # là comment)
+// Output: 200 [ { type, name, status, detail } ] — kết quả từng item (ok/skip/error)
+//         500 nếu không lấy được actor từ context
+// Flow  : lấy actor từ context → parseSections(body) → xử lý tuần tự từng section
+//         (users → nes → roles → user_roles → user_nes) → ghi operation history →
+//         trả mảng kết quả
 func HandlerImport(w http.ResponseWriter, r *http.Request) {
 	actor, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {

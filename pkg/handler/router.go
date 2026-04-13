@@ -125,7 +125,12 @@ func Init() {
 	})
 }
 
-// HealthCheck Function
+// HealthCheck kiểm tra kết nối đến database.
+//
+// Input : GET (không có body/query params)
+// Output: 200 "Database still alive" nếu DB phản hồi
+//         500 kèm error message nếu Ping thất bại
+// Flow  : store.GetSingleton().Ping() → trả kết quả
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
 	err := store.GetSingleton().Ping()
 	if err != nil {

@@ -18,7 +18,13 @@ type metricsResp struct {
 	GoVersion   string  `json:"go_version"`
 }
 
-// HandlerMetrics returns runtime metrics (memory, goroutines, CPU).
+// HandlerMetrics trả về các chỉ số runtime của tiến trình Go.
+//
+// Input : GET (không có body/query params)
+// Output: 200 { goroutines, heap_alloc_mb, heap_sys_mb, sys_mem_mb,
+//         num_gc, num_cpu, gomaxprocs, go_version }
+// Flow  : runtime.ReadMemStats → runtime.NumGoroutine/NumCPU/GOMAXPROCS →
+//         gộp vào metricsResp → trả JSON
 func HandlerMetrics(w http.ResponseWriter, r *http.Request) {
 	var m runtime.MemStats
 	runtime.ReadMemStats(&m)

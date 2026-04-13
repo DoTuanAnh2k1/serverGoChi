@@ -13,7 +13,15 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// HandlerPermissionSet handles POST /aa/authorize/permission/set
+// HandlerPermissionSet tạo mới một role/permission trong hệ thống.
+//
+// Input : POST body JSON { "permission": string, "scope": string, "ne_type": string,
+//         "include_type": string, "path": string } — các trường CliRole
+// Output: 201 nếu tạo thành công
+//         304 nếu role này đã tồn tại
+//         500 nếu lỗi parse/DB
+// Flow  : decode body → lấy actor từ context → IsExistCliRole →
+//         nếu chưa tồn tại thì CreateCliRole → ghi operation history
 func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		logger.Logger.Error("Method not allowed")
@@ -86,7 +94,15 @@ func HandlerPermissionSet(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandlerPermissionDelete handles POST /aa/authorize/permission/delete
+// HandlerPermissionDelete xoá một role/permission khỏi hệ thống.
+//
+// Input : POST body JSON { "permission": string, "scope": string, "ne_type": string,
+//         "include_type": string, "path": string } — các trường CliRole dùng để match
+// Output: 200 nếu xoá thành công
+//         304 nếu role không tồn tại
+//         500 nếu lỗi parse/DB
+// Flow  : decode body → lấy actor từ context → IsExistCliRole →
+//         nếu tồn tại thì DeleteCliRole → ghi operation history
 func HandlerPermissionDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		logger.Logger.Error("Method not allowed")
@@ -159,7 +175,13 @@ func HandlerPermissionDelete(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// HandlerPermissionShow handles GET /aa/authorize/permission/show
+// HandlerPermissionShow liệt kê tất cả role/permission đang có trong hệ thống.
+//
+// Input : GET (không có body/query params)
+// Output: 302 [ ...CliRole ]
+//         404 nếu danh sách rỗng
+//         500 nếu lỗi DB
+// Flow  : lấy actor từ context → GetAllCliRoles → ghi operation history → trả danh sách
 func HandlerPermissionShow(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		logger.Logger.Error("Method not allowed")

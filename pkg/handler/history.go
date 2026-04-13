@@ -28,7 +28,16 @@ type saveHistoryReq struct {
 	TimeToComplete int64  `json:"time_to_complete"`
 }
 
-// HandlerListHistory handles GET /aa/history/list
+// HandlerListHistory trả về lịch sử thao tác gần đây, có hỗ trợ lọc.
+//
+// Input : GET query params:
+//         ?limit=<int>   — số bản ghi tối đa (1–500, mặc định 100)
+//         ?scope=<string> — lọc theo scope (tuỳ chọn)
+//         ?ne_name=<string> — lọc theo tên NE (tuỳ chọn)
+// Output: 200 [ ...CliOperationHistory ] (mảng rỗng nếu không có bản ghi)
+//         500 nếu lỗi DB
+// Flow  : parse limit từ query → nếu có scope/ne_name dùng GetRecentHistoryFiltered,
+//         ngược lại dùng GetRecentHistory → trả danh sách
 func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 	limit := 100
 	if l := r.URL.Query().Get("limit"); l != "" {
@@ -61,7 +70,17 @@ func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusOK, records)
 }
 
-// HandlerSaveHistory saves a command history record to the database.
+// HandlerSaveHistory lưu một bản ghi lịch sử thao tác CLI vào database.
+//
+// Input : POST body JSON { "cmd_name": string (bắt buộc), "ne_name": string (bắt buộc),
+//         "ne_ip", "ne_id", "scope", "result", "input_type", "session",
+//         "batch_id", "time_to_complete" }
+// Output: 201 { ...CliOperationHistory } nếu lưu thành công
+//         400 nếu thiếu cmd_name/ne_name hoặc body không hợp lệ
+//         500 nếu lỗi DB
+// Flow  : decode body → validate cmd_name và ne_name không rỗng →
+//         lấy actor từ context → tạo CliOperationHistory với timestamp hiện tại →
+//         SaveHistoryCommand → trả bản ghi đã lưu
 func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 	var req saveHistoryReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -14,7 +14,17 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// HandlerChangePassword handles POST /aa/change-password/
+// HandlerChangePassword cho phép user tự thay đổi mật khẩu của mình.
+//
+// Input : POST body JSON { "username": string, "old_password": string, "new_password": string }
+// Output: 200 "password changed" nếu thành công
+//         400 nếu body không hợp lệ
+//         401 nếu actor không phải chính user đó
+//         403 nếu old_password sai
+//         500 nếu lỗi DB khi lấy hoặc cập nhật user
+// Flow  : decode body → kiểm tra actor == username trong request →
+//         GetUserByUserName → bcrypt.Matches(old_password) →
+//         hash new_password → UpdateUser → ghi operation history
 func HandlerChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -80,7 +90,16 @@ func HandlerChangePassword(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, "password changed")
 }
 
-// HandlerAuthorizeUserSet handles POST /aa/authorize/user/set
+// HandlerAuthorizeUserSet gán một permission (role) cho user.
+//
+// Input : POST body JSON { "username": string, "permission": string }
+// Output: 200 "permission added" nếu thành công
+//         304 nếu user đã có permission này rồi
+//         404 nếu user không tồn tại
+//         500 nếu lỗi DB
+// Flow  : decode body → lấy actor từ context → GetUserByUserName →
+//         GetAllUserRolesMappingById (kiểm tra trùng) → AddUserRole →
+//         ghi operation history
 func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -153,7 +172,16 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, "permission added")
 }
 
-// HandlerAuthorizeUserDelete handles POST /aa/authorize/user/delete
+// HandlerAuthorizeUserDelete gỡ bỏ một permission khỏi user.
+//
+// Input : POST body JSON { "username": string, "permission": string }
+// Output: 200 "permission removed" nếu thành công
+//         304 nếu user không có permission đó
+//         404 nếu user không tồn tại
+//         500 nếu lỗi DB
+// Flow  : decode body → lấy actor từ context → GetUserByUserName →
+//         GetAllUserRolesMappingById → tìm permission khớp → DeleteUserRole →
+//         ghi operation history
 func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -226,7 +254,13 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusNotModified, "permission not found")
 }
 
-// HandlerAuthorizeUserShow handles GET /aa/authorize/user/show
+// HandlerAuthorizeUserShow liệt kê tất cả user và permission hiện tại của họ.
+//
+// Input : GET (không có body/query params)
+// Output: 302 [ { username, permissions } ]
+//         500 nếu lỗi DB
+// Flow  : lấy actor từ context → GetAllUser → với mỗi user GetRolesById →
+//         gộp kết quả thành danh sách → ghi operation history
 func HandlerAuthorizeUserShow(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")

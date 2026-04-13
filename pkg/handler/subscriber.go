@@ -31,8 +31,13 @@ type subscriberFileInfo struct {
 	Size  int64  `json:"size_bytes"`
 }
 
-// HandlerListSubscriberFiles handles GET /aa/subscribers/files.
-// Returns list of list_subscribers_results.* files sorted by index.
+// HandlerListSubscriberFiles liệt kê các file kết quả subscriber trong thư mục dữ liệu.
+//
+// Input : GET (không có body/query params)
+// Output: 200 [ { name, index, size_bytes } ] sorted theo index tăng dần
+//         500 nếu lỗi glob hoặc không đọc được metadata file
+// Flow  : lấy thư mục từ env TCP_DATA_DIR → glob "list_subscribers_results.*" →
+//         parse index từ tên file → os.Stat lấy size → sort theo index → trả danh sách
 func HandlerListSubscriberFiles(w http.ResponseWriter, r *http.Request) {
 	dir := tcpDataDir()
 
@@ -85,8 +90,15 @@ type subscriberFileContent struct {
 	Total int      `json:"total"`
 }
 
-// HandlerViewSubscriberFile handles GET /aa/subscribers/files/{index}.
-// Returns contents of list_subscribers_results.<index>.
+// HandlerViewSubscriberFile trả về nội dung của một file subscriber theo index.
+//
+// Input : GET path param {index} — số nguyên không âm
+// Output: 200 { name, index, lines: [...string], total: int }
+//         400 nếu index không phải số nguyên hợp lệ
+//         404 nếu file không tồn tại
+//         500 nếu lỗi khi mở hoặc đọc file
+// Flow  : parse index từ URL param → tạo tên file "list_subscribers_results.<index>" →
+//         mở file từ TCP_DATA_DIR → đọc từng dòng bằng bufio.Scanner → trả nội dung
 func HandlerViewSubscriberFile(w http.ResponseWriter, r *http.Request) {
 	idxStr := chi.URLParam(r, "index")
 	idx, err := strconv.Atoi(idxStr)
