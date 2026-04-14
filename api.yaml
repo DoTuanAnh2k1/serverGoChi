@@ -462,11 +462,14 @@ paths:
             schema:
               $ref: "#/components/schemas/NeCreateRequest"
             example:
-              name: HTSMF01
+              ne_name: HTSMF01
               site_name: HCM
-              ip_address: 10.10.1.1
-              port: 22
               namespace: hcm-5gc
+              conf_master_ip: 10.10.1.1
+              conf_port_master_ssh: 22
+              conf_mode: SSH
+              conf_username: admin
+              conf_password: secret
               description: HCM SMF Node 01
       responses:
         "201":
@@ -1168,6 +1171,9 @@ components:
           type: string
 
     UserSetRequest:
+      description: |
+        Khớp với db_models.TblAccount — các trường thường dùng khi tạo user.
+        Handler decode trực tiếp vào TblAccount nên tên field là json tag của struct.
       type: object
       required: [account_name, password]
       properties:
@@ -1175,14 +1181,28 @@ components:
           type: string
         password:
           type: string
+          description: Plaintext — server tự hash bcrypt
         full_name:
           type: string
         email:
           type: string
+        address:
+          type: string
         phone_number:
+          type: string
+        avatar:
           type: string
         description:
           type: string
+        account_type:
+          type: integer
+          format: int32
+          description: "0=SuperAdmin, 1=Admin, 2=Normal (mặc định 2)"
+          default: 2
+        only_ad:
+          type: boolean
+          description: "true = chỉ đăng nhập qua Active Directory"
+          default: false
 
     UserShowItem:
       type: object
@@ -1243,48 +1263,100 @@ components:
 
     # ── Network Element ───────────────────────────────────────────────────────
     NeCreateRequest:
+      description: |
+        Maps directly to db_models.CliNe — field names are the json tags (snake_case).
+        Connection details (IP / port / credential / protocol) sit in conf_* columns.
       type: object
-      required: [name]
+      required: [ne_name]
       properties:
-        name:
+        ne_name:
           type: string
-        site_name:
-          type: string
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-          default: 22
+          description: Tên NE (bắt buộc)
         namespace:
           type: string
-        description:
+        site_name:
           type: string
         system_type:
           type: string
           default: 5GC
+          description: Mặc định "5GC" nếu bỏ trống
+        description:
+          type: string
+        command_url:
+          type: string
+          description: URL monitor / command (mode ne-command)
+        conf_mode:
+          type: string
+          enum: [SSH, TELNET, NETCONF, RESTCONF]
+          description: Giao thức kết nối chính
+        conf_master_ip:
+          type: string
+          description: IP master
+        conf_slave_ip:
+          type: string
+          description: IP slave (tuỳ chọn)
+        conf_port_master_ssh:
+          type: integer
+          format: int32
+          default: 22
+        conf_port_slave_ssh:
+          type: integer
+          format: int32
+        conf_port_master_tcp:
+          type: integer
+          format: int32
+        conf_port_slave_tcp:
+          type: integer
+          format: int32
+        conf_username:
+          type: string
+        conf_password:
+          type: string
 
     NeUpdateRequest:
+      description: |
+        Maps directly to db_models.CliNe — chỉ cần id, các trường còn lại tuỳ chọn.
+        Chỉ các trường được gửi mới bị cập nhật (GORM Save).
       type: object
       required: [id]
       properties:
         id:
           type: integer
           format: int64
-        name:
+        ne_name:
+          type: string
+        namespace:
           type: string
         site_name:
           type: string
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-        namespace:
+        system_type:
           type: string
         description:
           type: string
-        system_type:
+        command_url:
+          type: string
+        conf_mode:
+          type: string
+          enum: [SSH, TELNET, NETCONF, RESTCONF]
+        conf_master_ip:
+          type: string
+        conf_slave_ip:
+          type: string
+        conf_port_master_ssh:
+          type: integer
+          format: int32
+        conf_port_slave_ssh:
+          type: integer
+          format: int32
+        conf_port_master_tcp:
+          type: integer
+          format: int32
+        conf_port_slave_tcp:
+          type: integer
+          format: int32
+        conf_username:
+          type: string
+        conf_password:
           type: string
 
     UserNeRequest:
@@ -1570,36 +1642,31 @@ components:
 
     # ── History ───────────────────────────────────────────────────────────────
     HistorySaveRequest:
+      description: |
+        Khớp với saveHistoryReq struct — chỉ 5 trường.
+        account được lấy tự động từ JWT context, không truyền qua body.
       type: object
       required: [cmd_name, ne_name]
       properties:
         cmd_name:
           type: string
+          description: Tên lệnh đã thực thi
         ne_name:
           type: string
+          description: Tên NE thực thi lệnh
         ne_ip:
           type: string
-        ne_id:
-          type: integer
-          format: int32
+          description: IP của NE
         scope:
           type: string
           enum: [cli-config, ne-command, ne-config]
+          description: Nguồn phát sinh lịch sử
         result:
           type: string
           enum: [success, failure]
-        input_type:
-          type: string
-        session:
-          type: string
-        batch_id:
-          type: string
-        time_to_complete:
-          type: integer
-          format: int64
-          description: Milliseconds
 
     CliOperationHistory:
+      description: Khớp với db_models.CliOperationHistory — tất cả các trường của model.
       type: object
       properties:
         id:
@@ -1607,28 +1674,22 @@ components:
           format: int32
         account:
           type: string
+          description: Username của người thực hiện lệnh
         cmd_name:
           type: string
         ne_name:
           type: string
         ne_ip:
           type: string
-        ne_id:
-          type: integer
-          format: int32
+        ip_address:
+          type: string
+          description: IP của client gọi API
         scope:
           type: string
+          enum: [cli-config, ne-command, ne-config]
         result:
           type: string
-        input_type:
-          type: string
-        session:
-          type: string
-        batch_id:
-          type: string
-        time_to_complete:
-          type: integer
-          format: int64
+          enum: [success, failure]
         created_date:
           type: string
           format: date-time

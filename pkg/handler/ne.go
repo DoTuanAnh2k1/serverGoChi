@@ -17,7 +17,8 @@ import (
 // HandlerNeShow liệt kê tất cả NE thuộc hệ thống 5GC.
 //
 // Input : GET (không có body/query params)
-// Output: 302 [ { name, site_name, ip_address, port, description, id } ]
+// Output: 302 [ { name, site_name, ip_address (= conf_master_ip), port (= conf_port_master_ssh),
+//                 description, id, namespace } ]
 //         404 nếu danh sách NE rỗng
 //         500 nếu lỗi DB
 // Flow  : lấy actor từ context → GetNeListBySystemType("5GC") →
@@ -164,12 +165,26 @@ func HandlerNeRemove(w http.ResponseWriter, r *http.Request) {
 
 // HandlerNeCreate tạo mới một NE trong hệ thống.
 //
-// Input : POST body JSON { "name": string (bắt buộc), "site_name", "ip_address",
-//         "port", "namespace", "description", "system_type" } — các trường CliNe
+// Input : POST body JSON — các trường của CliNe (tất cả snake_case, khớp với tag json của struct):
+//           "ne_name"             string  (bắt buộc)
+//           "namespace"           string
+//           "site_name"           string
+//           "system_type"         string  (mặc định "5GC" nếu bỏ trống)
+//           "description"         string
+//           "command_url"         string  (URL monitor/command)
+//           "conf_mode"           string  (giao thức kết nối: SSH/TELNET/NETCONF/RESTCONF)
+//           "conf_master_ip"      string  (IP master)
+//           "conf_slave_ip"       string  (IP slave)
+//           "conf_port_master_ssh" int32
+//           "conf_port_slave_ssh"  int32
+//           "conf_port_master_tcp" int32
+//           "conf_port_slave_tcp"  int32
+//           "conf_username"       string
+//           "conf_password"       string
 // Output: 201 nếu tạo thành công
-//         400 nếu thiếu name hoặc body không hợp lệ
+//         400 nếu thiếu ne_name hoặc body không hợp lệ
 //         500 nếu lỗi DB
-// Flow  : decode body → validate name không rỗng →
+// Flow  : decode body → validate ne_name không rỗng →
 //         mặc định system_type="5GC" nếu không có → lấy actor từ context →
 //         CreateNe → ghi operation history
 func HandlerNeCreate(w http.ResponseWriter, r *http.Request) {
@@ -503,7 +518,10 @@ func HandlerNeDelete(w http.ResponseWriter, r *http.Request) {
 // HandlerListNe trả về danh sách NE mà user hiện tại được phép truy cập.
 //
 // Input : GET (không có body/query params; user lấy từ JWT context)
-// Output: 302 { status, code, message, neDataList: [{site, ne, ip, description, namespace, port}] }
+// Output: 302 { status, code, message, neDataList: [
+//                 { site, ne, ip (= conf_master_ip), description, namespace,
+//                   port (= conf_port_master_ssh), urlList }
+//               ] }
 //         404 nếu user không có NE nào được gán
 //         500 nếu lỗi DB
 // Flow  : lấy actor từ context → GetUserByUserName → GetAllCliNeOfUserByUserId →

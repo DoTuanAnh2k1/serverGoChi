@@ -36,7 +36,7 @@ type TblAccount struct {
 	UpdatedBy         string    `gorm:"column:updated_by" json:"updated_by"`
 	LockedTime        time.Time `gorm:"column:locked_time" json:"locked_time"`
 	FirstLogin        []uint8   `gorm:"column:first_login" json:"first_login"`
-	OnlyAD            bool      `gorm:"column:onlyAD" json:"onlyAD"`
+	OnlyAD            bool      `gorm:"column:only_ad" json:"only_ad"`
 }
 
 // TableName TblAccount's table name

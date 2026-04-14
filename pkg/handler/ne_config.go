@@ -16,15 +16,23 @@ import (
 
 // HandlerNeConfigCreate tạo mới một bản ghi cấu hình kết nối cho NE (mode ne-config).
 //
-// Input : POST body JSON { "ne_id": int64, "ip_address": string,
+// Mapping CliNeConfig → cột cli_ne:
+//   ip_address → conf_master_ip
+//   port       → conf_port_master_ssh
+//   protocol   → conf_mode   (SSH/TELNET/NETCONF/RESTCONF)
+//   username   → conf_username
+//   password   → conf_password
+//   description→ description
+//
+// Input : POST body JSON { "ne_id": int64 (bắt buộc), "ip_address": string (bắt buộc),
 //         "port": int32, "username": string, "password": string,
-//         "protocol": string (SSH/TELNET/NETCONF/RESTCONF), "description": string }
+//         "protocol": string (mặc định "SSH"), "description": string }
 // Output: 201 nếu tạo thành công
 //         400 nếu thiếu ne_id hoặc ip_address
 //         500 nếu lỗi DB
 // Flow  : decode body → validate ne_id > 0 và ip_address không rỗng →
 //         mặc định protocol="SSH" → lấy actor từ context →
-//         CreateNeConfig → ghi operation history
+//         CreateNeConfig (cập nhật conf_* trên hàng cli_ne tương ứng) → ghi operation history
 func HandlerNeConfigCreate(w http.ResponseWriter, r *http.Request) {
 	var req db_models.CliNeConfig
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.NeID == 0 || req.IPAddress == "" {
@@ -111,12 +119,16 @@ func HandlerNeConfigList(w http.ResponseWriter, r *http.Request) {
 
 // HandlerNeConfigUpdate cập nhật thông tin một bản ghi cấu hình kết nối NE.
 //
-// Input : POST body JSON { "id": int64 (bắt buộc), và bất kỳ trường CliNeConfig nào cần sửa }
+// Mapping CliNeConfig → cột cli_ne: xem HandlerNeConfigCreate.
+// Repository ưu tiên ne_id nếu có, fallback về id nếu ne_id = 0.
+//
+// Input : POST body JSON { "id": int64 (bắt buộc = ne_id), "ne_id": int64 (tuỳ chọn),
+//         và các trường cần sửa: ip_address, port, username, password, protocol, description }
 // Output: 200 "NE config updated" nếu thành công
 //         400 nếu thiếu id hoặc body không hợp lệ
 //         500 nếu lỗi DB
 // Flow  : decode body → validate id > 0 → lấy actor từ context →
-//         UpdateNeConfig → ghi operation history
+//         UpdateNeConfig (cập nhật conf_* trên cli_ne) → ghi operation history
 func HandlerNeConfigUpdate(w http.ResponseWriter, r *http.Request) {
 	var req db_models.CliNeConfig
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.ID == 0 {
@@ -169,8 +181,14 @@ func HandlerNeConfigDelete(w http.ResponseWriter, r *http.Request) {
 
 // HandlerListNeConfig trả về toàn bộ cấu hình kết nối (ne-config) của các NE thuộc user hiện tại.
 //
+// ne_ip trong response = conf_master_ip của cli_ne.
+// config_list mỗi phần tử là CliNeConfig DTO (ip_address=conf_master_ip, port=conf_port_master_ssh,
+//   protocol=conf_mode).
+//
 // Input : GET (không có body/query params; user lấy từ JWT context)
-// Output: 200 [ { ne_name, ne_ip, site_name, config_list: [...CliNeConfig] } ]
+// Output: 200 [ { ne_name, ne_ip (= conf_master_ip), site_name,
+//                 config_list: [{ id, ne_id, ip_address, port, username, password,
+//                                 protocol, description }] } ]
 //         (mảng rỗng nếu chưa có NE hoặc chưa có config)
 //         500 nếu lỗi DB khi lấy user/mapping
 // Flow  : lấy actor từ context → GetUserByUserName → GetAllCliNeOfUserByUserId →

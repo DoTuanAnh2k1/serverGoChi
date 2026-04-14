@@ -14,12 +14,12 @@ import (
 const (
 	colAccounts         = "tbl_account"
 	colNe               = "cli_ne"
-	colNeMonitor        = "cli_ne_monitor"
 	colRole             = "cli_role"
 	colRoleUserMapping  = "cli_role_user_mapping"
 	colUserNeMapping    = "cli_user_ne_mapping"
 	colOperationHistory = "cli_operation_history"
 	colLoginHistory     = "cli_login_history"
+	// colConfigBackup được định nghĩa trong config_backup.go
 )
 
 type Client struct {

@@ -84,3 +84,21 @@ ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `mapping_ne` FOREIGN KEY (`tbl_
 ALTER TABLE `cli_role_user_mapping` ADD CONSTRAINT `user_role` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
 
 ALTER TABLE `cli_login_history` ADD FOREIGN KEY (`time_login`) REFERENCES `cli_login_history` (`user_name`);
+
+CREATE TABLE `cli_role` (
+  `role_id`      bigint PRIMARY KEY AUTO_INCREMENT,
+  `include_type` varchar(255) NOT NULL,
+  `ne_type`      varchar(255) NOT NULL,
+  `scope`        varchar(255) NOT NULL,
+  `permission`   varchar(255) NOT NULL,
+  `path`         varchar(255) NOT NULL
+);
+
+CREATE TABLE `cli_config_backup` (
+  `id`         bigint PRIMARY KEY AUTO_INCREMENT,
+  `ne_name`    varchar(255) NOT NULL,
+  `ne_ip`      varchar(255),
+  `file_path`  varchar(255) NOT NULL COMMENT 'đường dẫn file XML trên disk',
+  `size`       bigint       COMMENT 'kích thước file tính bằng byte',
+  `created_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);

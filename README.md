@@ -91,6 +91,31 @@ Hỗ trợ 3 backend, chọn qua `DB_DRIVER`:
 MySQL và PostgreSQL tự động tạo/cập nhật tất cả tables khi app khởi động.  
 Không cần chạy SQL thủ công.
 
+### Schema (db.sql)
+
+File `db.sql` chứa DDL đầy đủ cho tất cả 8 bảng:
+
+| Bảng | PK | Mô tả |
+|---|---|---|
+| `tbl_account` | `account_id` bigint AI | Tài khoản người dùng — bcrypt password, `is_enable` (soft-delete), `account_type` (0=SuperAdmin / 1=Admin / 2=Normal), `only_ad` (AD-only login) |
+| `cli_ne` | `id` bigint AI | Network Element — kết nối lưu trong các cột `conf_*` (master/slave IP, SSH/TCP port, credential, `conf_mode`) |
+| `cli_role` | `role_id` bigint AI | Định nghĩa role/permission: `permission`, `scope`, `ne_type`, `include_type`, `path` |
+| `cli_role_user_mapping` | (`user_id`, `permission`) | Gán permission cho user — FK → `tbl_account` |
+| `cli_user_ne_mapping` | (`user_id`, `tbl_ne_id`) | Gán NE cho user — FK → `tbl_account`, `cli_ne` |
+| `cli_login_history` | `id` int AI | Lịch sử đăng nhập: `user_name`, `ip_address`, `time_login` |
+| `cli_operation_history` | `id` int AI | Audit log: `account`, `cmd_name`, `ne_name`, `ne_ip`, `scope`, `result`, `created_date` |
+| `cli_config_backup` | `id` bigint AI | Metadata backup NETCONF: `ne_name`, `ne_ip`, `file_path` (file XML lưu trên disk), `size`, `created_at` |
+
+**Mapping CliNeConfig DTO ↔ cột `cli_ne`** (config API chỉ thao tác trên master):
+
+| CliNeConfig field | Cột `cli_ne` |
+|---|---|
+| `ip_address` | `conf_master_ip` |
+| `port` | `conf_port_master_ssh` |
+| `protocol` | `conf_mode` (SSH / TELNET / NETCONF / RESTCONF) |
+| `username` | `conf_username` |
+| `password` | `conf_password` |
+
 ---
 
 ## Deploy
@@ -212,18 +237,20 @@ Hỗ trợ song ngữ Tiếng Việt / English.
 
 Tất cả endpoint (trừ `/health`, `/metrics`, `/admin`, `/docs`) yêu cầu:
 ```
-Authorization: Bearer <jwt_token>
+Authorization: Basic <jwt_token>
 ```
+> Token lấy từ `POST /aa/authenticate` — field `response_data` đã chứa sẵn prefix `Basic `, paste nguyên giá trị đó vào header.
 
 ### Authentication
 | Method | Path | Mô tả |
 |---|---|---|
 | `POST` | `/aa/authenticate` | Đăng nhập, lấy JWT |
 | `POST` | `/aa/validate-token` | Kiểm tra token |
-| `POST` | `/aa/change-password` | Đổi mật khẩu |
+| `POST` | `/aa/change-password` | Đổi mật khẩu (cần old_password) |
 | `POST` | `/aa/authenticate/user/set` | Tạo hoặc kích hoạt lại user |
-| `POST` | `/aa/authenticate/user/delete` | Vô hiệu hóa user |
+| `POST` | `/aa/authenticate/user/delete` | Vô hiệu hóa user (soft-delete) |
 | `GET`  | `/aa/authenticate/user/show` | Danh sách user kèm NE & role |
+| `POST` | `/aa/authenticate/user/reset-password` | Admin đặt lại mật khẩu (không cần old_password) |
 
 ### Permission (RBAC)
 | Method | Path | Mô tả |
@@ -236,13 +263,18 @@ Authorization: Bearer <jwt_token>
 | `GET`  | `/aa/authorize/user/show` | Quyền của tất cả user |
 
 ### Network Element
+
+Body của `/create` và `/update` nhận trực tiếp các trường `CliNe` (json tag snake_case).  
+Kết nối được lưu trong cột `conf_*` — không dùng `ip_address`/`port` mà dùng `conf_master_ip`/`conf_port_master_ssh`.
+
 | Method | Path | Mô tả |
 |---|---|---|
-| `POST` | `/aa/authorize/ne/create` | Tạo NE mới |
-| `POST` | `/aa/authorize/ne/remove` | Xóa NE (cascade) |
+| `POST` | `/aa/authorize/ne/create` | Tạo NE mới (`ne_name` bắt buộc) |
+| `POST` | `/aa/authorize/ne/update` | Cập nhật NE (`id` bắt buộc) |
+| `POST` | `/aa/authorize/ne/remove` | Xóa NE + toàn bộ mappings/configs (cascade) |
 | `POST` | `/aa/authorize/ne/set` | Gán NE cho user |
 | `POST` | `/aa/authorize/ne/delete` | Xóa NE khỏi user |
-| `GET`  | `/aa/authorize/ne/show` | Danh sách NE (5GC) |
+| `GET`  | `/aa/authorize/ne/show` | Danh sách NE (system_type=5GC) |
 | `GET`  | `/aa/list/ne` | NE mà user đang đăng nhập được truy cập |
 | `GET`  | `/aa/list/ne/monitor` | NE monitor URL |
 
