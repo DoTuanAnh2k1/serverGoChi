@@ -41,7 +41,7 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 	db := store.GetSingleton()
 	var results []importResult
 
-	// Users
+	// Users — username,password[,email]
 	if rows, ok := sections["users"]; ok {
 		for _, cols := range rows {
 			if len(cols) < 2 {
@@ -67,6 +67,9 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 				LockedTime:     now,
 				CreatedBy:      actor.Username,
 			}
+			if len(cols) >= 3 {
+				user.Email = cols[2]
+			}
 			if err := db.AddUser(user); err != nil {
 				results = append(results, importResult{"user", username, "error", err.Error()})
 			} else {
@@ -75,22 +78,22 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// NEs
+	// NEs — ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
 	if rows, ok := sections["nes"]; ok {
 		for _, cols := range rows {
-			if len(cols) < 6 {
+			if len(cols) < 2 {
 				continue
 			}
-			port, _ := strconv.Atoi(cols[3])
-			ne := &db_models.CliNe{
-				NeName:            cols[0],
-				SiteName:          cols[1],
-				ConfMasterIP:      cols[2],
-				ConfPortMasterSSH: int32(port),
-				Namespace:         cols[4],
-				Description:       cols[5],
-				SystemType:        "5GC",
-			}
+			ne := &db_models.CliNe{NeName: cols[0], SystemType: "5GC"}
+			if len(cols) > 1 { ne.SiteName = cols[1] }
+			if len(cols) > 2 { ne.Namespace = cols[2] }
+			if len(cols) > 3 { ne.CommandURL = cols[3] }
+			if len(cols) > 4 { ne.ConfMode = cols[4] }
+			if len(cols) > 5 { ne.ConfMasterIP = cols[5] }
+			if len(cols) > 6 { p, _ := strconv.Atoi(cols[6]); ne.ConfPortMasterSSH = int32(p) }
+			if len(cols) > 7 { ne.ConfUsername = cols[7] }
+			if len(cols) > 8 { ne.ConfPassword = cols[8] }
+			if len(cols) > 9 { ne.Description = cols[9] }
 			if err := db.CreateCliNe(ne); err != nil {
 				results = append(results, importResult{"ne", cols[0], "error", err.Error()})
 			} else {

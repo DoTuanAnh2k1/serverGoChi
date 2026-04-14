@@ -120,6 +120,9 @@ admin,HTSMF01`)
 				LockedTime:    now,
 				CreatedBy:     "import",
 			}
+			if len(cols) >= 3 {
+				user.Email = cols[2]
+			}
 			if err := db.AddUser(user); err != nil {
 				fmt.Printf("  [error] user %q: %v\n", username, err)
 			} else {
@@ -128,22 +131,22 @@ admin,HTSMF01`)
 		}
 	}
 
-	// Import NEs
+	// Import NEs — ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
 	if rows, ok := sections["nes"]; ok {
 		for _, cols := range rows {
-			if len(cols) < 6 {
+			if len(cols) < 2 {
 				continue
 			}
-			port, _ := strconv.Atoi(cols[3])
-			ne := &db_models.CliNe{
-				NeName:            cols[0],
-				SiteName:          cols[1],
-				ConfMasterIP:      cols[2],
-				ConfPortMasterSSH: int32(port),
-				Namespace:         cols[4],
-				Description:       cols[5],
-				SystemType:        "5GC",
-			}
+			ne := &db_models.CliNe{NeName: cols[0], SystemType: "5GC"}
+			if len(cols) > 1 { ne.SiteName = cols[1] }
+			if len(cols) > 2 { ne.Namespace = cols[2] }
+			if len(cols) > 3 { ne.CommandURL = cols[3] }
+			if len(cols) > 4 { ne.ConfMode = cols[4] }
+			if len(cols) > 5 { ne.ConfMasterIP = cols[5] }
+			if len(cols) > 6 { p, _ := strconv.Atoi(cols[6]); ne.ConfPortMasterSSH = int32(p) }
+			if len(cols) > 7 { ne.ConfUsername = cols[7] }
+			if len(cols) > 8 { ne.ConfPassword = cols[8] }
+			if len(cols) > 9 { ne.Description = cols[9] }
 			if err := db.CreateCliNe(ne); err != nil {
 				fmt.Printf("  [error] ne %q: %v\n", cols[0], err)
 			} else {

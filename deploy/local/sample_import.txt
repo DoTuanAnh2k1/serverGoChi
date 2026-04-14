@@ -1,22 +1,22 @@
 # Sample import file for MGT Service
-# Usage: go run ./cmd/import -file sample_import.txt
+# Usage: make import FILE=deploy/local/sample_import.txt
 
 [users]
-username,password
-admin,admin123
-operator1,Pass@123
-operator2,Pass@123
-viewer1,Pass@123
+username,password,email
+admin,admin123,admin@vht.com
+operator1,Pass@123,op1@vht.com
+operator2,Pass@123,op2@vht.com
+viewer1,Pass@123,viewer1@vht.com
 
 [nes]
-name,site_name,ip_address,port,namespace,description
-HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
-HTSMF02,HCM,10.10.1.2,22,hcm-5gc,HCM SMF Node 02
-HTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01
-HTAMF02,HCM,10.10.2.2,22,hcm-5gc,HCM AMF Node 02
-HNSMF01,HN,10.20.1.1,22,hn-5gc,Ha Noi SMF Node 01
-HNAMF01,HN,10.20.2.1,22,hn-5gc,Ha Noi AMF Node 01
-DNUPF01,DN,10.30.3.1,22,dn-5gc,Da Nang UPF Node 01
+ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
+HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
+HTSMF02,HCM,hcm-5gc,http://10.10.1.2:8080,SSH,10.10.1.2,22,admin,admin,HCM SMF Node 02
+HTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,SSH,10.10.2.1,22,admin,admin,HCM AMF Node 01
+HTAMF02,HCM,hcm-5gc,http://10.10.2.2:8080,SSH,10.10.2.2,22,admin,admin,HCM AMF Node 02
+HNSMF01,HN,hn-5gc,http://10.20.1.1:8080,NETCONF,10.20.1.1,830,admin,admin,Ha Noi SMF Node 01
+HNAMF01,HN,hn-5gc,http://10.20.2.1:8080,NETCONF,10.20.2.1,830,admin,admin,Ha Noi AMF Node 01
+DNUPF01,DN,dn-5gc,http://10.30.3.1:8080,SSH,10.30.3.1,22,admin,admin,Da Nang UPF Node 01
 
 [roles]
 permission,scope,ne_type,include_type,path

@@ -98,6 +98,17 @@ func Init() {
 			})
 		})
 
+		router.Route("/admin", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Use(middleware.CheckRole)
+
+			r.Get("/user/list", HandlerAdminUserList)
+
+			r.Get("/ne/list", HandlerAdminNeList)
+			r.Post("/ne/create", HandlerAdminNeCreate)
+			r.Post("/ne/update", HandlerAdminNeUpdate)
+		})
+
 		router.Route("/import", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
 			r.Use(middleware.CheckRole)

@@ -64,12 +64,13 @@ tr:hover td{background:#1e293b80}
 .guide ul{padding-left:1.2rem;margin:.5rem 0}
 .guide code{background:#334155;padding:.1rem .4rem;border-radius:3px;font-size:.82rem;color:#e2e8f0}
 .guide table{margin:.5rem 0}.guide th,.guide td{padding:.4rem .6rem;font-size:.82rem}
-.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;align-items:center;justify-content:center}
-.modal-overlay.show{display:flex}
-.modal{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.5rem;width:480px;max-width:96vw;max-height:90vh;overflow-y:auto}
-.modal h3{margin-bottom:1.25rem;color:#f1f5f9;font-size:1rem}
-.modal-footer{display:flex;justify-content:flex-end;gap:.5rem;margin-top:1.25rem}
-.btn-secondary{background:#334155;color:#e2e8f0;border:none}.btn-secondary:hover{background:#475569}
+.optional-toggle{color:#60a5fa;cursor:pointer;font-size:.82rem;margin-bottom:.5rem;display:inline-block}
+.optional-toggle:hover{text-decoration:underline}
+.optional-fields{display:none}.optional-fields.show{display:block}
+.user-type{font-size:.75rem;padding:.1rem .4rem;border-radius:3px}
+.user-type-0{background:#7f1d1d;color:#fca5a5}
+.user-type-1{background:#1e3a5f;color:#60a5fa}
+.user-type-2{background:#14532d;color:#4ade80}
 </style>
 </head>
 <body>
@@ -99,7 +100,6 @@ tr:hover td{background:#1e293b80}
   <a onclick="showSection('users')" data-section="users" data-i18n="nav_users">Users</a>
   <a onclick="showSection('permissions')" data-section="permissions" data-i18n="nav_permissions">Permissions</a>
   <a onclick="showSection('nes')" data-section="nes" data-i18n="nav_nes">Network Elements</a>
-  <a onclick="showSection('ne-config')" data-section="ne-config" data-i18n="nav_ne_config">NE Config</a>
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
   <a onclick="showSection('role-mapping')" data-section="role-mapping" data-i18n="nav_role_mapping">Role Mapping</a>
   <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
@@ -132,10 +132,29 @@ tr:hover td{background:#1e293b80}
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="create_user">Create User</h3>
     <div class="form-row">
-      <div class="form-group"><label data-i18n="username">Username</label><input id="newUsername" placeholder="username"></div>
-      <div class="form-group"><label data-i18n="password">Password</label><input id="newPassword" type="password" placeholder="password"></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createUser()" data-i18n="create">Create</button></div>
+      <div class="form-group"><label>Username *</label><input id="newUsername" placeholder="username"></div>
+      <div class="form-group"><label>Email *</label><input id="newEmail" placeholder="user@example.com" type="email"></div>
+      <div class="form-group"><label>Password *</label><input id="newPassword" type="password" placeholder="password"></div>
     </div>
+    <span class="optional-toggle" onclick="document.getElementById('userOptFields').classList.toggle('show')">+ Optional fields</span>
+    <div id="userOptFields" class="optional-fields">
+      <div class="form-row">
+        <div class="form-group"><label>Full Name</label><input id="newFullName" placeholder="Nguyen Van A"></div>
+        <div class="form-group"><label>Phone</label><input id="newPhone" placeholder="0901234567"></div>
+        <div class="form-group"><label>Address</label><input id="newAddress" placeholder="Ha Noi"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Description</label><input id="newDescription" placeholder="Operator team"></div>
+        <div class="form-group"><label>Account Type</label>
+          <select id="newAccountType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
+            <option value="2">Normal (2)</option>
+            <option value="1">Admin (1)</option>
+            <option value="0">SuperAdmin (0)</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="createUser()" data-i18n="create" style="margin-top:.5rem">Create</button>
   </div>
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="all_users">All Users</h3>
@@ -169,57 +188,32 @@ tr:hover td{background:#1e293b80}
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="create_ne">Create Network Element</h3>
     <div class="form-row">
-      <div class="form-group"><label data-i18n="ne_name">Name</label><input id="neCreateName" placeholder="HTSMF03"></div>
+      <div class="form-group"><label>NE Name</label><input id="neCreateName" placeholder="HTSMF03"></div>
       <div class="form-group"><label>Site</label><input id="neCreateSite" placeholder="HCM"></div>
-      <div class="form-group"><label>IP Address</label><input id="neCreateIP" placeholder="10.10.1.3"></div>
+      <div class="form-group"><label>Namespace</label><input id="neCreateNS" placeholder="hcm-5gc"></div>
+      <div class="form-group"><label>Description</label><input id="neCreateDesc" placeholder="HCM SMF Node 03"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Port</label><input id="neCreatePort" placeholder="22" type="number"></div>
-      <div class="form-group"><label>Namespace</label><input id="neCreateNS" placeholder="hcm-5gc"></div>
-      <div class="form-group"><label data-i18n="description">Description</label><input id="neCreateDesc" placeholder="HCM SMF Node 03"></div>
+      <div class="form-group"><label>Command URL</label><input id="neCreateCmdURL" placeholder="http://10.10.1.1:8080"></div>
+      <div class="form-group"><label>Conf Mode</label><input id="neCreateConfMode" placeholder="SSH"></div>
+      <div class="form-group"><label>Username</label><input id="neCreateUser" placeholder="admin"></div>
+      <div class="form-group"><label>Password</label><input id="neCreatePass" placeholder="admin" type="password"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Master IP</label><input id="neCreateMasterIP" placeholder="10.10.1.1"></div>
+      <div class="form-group"><label>Slave IP</label><input id="neCreateSlaveIP" placeholder="10.10.1.2"></div>
+      <div class="form-group"><label>Master SSH Port</label><input id="neCreateMasterSSH" placeholder="22" type="number"></div>
+      <div class="form-group"><label>Slave SSH Port</label><input id="neCreateSlaveSSH" placeholder="22" type="number"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Master TCP Port</label><input id="neCreateMasterTCP" placeholder="830" type="number"></div>
+      <div class="form-group"><label>Slave TCP Port</label><input id="neCreateSlaveTCP" placeholder="830" type="number"></div>
       <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createNe()" data-i18n="create">Create</button></div>
     </div>
   </div>
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="all_nes">All Network Elements</h3>
     <div id="nesTable"><div class="loading">Loading...</div></div>
-  </div>
-</div>
-
-<!-- NE Config -->
-<div class="section" id="sec-ne-config">
-  <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="create_ne_config">Add NE Config Entry</h3>
-    <div class="form-row">
-      <div class="form-group"><label data-i18n="ne">Network Element</label><div class="ac-wrap" id="acNeConfigNe"></div></div>
-      <div class="form-group"><label>IP Address</label><input id="neCfgIP" placeholder="10.10.1.3"></div>
-      <div class="form-group"><label>Port</label><input id="neCfgPort" type="number" placeholder="22"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Username</label><input id="neCfgUser" placeholder="admin"></div>
-      <div class="form-group"><label>Password</label><input id="neCfgPass" type="password" placeholder=""></div>
-      <div class="form-group">
-        <label>Protocol</label>
-        <select id="neCfgProto" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
-          <option value="SSH">SSH</option>
-          <option value="TELNET">TELNET</option>
-          <option value="NETCONF">NETCONF</option>
-          <option value="RESTCONF">RESTCONF</option>
-        </select>
-      </div>
-      <div class="form-group"><label data-i18n="description">Description</label><input id="neCfgDesc" placeholder="Primary management IP"></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createNeConfig()" data-i18n="create">Create</button></div>
-    </div>
-  </div>
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;gap:.5rem;flex-wrap:wrap">
-      <h3 data-i18n="all_ne_configs">NE Config Entries</h3>
-      <div style="display:flex;gap:.5rem;align-items:center">
-        <div class="ac-wrap" id="acNeConfigFilter" style="width:200px"></div>
-        <button class="btn btn-outline btn-sm" onclick="loadNeConfigList()" data-i18n="refresh">Refresh</button>
-      </div>
-    </div>
-    <div id="neConfigTable"><div class="empty" data-i18n="select_ne_to_view">Select a NE to view its configs</div></div>
   </div>
 </div>
 
@@ -307,89 +301,13 @@ tr:hover td{background:#1e293b80}
 </div><!-- main -->
 </div><!-- app -->
 
-<!-- Modal: Edit NE -->
-<div class="modal-overlay" id="modalEditNe" onclick="if(event.target===this)closeModal('modalEditNe')">
-<div class="modal">
-  <h3 data-i18n="edit_ne">Edit Network Element</h3>
-  <input type="hidden" id="editNeId">
-  <div class="form-row">
-    <div class="form-group"><label data-i18n="ne_name">Name</label><input id="editNeName" placeholder="HTSMF01"></div>
-    <div class="form-group"><label>Site</label><input id="editNeSite" placeholder="HCM"></div>
-  </div>
-  <div class="form-row">
-    <div class="form-group"><label>IP Address</label><input id="editNeIP" placeholder="10.10.1.1"></div>
-    <div class="form-group"><label>Port</label><input id="editNePort" type="number" placeholder="22"></div>
-  </div>
-  <div class="form-row">
-    <div class="form-group"><label>Namespace</label><input id="editNeNS" placeholder="hcm-5gc"></div>
-    <div class="form-group"><label data-i18n="description">Description</label><input id="editNeDesc" placeholder=""></div>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" onclick="closeModal('modalEditNe')" data-i18n="cancel">Cancel</button>
-    <button class="btn btn-primary" onclick="submitEditNe()" data-i18n="save">Save</button>
-  </div>
-</div>
-</div>
-
-<!-- Modal: Edit NE Config -->
-<div class="modal-overlay" id="modalEditNeConfig" onclick="if(event.target===this)closeModal('modalEditNeConfig')">
-<div class="modal">
-  <h3 data-i18n="edit_ne_config">Edit NE Config</h3>
-  <input type="hidden" id="editCfgId">
-  <div class="form-row">
-    <div class="form-group"><label>IP Address</label><input id="editCfgIP" placeholder="10.10.1.1"></div>
-    <div class="form-group"><label>Port</label><input id="editCfgPort" type="number" placeholder="22"></div>
-  </div>
-  <div class="form-row">
-    <div class="form-group"><label>Username</label><input id="editCfgUser" placeholder="admin"></div>
-    <div class="form-group"><label>Password</label><input id="editCfgPass" type="password" placeholder=""></div>
-  </div>
-  <div class="form-row">
-    <div class="form-group">
-      <label>Protocol</label>
-      <select id="editCfgProto" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
-        <option value="SSH">SSH</option>
-        <option value="TELNET">TELNET</option>
-        <option value="NETCONF">NETCONF</option>
-        <option value="RESTCONF">RESTCONF</option>
-      </select>
-    </div>
-    <div class="form-group"><label data-i18n="description">Description</label><input id="editCfgDesc" placeholder=""></div>
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" onclick="closeModal('modalEditNeConfig')" data-i18n="cancel">Cancel</button>
-    <button class="btn btn-primary" onclick="submitEditNeConfig()" data-i18n="save">Save</button>
-  </div>
-</div>
-</div>
-
-<!-- Modal: Reset Password -->
-<div class="modal-overlay" id="modalResetPass" onclick="if(event.target===this)closeModal('modalResetPass')">
-<div class="modal">
-  <h3 data-i18n="reset_password">Reset Password</h3>
-  <input type="hidden" id="resetPassUser">
-  <div class="form-group">
-    <label data-i18n="username">Username</label>
-    <input id="resetPassUserDisplay" disabled style="opacity:.6">
-  </div>
-  <div class="form-group">
-    <label data-i18n="new_password">New Password</label>
-    <input id="resetPassNew" type="password" placeholder="">
-  </div>
-  <div class="modal-footer">
-    <button class="btn btn-secondary" onclick="closeModal('modalResetPass')" data-i18n="cancel">Cancel</button>
-    <button class="btn btn-primary" onclick="submitResetPass()" data-i18n="save">Save</button>
-  </div>
-</div>
-</div>
-
 <script>
 // ── Config ──
 // {{API_BASE}} is replaced by the server. For embedded mode it's '/aa', for standalone it's configured via env.
 const API = '{{API_BASE}}';
 let TOKEN = localStorage.getItem('mgt_token') || '';
 let USERNAME = localStorage.getItem('mgt_user') || '';
-let cachedUsers = [], cachedNes = [], cachedPerms = [];
+let cachedUsers = [], cachedNes = [], cachedPerms = [], cachedAdminUsers = [];
 let LANG = localStorage.getItem('mgt_lang') || 'en';
 
 // ── i18n ──
@@ -397,17 +315,14 @@ const I18N = {
   en: {
     // nav
     nav_dashboard:'Dashboard', nav_users:'Users', nav_permissions:'Permissions', nav_nes:'Network Elements',
-    nav_ne_config:'NE Config', nav_ne_mapping:'NE Mapping', nav_role_mapping:'Role Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
+    nav_ne_mapping:'NE Mapping', nav_role_mapping:'Role Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     // common
     username:'Username', password:'Password', login:'Login', logout:'Logout', create:'Create', assign:'Assign',
-    refresh:'Refresh', delete_btn:'Delete', edit_btn:'Edit', save:'Save', cancel:'Cancel', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
-    new_password:'New Password', reset_password:'Reset Password',
-    edit_ne:'Edit Network Element', edit_ne_config:'Edit NE Config',
+    refresh:'Refresh', delete_btn:'Delete', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
     // sections
     create_user:'Create User', all_users:'All Users',
     create_permission:'Create Permission', all_permissions:'All Permissions',
     create_ne:'Create Network Element', all_nes:'All Network Elements',
-    create_ne_config:'Add NE Config Entry', all_ne_configs:'NE Config Entries', select_ne_to_view:'Select a NE to view its configs',
     assign_ne:'Assign NE to User', user_ne_assignments:'User - NE Assignments',
     assign_role:'Assign Role to User', user_role_assignments:'User - Role Assignments',
     operation_history:'Operation History',
@@ -447,14 +362,13 @@ const I18N = {
       <h3>Import</h3>
       <p>Bulk import data using a text file format:</p>
       <table><thead><tr><th>Section</th><th>Fields</th></tr></thead><tbody>
-        <tr><td><code>[users]</code></td><td>username, password</td></tr>
-        <tr><td><code>[nes]</code></td><td>name, site_name, ip_address, port, namespace, description</td></tr>
+        <tr><td><code>[users]</code></td><td>username, password, email (optional)</td></tr>
+        <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
         <tr><td><code>[roles]</code></td><td>permission, scope, ne_type, include_type, path</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
-        <tr><td><code>[ne_configs]</code></td><td>ne_name, ip_address, port, username, password, protocol, description</td></tr>
       </tbody></table>
-      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated). NE configs are always inserted as new entries.</p>
+      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated).</p>
 
       <h3>History</h3>
       <p>View operation audit log. All create/delete/assign actions are recorded with timestamp, user, and result.</p>
@@ -469,15 +383,12 @@ const I18N = {
   },
   vi: {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_permissions:'Phân quyền', nav_nes:'Phần tử mạng',
-    nav_ne_config:'Cấu hình NE', nav_ne_mapping:'Gán NE', nav_role_mapping:'Gán Role', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
+    nav_ne_mapping:'Gán NE', nav_role_mapping:'Gán Role', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
     username:'Tên đăng nhập', password:'Mật khẩu', login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', assign:'Gán',
-    refresh:'Làm mới', delete_btn:'Xóa', edit_btn:'Sửa', save:'Lưu', cancel:'Hủy', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
-    new_password:'Mật khẩu mới', reset_password:'Đặt lại mật khẩu',
-    edit_ne:'Sửa phần tử mạng', edit_ne_config:'Sửa cấu hình NE',
+    refresh:'Làm mới', delete_btn:'Xóa', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
     create_user:'Tạo người dùng', all_users:'Tất cả người dùng',
     create_permission:'Tạo quyền', all_permissions:'Tất cả quyền',
     create_ne:'Tạo phần tử mạng', all_nes:'Tất cả phần tử mạng',
-    create_ne_config:'Thêm cấu hình NE', all_ne_configs:'Danh sách cấu hình NE', select_ne_to_view:'Chọn NE để xem cấu hình',
     assign_ne:'Gán NE cho người dùng', user_ne_assignments:'Người dùng - NE',
     assign_role:'Gán role cho người dùng', user_role_assignments:'Người dùng - Role',
     operation_history:'Lịch sử thao tác',
@@ -516,14 +427,13 @@ const I18N = {
       <h3>Nhập liệu</h3>
       <p>Nhập dữ liệu hàng loạt từ file text:</p>
       <table><thead><tr><th>Section</th><th>Trường</th></tr></thead><tbody>
-        <tr><td><code>[users]</code></td><td>username, password</td></tr>
-        <tr><td><code>[nes]</code></td><td>name, site_name, ip_address, port, namespace, description</td></tr>
+        <tr><td><code>[users]</code></td><td>username, password, email (tùy chọn)</td></tr>
+        <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
         <tr><td><code>[roles]</code></td><td>permission, scope, ne_type, include_type, path</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
-        <tr><td><code>[ne_configs]</code></td><td>ne_name, ip_address, port, username, password, protocol, description</td></tr>
       </tbody></table>
-      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng). Cấu hình NE luôn được thêm mới.</p>
+      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng).</p>
 
       <h3>Lịch sử</h3>
       <p>Xem nhật ký thao tác. Tất cả hành động tạo/xóa/gán đều được ghi lại với thời gian, người dùng và kết quả.</p>
@@ -632,7 +542,6 @@ function showSection(name) {
   if (name === 'users') loadUsers();
   if (name === 'permissions') loadPermissions();
   if (name === 'nes') loadNes();
-  if (name === 'ne-config') initNeConfigSection();
   if (name === 'ne-mapping') loadNeMapping();
   if (name === 'role-mapping') loadRoleMapping();
   if (name === 'history') loadHistory();
@@ -656,10 +565,16 @@ function doLogout() {
   document.getElementById('loginPage').style.display = 'flex';
 }
 async function refreshCaches() {
-  const [u, n, p] = await Promise.all([api('GET', '/authenticate/user/show'), api('GET', '/authorize/ne/show'), api('GET', '/authorize/permission/show')]);
+  const [u, n, p, au] = await Promise.all([
+    api('GET', '/authenticate/user/show'),
+    api('GET', '/admin/ne/list'),
+    api('GET', '/authorize/permission/show'),
+    api('GET', '/admin/user/list')
+  ]);
   cachedUsers = Array.isArray(u.data) ? u.data : [];
   cachedNes = Array.isArray(n.data) ? n.data : [];
   cachedPerms = Array.isArray(p.data) ? p.data : [];
+  cachedAdminUsers = Array.isArray(au.data) ? au.data : [];
 }
 
 let acNeMapUser, acNeMapNe, acRoleMapUser, acRoleMapPerm;
@@ -668,7 +583,7 @@ function enterApp() {
   document.getElementById('app').style.display = 'block';
   document.getElementById('currentUser').textContent = USERNAME;
   acNeMapUser = initAC('acNeMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
-  acNeMapNe = initAC('acNeMapNe', 'Search NE...', () => cachedNes.map(n => ({label: n.name, value: String(n.id), sub: n.site_name + ' - ' + n.ip_address})));
+  acNeMapNe = initAC('acNeMapNe', 'Search NE...', () => cachedNes.map(n => ({label: n.ne_name, value: String(n.id), sub: n.site_name + ' - ' + (n.conf_master_ip||'')})));
   acRoleMapUser = initAC('acRoleMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
   acRoleMapPerm = initAC('acRoleMapPerm', 'Search permission...', () => { const unique=[...new Set(cachedPerms.map(p=>p.permission))]; return unique.map(p=>({label:p,value:p})); });
   refreshCaches().then(() => showSection('dashboard'));
@@ -686,8 +601,41 @@ async function loadDashboard() {
 }
 
 // ── Users ──
-async function loadUsers() { const data=cachedUsers; if(!data.length){document.getElementById('usersTable').innerHTML='<div class="empty">No users found</div>';return;} let html='<table><thead><tr><th>'+t('username')+'</th><th>Role</th><th>NEs</th><th>Actions</th></tr></thead><tbody>'; data.forEach(u=>{const nes=(u.tblNes||[]).map(n=>'<span class="badge badge-blue">'+esc(n.ne)+'</span>').join(' ')||'-';const role=u.role?'<span class="badge badge-green">'+esc(u.role)+'</span>':'-';html+='<tr><td>'+esc(u.username)+'</td><td>'+role+'</td><td>'+nes+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openResetPass(\''+esc(u.username)+'\')">'+t('reset_password')+'</button><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.username)+'\')">'+t('disable')+'</button></td></tr>';}); html+='</tbody></table>'; document.getElementById('usersTable').innerHTML=html; }
-async function createUser(){const username=document.getElementById('newUsername').value;const password=document.getElementById('newPassword').value;if(!username||!password){toast('Fill in all fields','error');return;}const{status}=await api('POST','/authenticate/user/set',{account_name:username,password});if(status===201){toast('User created');document.getElementById('newUsername').value='';document.getElementById('newPassword').value='';await refreshCaches();loadUsers();}else toast('Failed','error');}
+async function loadUsers() {
+  const data = cachedAdminUsers;
+  if(!data.length){document.getElementById('usersTable').innerHTML='<div class="empty">No users found</div>';return;}
+  const typeLabel = {0:'SuperAdmin',1:'Admin',2:'Normal'};
+  const typeClass = {0:'user-type-0',1:'user-type-1',2:'user-type-2'};
+  let html='<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Full Name</th><th>Phone</th><th>Type</th><th>Enabled</th><th>Actions</th></tr></thead><tbody>';
+  data.forEach(u=>{
+    const typ='<span class="user-type '+esc(typeClass[u.account_type]||'')+'">'+esc(typeLabel[u.account_type]||String(u.account_type))+'</span>';
+    const enabled=u.is_enable?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>';
+    html+='<tr><td>'+u.account_id+'</td>'
+      +'<td><b>'+esc(u.account_name)+'</b></td>'
+      +'<td>'+esc(u.email||'-')+'</td>'
+      +'<td>'+esc(u.full_name||'-')+'</td>'
+      +'<td>'+esc(u.phone_number||'-')+'</td>'
+      +'<td>'+typ+'</td>'
+      +'<td>'+enabled+'</td>'
+      +'<td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button></td></tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('usersTable').innerHTML=html;
+}
+async function createUser(){
+  const account_name=document.getElementById('newUsername').value;
+  const email=document.getElementById('newEmail').value;
+  const password=document.getElementById('newPassword').value;
+  if(!account_name||!email||!password){toast('Username, email and password are required','error');return;}
+  const full_name=document.getElementById('newFullName').value;
+  const phone_number=document.getElementById('newPhone').value;
+  const address=document.getElementById('newAddress').value;
+  const description=document.getElementById('newDescription').value;
+  const account_type=parseInt(document.getElementById('newAccountType').value)||2;
+  const{status}=await api('POST','/authenticate/user/set',{account_name,password,email,full_name,phone_number,address,description,account_type});
+  if(status===201){toast('User created');['newUsername','newEmail','newPassword','newFullName','newPhone','newAddress','newDescription'].forEach(id=>document.getElementById(id).value='');document.getElementById('newAccountType').value='2';await refreshCaches();loadUsers();}
+  else toast('Failed','error');
+}
 async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const{status}=await api('POST','/authenticate/user/delete',{account_name:username});if(status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast('Failed','error');}
 
 // ── Permissions ──
@@ -696,128 +644,51 @@ async function createPermission(){const permission=document.getElementById('newP
 async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const{status}=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast('Failed','error');}
 
 // ── NEs ──
-let neDataMap = {};
-async function loadNes(){const data=cachedNes;if(!data.length){document.getElementById('nesTable').innerHTML='<div class="empty">No NEs</div>';return;}neDataMap={};let html='<table><thead><tr><th>ID</th><th>'+t('ne_name')+'</th><th>Site</th><th>IP</th><th>Port</th><th>Namespace</th><th>'+t('description')+'</th><th>Actions</th></tr></thead><tbody>';data.forEach(n=>{neDataMap[n.id]=n;html+='<tr><td>'+n.id+'</td><td><span class="badge badge-blue">'+esc(n.name)+'</span></td><td>'+esc(n.site_name||'-')+'</td><td>'+esc(n.ip_address||'-')+'</td><td>'+(n.port||'-')+'</td><td>'+esc(n.namespace||'-')+'</td><td>'+esc(n.description||'-')+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openEditNe('+n.id+')">'+t('edit_btn')+'</button><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.name)+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('nesTable').innerHTML=html;}
-async function deleteNe(id,name){if(!confirm(t('delete_btn')+' '+name+'?'))return;const{status}=await api('POST','/authorize/ne/remove',{id});if(status===200){toast('Deleted');await refreshCaches();loadNes();}else toast('Failed','error');}
-async function createNe(){const name=document.getElementById('neCreateName').value;const site_name=document.getElementById('neCreateSite').value;const ip_address=document.getElementById('neCreateIP').value;const port=parseInt(document.getElementById('neCreatePort').value)||22;const namespace=document.getElementById('neCreateNS').value;const description=document.getElementById('neCreateDesc').value;if(!name){toast('Name required','error');return;}const{status}=await api('POST','/authorize/ne/create',{name,site_name,ip_address,port,namespace,description,system_type:'5GC'});if(status===201){toast('Created');['neCreateName','neCreateSite','neCreateIP','neCreatePort','neCreateNS','neCreateDesc'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadNes();}else toast('Failed','error');}
-
-// ── NE Config ──
-let acNeConfigNe, acNeConfigFilter, selectedNeConfigId = null;
-function initNeConfigSection(){
-  if(!acNeConfigNe) acNeConfigNe = initAC('acNeConfigNe','Search NE...', ()=>cachedNes.map(n=>({label:n.name,value:String(n.id),sub:n.site_name+' - '+n.ip_address})));
-  if(!acNeConfigFilter) acNeConfigFilter = initAC('acNeConfigFilter','Filter by NE...', ()=>cachedNes.map(n=>({label:n.name,value:String(n.id),sub:n.site_name+' - '+n.ip_address})));
-}
-async function loadNeConfigList(){
-  const neId = acNeConfigFilter ? acNeConfigFilter.getValue() : null;
-  if(!neId){document.getElementById('neConfigTable').innerHTML='<div class="empty">'+t('select_ne_to_view')+'</div>';return;}
-  const{status,data}=await api('GET','/authorize/ne/config/list?ne_id='+neId);
-  if(status!==200){document.getElementById('neConfigTable').innerHTML='<div class="empty">Failed to load</div>';return;}
-  const list=data||[];
-  if(!list.length){document.getElementById('neConfigTable').innerHTML='<div class="empty">No configs for this NE</div>';return;}
-  let html='<table><thead><tr><th>ID</th><th>NE Name</th><th>IP Address</th><th>Port</th><th>Username</th><th>Password</th><th>Protocol</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
-  const cfgMap={};
-  list.forEach(c=>{cfgMap[c.id]=c;});
-  window._neConfigMap=cfgMap;
-  list.forEach(c=>{
-    html+='<tr><td>'+c.id+'</td><td>'+esc(c.ne_name||'-')+'</td><td>'+esc(c.ip_address)+'</td><td>'+c.port+'</td><td>'+esc(c.username)+'</td><td><code>'+esc(c.password||'')+'</code></td><td><span class="badge badge-blue">'+esc(c.protocol)+'</span></td><td>'+esc(c.description)+'</td><td class="actions"><button class="btn btn-outline btn-sm" onclick="openEditNeConfig('+c.id+')">'+t('edit_btn')+'</button><button class="btn btn-danger btn-sm" onclick="deleteNeConfig('+c.id+')">'+t('delete_btn')+'</button></td></tr>';
+async function loadNes(){
+  const data=cachedNes;
+  if(!data.length){document.getElementById('nesTable').innerHTML='<div class="empty">No NEs</div>';return;}
+  let html='<table><thead><tr><th>ID</th><th>NE Name</th><th>Site</th><th>Namespace</th><th>Command URL</th><th>Mode</th><th>Master IP</th><th>SSH Port</th><th>TCP Port</th><th>Slave IP</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
+  data.forEach(n=>{
+    html+='<tr><td>'+n.id+'</td>'
+      +'<td><span class="badge badge-blue">'+esc(n.ne_name||'-')+'</span></td>'
+      +'<td>'+esc(n.site_name||'-')+'</td>'
+      +'<td>'+esc(n.namespace||'-')+'</td>'
+      +'<td style="font-size:.8rem">'+esc(n.command_url||'-')+'</td>'
+      +'<td>'+esc(n.conf_mode||'-')+'</td>'
+      +'<td>'+esc(n.conf_master_ip||'-')+'</td>'
+      +'<td>'+(n.conf_port_master_ssh||'-')+'</td>'
+      +'<td>'+(n.conf_port_master_tcp||'-')+'</td>'
+      +'<td>'+esc(n.conf_slave_ip||'-')+'</td>'
+      +'<td>'+esc(n.description||'-')+'</td>'
+      +'<td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button></td></tr>';
   });
   html+='</tbody></table>';
-  document.getElementById('neConfigTable').innerHTML=html;
+  document.getElementById('nesTable').innerHTML=html;
 }
-async function createNeConfig(){
-  const neId = acNeConfigNe ? parseInt(acNeConfigNe.getValue()) : 0;
-  const ip_address=document.getElementById('neCfgIP').value;
-  const port=parseInt(document.getElementById('neCfgPort').value)||22;
-  const username=document.getElementById('neCfgUser').value;
-  const password=document.getElementById('neCfgPass').value;
-  const protocol=document.getElementById('neCfgProto').value||'SSH';
-  const description=document.getElementById('neCfgDesc').value;
-  if(!neId||!ip_address){toast('NE and IP Address are required','error');return;}
-  const{status}=await api('POST','/authorize/ne/config/create',{ne_id:neId,ip_address,port,username,password,protocol,description});
-  if(status===201){toast('Created');['neCfgIP','neCfgPort','neCfgUser','neCfgPass','neCfgDesc'].forEach(id=>document.getElementById(id).value='');if(acNeConfigNe)acNeConfigNe.clear();loadNeConfigList();}
-  else toast('Failed','error');
-}
-async function deleteNeConfig(id){
-  if(!confirm(t('delete_btn')+' config #'+id+'?'))return;
-  const{status}=await api('POST','/authorize/ne/config/delete',{id});
-  if(status===200){toast('Deleted');loadNeConfigList();}else toast('Failed','error');
-}
-
-// ── Modal helpers ──
-function closeModal(id){document.getElementById(id).classList.remove('show');}
-
-// ── Edit NE ──
-function openEditNe(id){
-  const n=neDataMap[id]; if(!n)return;
-  document.getElementById('editNeId').value=n.id;
-  document.getElementById('editNeName').value=n.name||'';
-  document.getElementById('editNeSite').value=n.site_name||'';
-  document.getElementById('editNeIP').value=n.ip_address||'';
-  document.getElementById('editNePort').value=n.port||'';
-  document.getElementById('editNeNS').value=n.namespace||'';
-  document.getElementById('editNeDesc').value=n.description||'';
-  document.getElementById('modalEditNe').classList.add('show');
-}
-async function submitEditNe(){
-  const id=parseInt(document.getElementById('editNeId').value);
-  const name=document.getElementById('editNeName').value;
-  const site_name=document.getElementById('editNeSite').value;
-  const ip_address=document.getElementById('editNeIP').value;
-  const port=parseInt(document.getElementById('editNePort').value)||22;
-  const namespace=document.getElementById('editNeNS').value;
-  const description=document.getElementById('editNeDesc').value;
-  if(!id){toast('Missing NE id','error');return;}
-  const{status}=await api('POST','/authorize/ne/update',{id,name,site_name,ip_address,port,namespace,description,system_type:'5GC'});
-  if(status===200){toast('NE updated');closeModal('modalEditNe');await refreshCaches();loadNes();}
-  else toast('Failed','error');
-}
-
-// ── Edit NE Config ──
-function openEditNeConfig(id){
-  const c=(window._neConfigMap||{})[id]; if(!c)return;
-  document.getElementById('editCfgId').value=c.id;
-  document.getElementById('editCfgIP').value=c.ip_address||'';
-  document.getElementById('editCfgPort').value=c.port||'';
-  document.getElementById('editCfgUser').value=c.username||'';
-  document.getElementById('editCfgPass').value=c.password||'';
-  document.getElementById('editCfgProto').value=c.protocol||'SSH';
-  document.getElementById('editCfgDesc').value=c.description||'';
-  document.getElementById('modalEditNeConfig').classList.add('show');
-}
-async function submitEditNeConfig(){
-  const id=parseInt(document.getElementById('editCfgId').value);
-  const ip_address=document.getElementById('editCfgIP').value;
-  const port=parseInt(document.getElementById('editCfgPort').value)||22;
-  const username=document.getElementById('editCfgUser').value;
-  const password=document.getElementById('editCfgPass').value;
-  const protocol=document.getElementById('editCfgProto').value||'SSH';
-  const description=document.getElementById('editCfgDesc').value;
-  if(!id){toast('Missing config id','error');return;}
-  const body={id,ip_address,port,username,protocol,description};
-  if(password) body.password=password;
-  const{status}=await api('POST','/authorize/ne/config/update',body);
-  if(status===200){toast('Config updated');closeModal('modalEditNeConfig');loadNeConfigList();}
-  else toast('Failed','error');
-}
-
-// ── Reset Password ──
-function openResetPass(username){
-  document.getElementById('resetPassUser').value=username;
-  document.getElementById('resetPassUserDisplay').value=username;
-  document.getElementById('resetPassNew').value='';
-  document.getElementById('modalResetPass').classList.add('show');
-}
-async function submitResetPass(){
-  const username=document.getElementById('resetPassUser').value;
-  const new_password=document.getElementById('resetPassNew').value;
-  if(!new_password){toast('New password required','error');return;}
-  const{status}=await api('POST','/authenticate/user/reset-password',{username,new_password});
-  if(status===200){toast('Password reset');closeModal('modalResetPass');}
+async function deleteNe(id,name){if(!confirm(t('delete_btn')+' '+name+'?'))return;const{status}=await api('POST','/authorize/ne/remove',{id});if(status===200){toast('Deleted');await refreshCaches();loadNes();}else toast('Failed','error');}
+async function createNe(){
+  const ne_name=document.getElementById('neCreateName').value;
+  const site_name=document.getElementById('neCreateSite').value;
+  const namespace=document.getElementById('neCreateNS').value;
+  const description=document.getElementById('neCreateDesc').value;
+  const command_url=document.getElementById('neCreateCmdURL').value;
+  const conf_mode=document.getElementById('neCreateConfMode').value;
+  const conf_username=document.getElementById('neCreateUser').value;
+  const conf_password=document.getElementById('neCreatePass').value;
+  const conf_master_ip=document.getElementById('neCreateMasterIP').value;
+  const conf_slave_ip=document.getElementById('neCreateSlaveIP').value;
+  const conf_port_master_ssh=parseInt(document.getElementById('neCreateMasterSSH').value)||0;
+  const conf_port_slave_ssh=parseInt(document.getElementById('neCreateSlaveSSH').value)||0;
+  const conf_port_master_tcp=parseInt(document.getElementById('neCreateMasterTCP').value)||0;
+  const conf_port_slave_tcp=parseInt(document.getElementById('neCreateSlaveTCP').value)||0;
+  if(!ne_name){toast('NE Name required','error');return;}
+  const{status}=await api('POST','/admin/ne/create',{ne_name,site_name,namespace,description,command_url,conf_mode,conf_master_ip,conf_slave_ip,conf_port_master_ssh,conf_port_slave_ssh,conf_port_master_tcp,conf_port_slave_tcp,conf_username,conf_password,system_type:'5GC'});
+  if(status===201){toast('Created');['neCreateName','neCreateSite','neCreateNS','neCreateDesc','neCreateCmdURL','neCreateConfMode','neCreateUser','neCreatePass','neCreateMasterIP','neCreateSlaveIP','neCreateMasterSSH','neCreateSlaveSSH','neCreateMasterTCP','neCreateSlaveTCP'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadNes();}
   else toast('Failed','error');
 }
 
 // ── NE Mapping ──
-async function loadNeMapping(){const data=cachedUsers;const neIdMap={};cachedNes.forEach(n=>{neIdMap[n.name]=n.id;});if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>NEs</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const nes=(u.tblNes||[]);const nesBadges=nes.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' ('+esc(n.site)+')</span>').join(' ')||'<span style="color:#64748b">None</span>';const removeButtons=nes.map(n=>{const neid=neIdMap[n.ne]||'';return '<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+neid+')">'+esc(n.ne)+' &times;</button>';}).join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+nesBadges+'</td><td class="actions">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('neMappingTable').innerHTML=html;}
+async function loadNeMapping(){const data=cachedUsers;const neIdMap={};cachedNes.forEach(n=>{neIdMap[n.ne_name]=n.id;});if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>NEs</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const nes=(u.tblNes||[]);const nesBadges=nes.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' ('+esc(n.site)+')</span>').join(' ')||'<span style="color:#64748b">None</span>';const removeButtons=nes.map(n=>{const neid=neIdMap[n.ne]||'';return '<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+neid+')">'+esc(n.ne)+' &times;</button>';}).join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+nesBadges+'</td><td class="actions">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('neMappingTable').innerHTML=html;}
 async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+username+'?'))return;const{status}=await api('POST','/authorize/ne/delete',{username,neid:String(neid)});if(status===200){toast('Removed');await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 async function assignNe(){const username=acNeMapUser.getValue();const neid=acNeMapNe.getValue();if(!username||!neid){toast('Select user and NE','error');return;}const{status}=await api('POST','/authorize/ne/set',{username,neid});if(status===200){toast('Assigned');acNeMapUser.clear();acNeMapNe.clear();await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 
@@ -849,7 +720,7 @@ async function loadHistory(){
 
 // ── Import ──
 function handleImportFile(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{document.getElementById('importText').value=e.target.result;};reader.readAsText(file);}
-function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password\nadmin,admin123\noperator1,Pass@123\n\n[nes]\nname,site_name,ip_address,port,namespace,description\nHTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01\nHTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01\n\n[roles]\npermission,scope,ne_type,include_type,path\nadmin,ext-config,5GC,include,/\noperator,ext-config,5GC,include,/\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,operator\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01\n\n[ne_configs]\nne_name,ip_address,port,username,password,protocol,description\nHTSMF01,10.10.1.1,830,netconf,netconf123,NETCONF,SMF NETCONF interface\nHTSMF01,10.10.1.1,22,admin,admin123,SSH,SMF SSH fallback\nHTAMF01,10.10.2.1,830,netconf,netconf123,NETCONF,AMF NETCONF interface';}
+function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password,email\nadmin,admin123,admin@vht.com\noperator1,Pass@123,op1@vht.com\n\n[nes]\nne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description\nHTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01\nHTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,SSH,10.10.2.1,22,admin,admin,HCM AMF Node 01\n\n[roles]\npermission,scope,ne_type,include_type,path\nadmin,ext-config,5GC,include,/\noperator,ext-config,5GC,include,/\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,operator\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01';}
 async function runImport(){const text=document.getElementById('importText').value;if(!text.trim()){toast('Paste or upload data first','error');return;}const res=await fetch(API+'/import/',{method:'POST',headers:{'Content-Type':'text/plain','Authorization':TOKEN},body:text});let data;try{data=await res.json();}catch{data=null;}if(!Array.isArray(data)||!data.length){toast('No results','error');return;}const card=document.getElementById('importResultsCard');card.style.display='block';let html='<table><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Detail</th></tr></thead><tbody>';let ok=0,err=0,skip=0;data.forEach(r=>{const badge=r.status==='ok'?'<span class="badge badge-green">ok</span>':r.status==='skip'?'<span class="badge badge-blue">skip</span>':'<span class="badge badge-red">error</span>';if(r.status==='ok')ok++;else if(r.status==='skip')skip++;else err++;html+='<tr><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td><td>'+badge+'</td><td style="font-size:.8rem">'+esc(r.detail)+'</td></tr>';});html+='</tbody></table><p style="margin-top:.75rem;font-size:.85rem;color:#94a3b8"><span class="badge badge-green">'+ok+' ok</span> <span class="badge badge-blue">'+skip+' skipped</span> <span class="badge badge-red">'+err+' errors</span></p>';document.getElementById('importResults').innerHTML=html;await refreshCaches();toast('Import: '+ok+' ok, '+skip+' skipped, '+err+' errors');}
 
 // ── Init ──

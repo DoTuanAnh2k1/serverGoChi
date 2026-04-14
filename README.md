@@ -168,14 +168,14 @@ CSV, phân section bằng `[section_name]`, dòng đầu mỗi section là heade
 
 ```
 [users]
-username,password
-anhdt195,123
-operator1,Pass@123
+username,password,email
+admin,admin123,admin@vht.com
+operator1,Pass@123,op1@vht.com
 
 [nes]
-name,site_name,ip_address,port,namespace,description
-HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
-HTAMF01,HCM,10.10.2.1,22,hcm-5gc,HCM AMF Node 01
+ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
+HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
+HTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,NETCONF,10.10.2.1,830,admin,admin,HCM AMF Node 01
 
 [roles]
 permission,scope,ne_type,include_type,path
@@ -184,29 +184,22 @@ operator,ext-config,5GC,include,/
 
 [user_roles]
 username,permission
-anhdt195,admin
+admin,admin
 operator1,operator
 
 [user_nes]
 username,ne_name
-anhdt195,HTSMF01
+admin,HTSMF01
 operator1,HTAMF01
-
-[ne_configs]
-ne_name,ip_address,port,username,password,protocol,description
-HTSMF01,10.10.1.1,830,netconf,netconf123,NETCONF,SMF NETCONF interface
-HTSMF01,10.10.1.1,22,admin,admin123,SSH,SMF SSH fallback
-HTAMF01,10.10.2.1,830,netconf,netconf123,NETCONF,AMF NETCONF interface
 ```
 
 | Section | Trường | Ghi chú |
 |---|---|---|
-| `[users]` | username, password | Bỏ qua nếu user đã tồn tại |
-| `[nes]` | name, site_name, ip_address, port, namespace, description | Luôn insert mới |
+| `[users]` | username, password, email (tùy chọn) | Bỏ qua nếu user đã tồn tại |
+| `[nes]` | ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description | Các field sau ne_name là tùy chọn |
 | `[roles]` | permission, scope, ne_type, include_type, path | Bỏ qua nếu role đã tồn tại |
 | `[user_roles]` | username, permission | Gán permission cho user |
 | `[user_nes]` | username, ne_name | Gán NE cho user |
-| `[ne_configs]` | ne_name, ip_address, port, username, password, protocol, description | Luôn insert mới; protocol mặc định `SSH` |
 
 ### Frontend
 
@@ -307,6 +300,15 @@ Kết nối được lưu trong cột `conf_*` — không dùng `ip_address`/`po
 | `cli-config` | cli-mgt-svc | Audit thao tác quản trị |
 | `ne-command` | SSH_SERVER | Lịch sử lệnh chạy trên NE |
 | `ne-config` | cli-netconf-svc | Lịch sử cấu hình NETCONF |
+
+### Admin (Frontend API)
+
+| Method | Path | Mô tả |
+|---|---|---|
+| `GET`  | `/aa/admin/user/list` | Danh sách user đầy đủ (không password) |
+| `GET`  | `/aa/admin/ne/list` | Danh sách NE đầy đủ (tất cả fields từ cli_ne) |
+| `POST` | `/aa/admin/ne/create` | Tạo NE đầy đủ fields |
+| `POST` | `/aa/admin/ne/update` | Cập nhật NE đầy đủ fields |
 
 ### Import & Subscribers
 | Method | Path | Mô tả |
