@@ -32,6 +32,8 @@ tags:
     description: NETCONF commit config backup (XML on disk + metadata in DB)
   - name: History
     description: Command / audit history
+  - name: Admin
+    description: Frontend admin APIs — full user / NE data (no password)
   - name: Import
     description: Bulk data import
   - name: Subscribers
@@ -793,7 +795,7 @@ paths:
             schema:
               $ref: "#/components/schemas/ConfigBackupSaveRequest"
       responses:
-        "200":
+        "201":
           description: Saved
           content:
             application/json:
@@ -940,12 +942,12 @@ paths:
 
         ```
         [users]
-        username,password
-        admin,admin123
+        username,password,email
+        admin,admin123,admin@vht.com
 
         [nes]
-        name,site_name,ip_address,port,namespace,description
-        HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
+        ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
+        HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
 
         [roles]
         permission,scope,ne_type,include_type,path
@@ -958,13 +960,9 @@ paths:
         [user_nes]
         username,ne_name
         admin,HTSMF01
-
-        [ne_configs]
-        ne_name,ip_address,port,username,password,protocol,description
-        HTSMF01,10.10.1.1,830,netconf,netconf123,NETCONF,Primary NETCONF
         ```
 
-        Existing users/roles are skipped. NE configs are always inserted as new entries.
+        Existing users/roles are skipped (idempotent). NE rows are upserted by `ne_name`.
       security:
         - bearerAuth: []
       requestBody:
@@ -982,6 +980,114 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/ImportResult"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  # ── Admin (Frontend API) ─────────────────────────────────────────────────────
+  /aa/admin/user/list:
+    get:
+      tags: [Admin]
+      summary: List all users with full fields (no password) — for frontend admin panel
+      operationId: adminUserList
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: User list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUserItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /aa/admin/ne/list:
+    get:
+      tags: [Admin]
+      summary: List all NEs with full fields (all cli_ne columns) — for frontend admin panel
+      operationId: adminNeList
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: NE list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/CliNe"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /aa/admin/ne/create:
+    post:
+      tags: [Admin]
+      summary: Create NE with full fields — for frontend admin panel
+      operationId: adminNeCreate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CliNe"
+            example:
+              ne_name: HTSMF01
+              site_name: HCM
+              namespace: hcm-5gc
+              command_url: http://10.10.1.1:8080
+              conf_mode: SSH
+              conf_master_ip: 10.10.1.1
+              conf_port_master_ssh: 22
+              conf_username: admin
+              conf_password: secret
+              description: HCM SMF Node 01
+      responses:
+        "201":
+          description: Created — returns the new NE object
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CliNe"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /aa/admin/ne/update:
+    post:
+      tags: [Admin]
+      summary: Update NE with full fields (id required) — for frontend admin panel
+      operationId: adminNeUpdate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CliNe"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
         "401":
@@ -1623,6 +1729,9 @@ components:
     ConfigBackupGetResponse:
       type: object
       properties:
+        status:
+          type: string
+          example: ok
         id:
           type: integer
           format: int64
@@ -1636,6 +1745,7 @@ components:
         created_at:
           type: string
           format: date-time
+          description: UTC timestamp in RFC3339 format
         config_xml:
           type: string
           description: XML file content
@@ -1696,6 +1806,89 @@ components:
         executed_time:
           type: string
           format: date-time
+
+    # ── Admin ─────────────────────────────────────────────────────────────────
+    AdminUserItem:
+      description: TblAccount without password — returned by GET /aa/admin/user/list
+      type: object
+      properties:
+        account_id:
+          type: integer
+          format: int64
+        account_name:
+          type: string
+        full_name:
+          type: string
+        email:
+          type: string
+        address:
+          type: string
+        phone_number:
+          type: string
+        account_type:
+          type: integer
+          format: int32
+          description: "0=SuperAdmin, 1=Admin, 2=Normal"
+        description:
+          type: string
+        is_enable:
+          type: boolean
+        status:
+          type: boolean
+        created_by:
+          type: string
+        login_failure_count:
+          type: integer
+          format: int32
+
+    CliNe:
+      description: |
+        Full CliNe model (all columns of table cli_ne).
+        Used by Admin create/update/list endpoints.
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          readOnly: true
+        ne_name:
+          type: string
+          description: Tên NE (bắt buộc khi tạo mới)
+        namespace:
+          type: string
+        site_name:
+          type: string
+        system_type:
+          type: string
+          default: 5GC
+        description:
+          type: string
+        command_url:
+          type: string
+          description: URL monitor / command (mode ne-command)
+        conf_mode:
+          type: string
+          enum: [SSH, TELNET, NETCONF, RESTCONF]
+        conf_master_ip:
+          type: string
+        conf_slave_ip:
+          type: string
+        conf_port_master_ssh:
+          type: integer
+          format: int32
+        conf_port_slave_ssh:
+          type: integer
+          format: int32
+        conf_port_master_tcp:
+          type: integer
+          format: int32
+        conf_port_slave_tcp:
+          type: integer
+          format: int32
+        conf_username:
+          type: string
+        conf_password:
+          type: string
 
     # ── Import ────────────────────────────────────────────────────────────────
     ImportResult:

@@ -3,6 +3,7 @@
 APP_NAME     := mgt-service
 COMPOSE      := docker compose -f deploy/docker/docker-compose.yml
 COMPOSE_PRV  := docker compose -f deploy/docker/docker-compose-private.yaml
+COMPOSE_CMD  := docker compose -f deploy/docker/docker-compose-command-private.yaml
 MAIN         := ./cmd/main/main.go
 IMPORT_CMD   := ./cmd/import
 BUILD_DIR    := bin
@@ -34,7 +35,7 @@ define APP_ENV
 	PPROF_ENABLED=true PPROF_ADDR=:$(PPROF_PORT)
 endef
 
-.PHONY: help up up-docker up-local down build build-docker import dump metric \
+.PHONY: help up up-docker up-local up-cmd down down-cmd build build-docker import dump metric \
         pprof-heap pprof-cpu pprof-goroutine test clean logs ps
 
 help: ## Show this help
@@ -56,6 +57,20 @@ up-docker: ## Start all services in Docker containers
 	@echo "  TCP:     localhost:$(TCP_PORT)"
 	@echo "  MySQL:   localhost:$(DB_PORT)"
 	@echo ""
+
+up-cmd: ## Start minimal stack: MySQL + cli-mgt-svc + cli-command-svc (private registry)
+	JWT_SECRET_KEY=$${JWT_SECRET_KEY:-dev-secret-key} \
+	$(COMPOSE_CMD) up -d --build
+	@echo ""
+	@echo "  App:     http://localhost:$(SERVER_PORT)"
+	@echo "  Admin:   http://localhost:$(SERVER_PORT)/admin"
+	@echo "  TCP:     localhost:$(TCP_PORT)"
+	@echo "  MySQL:   localhost:$(DB_PORT)"
+	@echo ""
+
+down-cmd: ## Stop minimal stack (MySQL + cli-mgt-svc + cli-command-svc)
+	-JWT_SECRET_KEY=x $(COMPOSE_CMD) down 2>/dev/null
+	@echo "Done."
 
 up-local: ## Start DB in Docker + app locally (hot reload with go run)
 	$(COMPOSE) up -d mysql mongodb postgres
