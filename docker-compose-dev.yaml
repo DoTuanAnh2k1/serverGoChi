@@ -1,0 +1,102 @@
+# Dev stack: MySQL + cli-mgt-svc + cli-netconf-full
+# Usage: docker compose -f docker-compose-dev.yaml up -d --build
+#
+# Connects to existing confd container at 172.19.0.2:23645 via confd_default network.
+# SSH into cli-netconf: ssh anhdt195@localhost -p 2222
+
+services:
+
+  mysql:
+    image: mysql:8.0
+    container_name: mgt-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: cli_db
+      MYSQL_USER: mgtuser
+      MYSQL_PASSWORD: mgtpassword
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    networks:
+      - mgt-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  cli-mgt-svc:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile
+    container_name: cli-mgt-svc
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    ports:
+      - "9233:9233"
+    networks:
+      - mgt-net
+    environment:
+      SERVER_HOST: "0.0.0.0"
+      SERVER_PORT: "9233"
+      DB_DRIVER: mysql
+      MYSQL_HOST: mysql
+      MYSQL_PORT: "3306"
+      MYSQL_USER: mgtuser
+      MYSQL_PASSWORD: mgtpassword
+      MYSQL_DB_NAME: cli_db
+      JWT_SECRET_KEY: dev-secret-key
+      JWT_EXPIRY_HOURS: "24"
+      LOG_LEVEL: info
+      DB_LOG_LEVEL: warn
+      CORS_ORIGINS: "*"
+      TCP_LISTEN_PORT: "3675"
+      TCP_DATA_DIR: /data/subscribers
+      CLI_LOG_EXPORT_DIR: /data/csv
+      CSV_EXPORT_HOUR: "23"
+      PPROF_ENABLED: "false"
+      LEADER_ELECTION_ENABLED: "false"
+      POD_NAME: cli-mgt-svc-dev
+    volumes:
+      - app_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://127.0.0.1:9233/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  cli-netconf:
+    build:
+      context: ../cli-netconf
+      dockerfile: Dockerfile.full
+    container_name: cli-netconf-dev
+    restart: unless-stopped
+    depends_on:
+      cli-mgt-svc:
+        condition: service_healthy
+    ports:
+      - "2222:22"
+    networks:
+      - mgt-net
+      - confd_default
+    environment:
+      CONFD_IPC_ADDR: "172.19.0.2"
+      CONFD_IPC_PORT: "23645"
+      MGT_SERVICE_URL: http://cli-mgt-svc:9233
+      NE_NAME: eir
+
+volumes:
+  mysql_data:
+  app_data:
+
+networks:
+  mgt-net:
+    driver: bridge
+  confd_default:
+    external: true

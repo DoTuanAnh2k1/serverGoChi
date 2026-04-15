@@ -735,27 +735,6 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  /aa/list/ne/config:
-    get:
-      tags: [NE Config]
-      summary: All config entries for NEs belonging to logged-in user (grouped by NE)
-      operationId: listNeConfig
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Config list grouped by NE
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/NeConfigGroupEntry"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
   # ── Config Backup ────────────────────────────────────────────────────────────
   /aa/config-backup/save:
     post:
@@ -1526,6 +1505,7 @@ components:
           type: string
         ip:
           type: string
+          description: Same as conf_master_ip
         description:
           type: string
         namespace:
@@ -1533,6 +1513,34 @@ components:
         port:
           type: integer
           format: int32
+          description: Same as conf_port_master_ssh
+        command_url:
+          type: string
+          description: URL for ne-command mode
+        conf_mode:
+          type: string
+          description: "Connection protocol: SSH, TELNET, NETCONF, RESTCONF"
+        conf_master_ip:
+          type: string
+        conf_slave_ip:
+          type: string
+        conf_port_master_ssh:
+          type: integer
+          format: int32
+        conf_port_slave_ssh:
+          type: integer
+          format: int32
+        conf_port_master_tcp:
+          type: integer
+          format: int32
+          description: ConfD IPC / NETCONF TCP port
+        conf_port_slave_tcp:
+          type: integer
+          format: int32
+        conf_username:
+          type: string
+        conf_password:
+          type: string
         urlList:
           type: array
           nullable: true

@@ -565,13 +565,22 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		neDataList = append(neDataList, neData{
-			Site:        cliNe.SiteName,
-			Ne:          cliNe.NeName,
-			Ip:          cliNe.ConfMasterIP,
-			Description: cliNe.Description,
-			Namespace:   cliNe.Namespace,
-			Port:        cliNe.ConfPortMasterSSH,
-			UrlList:     nil,
+			Site:              cliNe.SiteName,
+			Ne:                cliNe.NeName,
+			Ip:                cliNe.ConfMasterIP,
+			Description:       cliNe.Description,
+			Namespace:         cliNe.Namespace,
+			Port:              cliNe.ConfPortMasterSSH,
+			CommandURL:        cliNe.CommandURL,
+			ConfMode:          cliNe.ConfMode,
+			ConfMasterIP:      cliNe.ConfMasterIP,
+			ConfSlaveIP:       cliNe.ConfSlaveIP,
+			ConfPortMasterSSH: cliNe.ConfPortMasterSSH,
+			ConfPortSlaveSSH:  cliNe.ConfPortSlaveSSH,
+			ConfPortMasterTCP: cliNe.ConfPortMasterTCP,
+			ConfPortSlaveTCP:  cliNe.ConfPortSlaveTCP,
+			ConfUsername:      cliNe.ConfUsername,
+			ConfPassword:      cliNe.ConfPassword,
 		})
 	}
 
@@ -693,13 +702,23 @@ type neResponse struct {
 }
 
 type neData struct {
-	Site        string  `json:"site"`
-	Ne          string  `json:"ne"`
-	Ip          string  `json:"ip"`
-	Description string  `json:"description"`
-	Namespace   string  `json:"namespace"`
-	Port        int32   `json:"port"`
-	UrlList     []neURL `json:"urlList"`
+	Site              string  `json:"site"`
+	Ne                string  `json:"ne"`
+	Ip                string  `json:"ip"`
+	Description       string  `json:"description"`
+	Namespace         string  `json:"namespace"`
+	Port              int32   `json:"port"`
+	CommandURL        string  `json:"command_url"`
+	ConfMode          string  `json:"conf_mode"`
+	ConfMasterIP      string  `json:"conf_master_ip"`
+	ConfSlaveIP       string  `json:"conf_slave_ip"`
+	ConfPortMasterSSH int32   `json:"conf_port_master_ssh"`
+	ConfPortSlaveSSH  int32   `json:"conf_port_slave_ssh"`
+	ConfPortMasterTCP int32   `json:"conf_port_master_tcp"`
+	ConfPortSlaveTCP  int32   `json:"conf_port_slave_tcp"`
+	ConfUsername      string  `json:"conf_username"`
+	ConfPassword      string  `json:"conf_password"`
+	UrlList           []neURL `json:"urlList"`
 }
 
 type neURL struct {

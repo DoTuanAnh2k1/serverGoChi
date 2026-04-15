@@ -178,36 +178,26 @@ services:
   cli-netconf-svc:
     build:
       context: ../../../cli-netconf
-      dockerfile: ../serverGoChi/deploy/docker/Dockerfile_cli_netconf_private
+      dockerfile: Dockerfile.full.private
     container_name: cli-netconf-svc
     restart: unless-stopped
     depends_on:
       cli-mgt-svc:
         condition: service_healthy
     ports:
-      - "${NETCONF_SSH_PORT:-2222}:2222"
+      - "${NETCONF_SSH_PORT:-2222}:22"
     environment:
-      # SSH listen address
-      SSH_ADDR: ":2222"
-
-      # Path to persistent SSH host key (mounted via volume).
-      # If not set, an ephemeral key is generated — clients will see a
-      # host-key-changed warning after every container restart.
-      SSH_HOST_KEY_PATH: /etc/ssh-keys/host_key
-
-      # URL of mgt-service (serverGoChi) — used for user auth and NE list
-      MGT_SERVICE_URL: http://cli-mgt-svc:${SERVER_PORT:-9233}
-
-      # Credentials used to connect to actual NETCONF devices
-      NETCONF_USERNAME: ${NETCONF_USERNAME:-admin}
-      NETCONF_PASSWORD: ${NETCONF_PASSWORD:-admin}
-      NETCONF_TIMEOUT:  ${NETCONF_TIMEOUT:-30s}
-    volumes:
-      - netconf_host_key:/etc/ssh-keys
+      CONFD_IPC_ADDR:    ${CONFD_IPC_ADDR:-127.0.0.1}
+      CONFD_IPC_PORT:    ${CONFD_IPC_PORT:-4565}
+      MGT_SERVICE_URL:   http://cli-mgt-svc:${SERVER_PORT:-9233}
+      NE_NAME:           ${NE_NAME:-confd}
+      SEED_USERNAME:     ${SEED_USERNAME:-anhdt195}
+      SEED_PASSWORD:     ${SEED_PASSWORD:-123}
     networks:
       - mgt-net
+      - confd-net
     healthcheck:
-      test: ["CMD-SHELL", "nc -z 127.0.0.1 2222 || exit 1"]
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22 || exit 1"]
       interval: 15s
       timeout: 5s
       retries: 3
@@ -218,8 +208,13 @@ volumes:
   mongodb_data:
   postgres_data:
   app_data:
-  netconf_host_key:
 
 networks:
   mgt-net:
     driver: bridge
+  confd-net:
+    # External network where ConfD container runs.
+    # Create with: docker network create confd-net
+    # Or set to your existing confd network name.
+    external: true
+    name: ${CONFD_NETWORK:-confd_default}
