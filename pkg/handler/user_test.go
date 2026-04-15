@@ -172,6 +172,40 @@ func TestHandlerAuthorizeUserDelete_UserNotFound(t *testing.T) {
 	}
 }
 
+func TestHandlerAuthorizeUserSet_RejectsSeedUser(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{"username": "anhdt195", "permission": "user"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerAuthorizeUserSet(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status: got %d, want 403 (seed user must be protected)", w.Code)
+	}
+}
+
+func TestHandlerAuthorizeUserDelete_RejectsSeedUser(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{"username": "anhdt195"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerAuthorizeUserDelete(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status: got %d, want 403 (seed user must be protected)", w.Code)
+	}
+}
+
 // ── HandlerAuthorizeUserShow ──────────────────────────────────────────────────
 
 func TestHandlerAuthorizeUserShow_ReturnsPermissions(t *testing.T) {

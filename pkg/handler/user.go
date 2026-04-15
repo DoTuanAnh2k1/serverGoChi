@@ -125,6 +125,12 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 		Account:     actor.Username,
 	}
 
+	if req.Username == service.SeedUsername {
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusForbidden, "cannot modify system user")
+		return
+	}
+
 	var newAccountType int32
 	switch req.Permission {
 	case "admin":
@@ -199,6 +205,12 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 		CreatedDate: time.Now(),
 		Scope:       "cli-config",
 		Account:     actor.Username,
+	}
+
+	if req.Username == service.SeedUsername {
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusForbidden, "cannot modify system user")
+		return
 	}
 
 	u, err := service.GetUserByUserName(req.Username)

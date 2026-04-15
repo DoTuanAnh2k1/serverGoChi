@@ -205,6 +205,11 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if userInfo.AccountName == service.SeedUsername {
+		response.Write(w, http.StatusForbidden, "cannot disable system user")
+		return
+	}
+
 	actor, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
 		logger.Logger.Error("authenticate/user/delete: user not found in context")

@@ -99,6 +99,7 @@ func Initialize() *server.Server {
 	handler.Init()
 	store.Init()
 	service.SeedDefaultUser()
+	service.SeedDefaultNes()
 
 	tcpAddr := ":" + getEnvOrDefault("TCP_LISTEN_PORT", "3675")
 	tcpDataDir := getEnvOrDefault("TCP_DATA_DIR", ".")
