@@ -101,16 +101,37 @@ services:
       start_period: 20s
 
   cli-command-svc:
-    image: cli # TODO: điền image name vào đây
+    build:
+      context: ../..
+      dockerfile: deploy/docker/Dockerfile_cli_netconf_c
+      args:
+        # Đổi nếu cần dùng fork/branch khác
+        CLI_NETCONF_REPO:   ${CLI_NETCONF_REPO:-https://github.com/DoTuanAnh2k1/cli-netconf.git}
+        CLI_NETCONF_BRANCH: ${CLI_NETCONF_BRANCH:-feature/c-maapi-rewrite}
+    image: cli-netconf-full:latest
     container_name: cli-command-svc
     restart: unless-stopped
     depends_on:
       cli-mgt-svc:
         condition: service_healthy
     ports:
-      - "${NE_COMMAND_PORT:-8030}:8030"
+      - "${NE_SSH_PORT:-2222}:22"
     networks:
       - mgt-net
+    environment:
+      # URL mgt-service để auth-mgt.sh gọi xác thực
+      MGT_SERVICE_URL: http://ems-aaservice:${SERVER_PORT:-9233}
+
+      # ConfD NE mặc định — override per-NE khi cần
+      CONFD_IPC_ADDR: ${CONFD_IPC_ADDR:-127.0.0.1}
+      CONFD_IPC_PORT: ${CONFD_IPC_PORT:-4565}
+      NE_NAME:        ${NE_NAME:-confd}
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 22 || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   mysql_data:

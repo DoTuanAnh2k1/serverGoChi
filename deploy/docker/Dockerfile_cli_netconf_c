@@ -1,0 +1,162 @@
+# =============================================================================
+# Dockerfile_cli_netconf_c — CLI NETCONF C rewrite (feature/c-maapi-rewrite)
+#
+# Full mode: OpenSSH server + xác thực qua mgt-service API + MAAPI → ConfD.
+# User SSH vào container → PAM gọi mgt-service → ForceCommand chạy cli-netconf.
+#
+# Build args:
+#   CLI_NETCONF_REPO   — Git repo URL         (default: GitHub public)
+#   CLI_NETCONF_BRANCH — Git branch           (default: feature/c-maapi-rewrite)
+#
+# Runtime env vars (đặt trong docker-compose):
+#   CONFD_IPC_ADDR   — Địa chỉ ConfD IPC     (default: 127.0.0.1)
+#   CONFD_IPC_PORT   — Port ConfD IPC         (default: 4565)
+#   MGT_SERVICE_URL  — URL mgt-service        (default: http://mgt-service:3000)
+#   NE_NAME          — Tên NE hiển thị        (default: confd)
+#
+# Truy cập:
+#   ssh <username>@<host> -p 2222
+# =============================================================================
+
+# ── Build stage ──────────────────────────────────────────────────────────────
+FROM ubuntu:24.04 AS builder
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git gcc make libxml2-dev libreadline-dev ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+ARG CLI_NETCONF_REPO=https://github.com/DoTuanAnh2k1/cli-netconf.git
+ARG CLI_NETCONF_BRANCH=feature/c-maapi-rewrite
+
+WORKDIR /build
+RUN git clone --branch ${CLI_NETCONF_BRANCH} --depth=1 ${CLI_NETCONF_REPO} .
+
+# libconfd-server.so và libcrypto-server.so đã có trong repo
+# Đổi tên để linker tìm đúng: -lconfd, -lcrypto
+RUN cp libconfd-server.so libconfd.so \
+    && cp libcrypto-server.so libcrypto.so
+
+# Build với rpath trỏ thẳng tới /usr/lib/cli trong runtime container
+RUN make CONFD_LIB=/build/libconfd.so \
+         LDFLAGS="-lreadline -lxml2 -L/build -lconfd -lcrypto -Wl,-rpath,/usr/lib/cli"
+
+# ── Runtime stage ────────────────────────────────────────────────────────────
+FROM ubuntu:24.04
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        openssh-server \
+        libxml2 \
+        libreadline8 \
+        curl \
+        jq \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /var/run/sshd /usr/lib/cli
+
+# Binary + shared libraries
+COPY --from=builder /build/cli-netconf          /usr/local/bin/cli-netconf
+COPY --from=builder /build/libconfd.so          /usr/lib/cli/libconfd.so
+COPY --from=builder /build/libcrypto.so         /usr/lib/cli/libcrypto.so.1.0.0
+
+RUN ln -sf /usr/lib/cli/libcrypto.so.1.0.0 /usr/lib/cli/libcrypto.so.10 \
+    && echo "/usr/lib/cli" > /etc/ld.so.conf.d/cli.conf \
+    && ldconfig
+
+# ── PAM auth script — xác thực user qua mgt-service API ─────────────────────
+COPY <<'AUTH_SCRIPT' /usr/local/bin/auth-mgt.sh
+#!/bin/bash
+# Gọi POST /aa/authenticate lên mgt-service.
+# Input: PAM_USER (env), password (stdin từ pam_exec expose_authtok).
+# Output: exit 0 = auth OK, exit 1 = auth fail.
+
+MGT_URL="${MGT_SERVICE_URL:-http://mgt-service:3000}"
+read -r PASS
+
+RESP=$(curl -sf --max-time 5 -X POST "$MGT_URL/aa/authenticate" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$PAM_USER\",\"password\":\"$PASS\"}" 2>/dev/null)
+
+[ $? -ne 0 ] && exit 1
+
+STATUS=$(printf '%s' "$RESP" | jq -r '.status // empty' 2>/dev/null)
+TOKEN=$(printf '%s'  "$RESP" | jq -r '.response_data // empty' 2>/dev/null)
+
+if [ "$STATUS" = "success" ] && [ -n "$TOKEN" ]; then
+    mkdir -p /tmp/cli-tokens
+    printf '%s' "$TOKEN" > "/tmp/cli-tokens/$PAM_USER"
+    exit 0
+fi
+exit 1
+AUTH_SCRIPT
+
+RUN chmod +x /usr/local/bin/auth-mgt.sh
+
+# ── CLI wrapper — chạy khi user login (ForceCommand) ────────────────────────
+COPY <<'CLI_WRAPPER' /usr/local/bin/cli-wrapper.sh
+#!/bin/bash
+export LD_LIBRARY_PATH=/usr/lib/cli
+export CONFD_IPC_ADDR="${CONFD_IPC_ADDR:-127.0.0.1}"
+export CONFD_IPC_PORT="${CONFD_IPC_PORT:-4565}"
+export NE_NAME="${NE_NAME:-confd}"
+export MAAPI_USER="${USER:-admin}"
+
+# Đưa JWT token vào env nếu có (để cli-netconf gọi history API)
+TOKEN_FILE="/tmp/cli-tokens/$USER"
+[ -f "$TOKEN_FILE" ] && export MGT_JWT_TOKEN="$(cat "$TOKEN_FILE")"
+
+exec /usr/local/bin/cli-netconf
+CLI_WRAPPER
+
+RUN chmod +x /usr/local/bin/cli-wrapper.sh
+
+# ── Cấu hình SSH server ──────────────────────────────────────────────────────
+RUN sed -i \
+        -e 's/#PasswordAuthentication yes/PasswordAuthentication yes/' \
+        -e 's/#PermitRootLogin.*/PermitRootLogin no/' \
+        -e 's/#UsePAM.*/UsePAM yes/' \
+        /etc/ssh/sshd_config \
+    && echo "ForceCommand /usr/local/bin/cli-wrapper.sh" >> /etc/ssh/sshd_config \
+    && echo "PrintMotd no"      >> /etc/ssh/sshd_config \
+    && echo "PrintLastLog no"   >> /etc/ssh/sshd_config \
+    && echo "AllowAgentForwarding no" >> /etc/ssh/sshd_config \
+    && echo "AllowTcpForwarding no"   >> /etc/ssh/sshd_config
+
+# ── PAM: xác thực qua script thay vì /etc/shadow ────────────────────────────
+COPY <<'PAM_CFG' /etc/pam.d/sshd
+auth    required  pam_exec.so  expose_authtok  /usr/local/bin/auth-mgt.sh
+auth    optional  pam_permit.so
+account required  pam_permit.so
+session required  pam_limits.so
+session required  pam_permit.so
+PAM_CFG
+
+# PAM cần user tồn tại trong system để tạo session
+# Tạo một system user dùng chung; ForceCommand quyết định gì chạy
+RUN useradd -m -s /bin/bash -G sudo cliuser \
+    && echo "cliuser:!" | chpasswd
+
+# ── Entrypoint ───────────────────────────────────────────────────────────────
+COPY <<'ENTRYPOINT' /entrypoint.sh
+#!/bin/bash
+ssh-keygen -A 2>/dev/null
+
+echo "=== CLI NETCONF (C/MAAPI) Full Mode ==="
+echo "  CONFD_IPC_ADDR:  ${CONFD_IPC_ADDR:-127.0.0.1}"
+echo "  CONFD_IPC_PORT:  ${CONFD_IPC_PORT:-4565}"
+echo "  MGT_SERVICE_URL: ${MGT_SERVICE_URL:-http://mgt-service:3000}"
+echo "  NE_NAME:         ${NE_NAME:-confd}"
+echo "  SSH port:        22"
+echo ""
+
+exec /usr/sbin/sshd -D -e
+ENTRYPOINT
+
+RUN chmod +x /entrypoint.sh
+
+EXPOSE 22
+
+ENV CONFD_IPC_ADDR=127.0.0.1 \
+    CONFD_IPC_PORT=4565 \
+    MGT_SERVICE_URL=http://mgt-service:3000 \
+    NE_NAME=confd
+
+ENTRYPOINT ["/entrypoint.sh"]

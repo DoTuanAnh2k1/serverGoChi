@@ -60,6 +60,7 @@ up-docker: ## Start all services in Docker containers
 	@echo "  pprof:   http://localhost:$(PPROF_PORT)/debug/pprof/"
 	@echo "  TCP:     localhost:$(TCP_PORT)"
 	@echo "  MySQL:   localhost:$(DB_PORT)"
+	@echo "  CLI SSH: ssh <user>@localhost -p $${NE_SSH_PORT:-2222}"
 	@echo ""
 
 up-cmd: ## Start minimal stack: MySQL + cli-mgt-svc + cli-command-svc (private registry)
@@ -72,6 +73,7 @@ up-cmd: ## Start minimal stack: MySQL + cli-mgt-svc + cli-command-svc (private r
 	@echo "  Swagger: http://localhost:$(SWAGGER_PORT)"
 	@echo "  TCP:     localhost:$(TCP_PORT)"
 	@echo "  MySQL:   localhost:$(DB_PORT)"
+	@echo "  CLI SSH: ssh <user>@localhost -p $${NE_SSH_PORT:-2222}"
 	@echo ""
 
 down-cmd: ## Stop minimal stack (MySQL + cli-mgt-svc + cli-command-svc)
