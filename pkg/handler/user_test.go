@@ -172,12 +172,15 @@ func TestHandlerAuthorizeUserDelete_UserNotFound(t *testing.T) {
 	}
 }
 
-func TestHandlerAuthorizeUserSet_RejectsSeedUser(t *testing.T) {
+func TestHandlerAuthorizeUserSet_RejectsSuperAdmin(t *testing.T) {
 	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
+			return &db_models.TblAccount{AccountID: 1, AccountName: name, AccountType: 0}, nil
+		},
 		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
 	})
 
-	body, _ := json.Marshal(map[string]string{"username": "anhdt195", "permission": "user"})
+	body, _ := json.Marshal(map[string]string{"username": "superadmin", "permission": "user"})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	req = injectUser(req, "alice")
 	w := httptest.NewRecorder()
@@ -185,16 +188,19 @@ func TestHandlerAuthorizeUserSet_RejectsSeedUser(t *testing.T) {
 	handler.HandlerAuthorizeUserSet(w, req)
 
 	if w.Code != http.StatusForbidden {
-		t.Errorf("status: got %d, want 403 (seed user must be protected)", w.Code)
+		t.Errorf("status: got %d, want 403 (SuperAdmin cannot have permission changed)", w.Code)
 	}
 }
 
-func TestHandlerAuthorizeUserDelete_RejectsSeedUser(t *testing.T) {
+func TestHandlerAuthorizeUserDelete_RejectsSuperAdmin(t *testing.T) {
 	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
+			return &db_models.TblAccount{AccountID: 1, AccountName: name, AccountType: 0}, nil
+		},
 		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
 	})
 
-	body, _ := json.Marshal(map[string]string{"username": "anhdt195"})
+	body, _ := json.Marshal(map[string]string{"username": "superadmin"})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	req = injectUser(req, "alice")
 	w := httptest.NewRecorder()
@@ -202,7 +208,7 @@ func TestHandlerAuthorizeUserDelete_RejectsSeedUser(t *testing.T) {
 	handler.HandlerAuthorizeUserDelete(w, req)
 
 	if w.Code != http.StatusForbidden {
-		t.Errorf("status: got %d, want 403 (seed user must be protected)", w.Code)
+		t.Errorf("status: got %d, want 403 (SuperAdmin permission cannot be reset)", w.Code)
 	}
 }
 

@@ -205,11 +205,6 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if userInfo.AccountName == service.SeedUsername {
-		response.Write(w, http.StatusForbidden, "cannot disable system user")
-		return
-	}
-
 	actor, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
 	if !ok {
 		logger.Logger.Error("authenticate/user/delete: user not found in context")
@@ -231,6 +226,14 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("authenticate/user/delete: get user: %v", err)
 		saveHistory(opHistory, "failure")
 		response.InternalError(w, "failed to find user")
+		return
+	}
+
+	// Guard: SuperAdmin accounts (account_type=0) cannot be disabled by anyone.
+	if u != nil && u.AccountType == 0 {
+		log.Warn("authenticate/user/delete: attempt to disable SuperAdmin — rejected")
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusForbidden, "cannot disable SuperAdmin account")
 		return
 	}
 

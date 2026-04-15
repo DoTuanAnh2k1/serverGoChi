@@ -72,10 +72,6 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 		response.Write(w, http.StatusBadRequest, "account_name is required")
 		return
 	}
-	if req.AccountName == service.SeedUsername {
-		response.Write(w, http.StatusForbidden, "cannot modify system user")
-		return
-	}
 	u, err := service.GetUserByUserName(req.AccountName)
 	if err != nil {
 		logger.Logger.Errorf("admin/user/update: get user: %v", err)
@@ -84,6 +80,16 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if u == nil {
 		response.NotFound(w, "user not found")
+		return
+	}
+	// Guard: SuperAdmin accounts (account_type=0) cannot be edited by anyone.
+	if u.AccountType == 0 {
+		response.Write(w, http.StatusForbidden, "cannot modify SuperAdmin account")
+		return
+	}
+	// Guard: cannot elevate a user to SuperAdmin via this endpoint.
+	if req.AccountType == 0 {
+		response.Write(w, http.StatusForbidden, "cannot set account_type to 0 (SuperAdmin)")
 		return
 	}
 	u.FullName = req.FullName

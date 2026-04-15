@@ -322,7 +322,6 @@ tr:hover td{background:#1e293b80}
         <select id="editUserType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
           <option value="2">Normal (2)</option>
           <option value="1">Admin (1)</option>
-          <option value="0">SuperAdmin (0)</option>
         </select>
       </div>
     </div>
@@ -691,8 +690,11 @@ async function loadUsers() {
       +'<td>'+typ+'</td>'
       +'<td>'+enabled+'</td>'
       +'<td class="actions">'
-      +'<button class="btn btn-warning btn-sm" onclick="openEditUserByName(\''+esc(u.account_name)+'\')">Edit</button>'
-      +'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button>'
+      +(u.account_type === 0
+        ? '<span class="badge" style="background:#374151;color:#9ca3af;padding:.3rem .6rem">🔒 SuperAdmin</span>'
+        : '<button class="btn btn-warning btn-sm" onclick="openEditUserByName(\''+esc(u.account_name)+'\')">Edit</button>'
+          +'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button>'
+      )
       +'</td></tr>';
   });
   html+='</tbody></table>';
@@ -770,7 +772,7 @@ async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+us
 async function assignNe(){const username=acNeMapUser.getValue();const neid=acNeMapNe.getValue();if(!username||!neid){toast('Select user and NE','error');return;}const{status}=await api('POST','/authorize/ne/set',{username,neid});if(status===200){toast('Assigned');acNeMapUser.clear();acNeMapNe.clear();await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 
 // ── User Permission (account_type based) ──
-async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permission</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const perm=u.permission||'user';const badge=perm==='admin'?'<span class="badge badge-blue">admin</span>':'<span class="badge badge-green">user</span>';html+='<tr><td>'+esc(u.username)+'</td><td>'+badge+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="resetPermission(\''+esc(u.username)+'\')">Reset to user</button></td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
+async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permission</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const perm=u.permission||'user';const badge=perm==='admin'?'<span class="badge badge-blue">admin</span>':'<span class="badge badge-green">user</span>';const adminUser=cachedAdminUsers.find(a=>a.account_name===u.username);const isSuperAdmin=adminUser&&adminUser.account_type===0;const actions=isSuperAdmin?'<span class="badge" style="background:#374151;color:#9ca3af;padding:.3rem .6rem">🔒 SuperAdmin</span>':'<button class="btn btn-danger btn-sm" onclick="resetPermission(\''+esc(u.username)+'\')">Reset to user</button>';html+='<tr><td>'+esc(u.username)+'</td><td>'+badge+'</td><td class="actions">'+actions+'</td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
 async function assignRole(){const username=acRoleMapUser.getValue();const permission=document.getElementById('roleMapPerm').value;if(!username||!permission){toast('Select user and permission','error');return;}const{status}=await api('POST','/authorize/user/set',{username,permission});if(status===200){toast('Permission updated');acRoleMapUser.clear();await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
 async function resetPermission(username){if(!confirm('Reset '+username+' to user?'))return;const{status}=await api('POST','/authorize/user/delete',{username});if(status===200){toast('Reset to user');await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
 

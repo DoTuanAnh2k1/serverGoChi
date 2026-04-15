@@ -125,12 +125,6 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 		Account:     actor.Username,
 	}
 
-	if req.Username == service.SeedUsername {
-		saveHistory(opHistory, "failure")
-		response.Write(w, http.StatusForbidden, "cannot modify system user")
-		return
-	}
-
 	var newAccountType int32
 	switch req.Permission {
 	case "admin":
@@ -155,6 +149,13 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 		log.Warn("authorize/user/set: user not found")
 		saveHistory(opHistory, "failure")
 		response.NotFound(w, "user not found")
+		return
+	}
+	// Guard: SuperAdmin accounts cannot have their permission changed.
+	if u.AccountType == 0 {
+		log.Warn("authorize/user/set: attempt to change SuperAdmin permission — rejected")
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusForbidden, "cannot modify SuperAdmin account")
 		return
 	}
 
@@ -207,12 +208,6 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 		Account:     actor.Username,
 	}
 
-	if req.Username == service.SeedUsername {
-		saveHistory(opHistory, "failure")
-		response.Write(w, http.StatusForbidden, "cannot modify system user")
-		return
-	}
-
 	u, err := service.GetUserByUserName(req.Username)
 	if err != nil {
 		log.Errorf("authorize/user/delete: get user: %v", err)
@@ -224,6 +219,13 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 		log.Warn("authorize/user/delete: user not found")
 		saveHistory(opHistory, "failure")
 		response.NotFound(w, "user not found")
+		return
+	}
+	// Guard: SuperAdmin accounts cannot have their permission reset.
+	if u.AccountType == 0 {
+		log.Warn("authorize/user/delete: attempt to reset SuperAdmin permission — rejected")
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusForbidden, "cannot modify SuperAdmin account")
 		return
 	}
 
@@ -326,6 +328,11 @@ func HandlerAdminResetPassword(w http.ResponseWriter, r *http.Request) {
 	if u == nil {
 		saveHistory(op, "failure")
 		response.NotFound(w, "user not found")
+		return
+	}
+	if u.AccountType == 0 {
+		saveHistory(op, "failure")
+		response.Write(w, http.StatusForbidden, "cannot reset SuperAdmin password")
 		return
 	}
 
