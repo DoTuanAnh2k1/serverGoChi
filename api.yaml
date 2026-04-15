@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: cli-mgt-svc
-  version: "2.2"
+  version: "2.3"
   description: |
     REST API for user management, Network Element (NE) management,
     NE connection config, NETCONF config backup, command history, and bulk import.
@@ -94,6 +94,23 @@ paths:
       responses:
         "200":
           description: Metrics JSON
+
+  /aa/heath-check-db:
+    get:
+      tags: [System]
+      summary: Health check (DB ping) — /aa alias
+      description: Same as `GET /health` but mounted under the `/aa` prefix for compatibility with internal callers.
+      operationId: heathCheckDb
+      security: []
+      responses:
+        "200":
+          description: Service healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "500":
+          $ref: "#/components/responses/InternalError"
 
   # ── Authentication ───────────────────────────────────────────────────────────
   /aa/authenticate:
@@ -209,6 +226,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Disable user (soft delete)
+      description: Sets `is_enable=false`. SuperAdmin accounts (`account_type=0`) cannot be disabled — returns 403.
       operationId: userDelete
       security:
         - bearerAuth: []
@@ -221,10 +239,16 @@ paths:
       responses:
         "200":
           description: Disabled
-        "404":
-          $ref: "#/components/responses/NotFound"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Target is a SuperAdmin account — cannot be disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
         "500":
           $ref: "#/components/responses/InternalError"
 
@@ -253,6 +277,7 @@ paths:
     post:
       tags: [Authentication]
       summary: Admin reset any user's password (no old password required)
+      description: SuperAdmin accounts (`account_type=0`) cannot have their password reset — returns 403.
       operationId: adminResetPassword
       security:
         - bearerAuth: []
@@ -273,6 +298,12 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Target is a SuperAdmin account — cannot reset password
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -283,6 +314,7 @@ paths:
     post:
       tags: [User Authorization]
       summary: Set user permission (updates account_type — "admin"→1, "user"→2)
+      description: SuperAdmin accounts (`account_type=0`) cannot have their permission changed — returns 403.
       operationId: authorizeUserSet
       security:
         - bearerAuth: []
@@ -303,6 +335,12 @@ paths:
           description: Invalid permission value (must be "admin" or "user")
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Target is a SuperAdmin account — cannot change permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -312,6 +350,7 @@ paths:
     post:
       tags: [User Authorization]
       summary: Reset user permission to "user" (sets account_type=2)
+      description: SuperAdmin accounts (`account_type=0`) cannot have their permission reset — returns 403.
       operationId: authorizeUserDelete
       security:
         - bearerAuth: []
@@ -334,6 +373,12 @@ paths:
                 $ref: "#/components/schemas/MessageResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Target is a SuperAdmin account — cannot reset permission
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
         "404":
           $ref: "#/components/responses/NotFound"
         "500":
@@ -940,6 +985,53 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  /aa/admin/user/update:
+    post:
+      tags: [Admin]
+      summary: Update user metadata — for frontend admin panel
+      description: |
+        Updates `full_name`, `email`, `phone_number`, `address`, `description`, `account_type`.
+        SuperAdmin accounts (`account_type=0`) cannot be edited.
+        Cannot elevate a user to SuperAdmin (`account_type=0`) via this endpoint.
+      operationId: adminUserUpdate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AdminUserUpdateRequest"
+            example:
+              account_name: bob
+              full_name: Robert Smith
+              email: bob@example.com
+              phone_number: "0912345678"
+              address: Ha Noi
+              description: Operator team
+              account_type: 1
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          description: Target is a SuperAdmin account, or account_type=0 requested
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessageResponse"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
   /aa/admin/ne/list:
     get:
       tags: [Admin]
@@ -1178,7 +1270,7 @@ components:
           type: string
         roles:
           type: string
-          description: Space-separated role list
+          description: Permission derived from account_type — "admin" (type 0/1) or "user" (type 2)
 
     ChangePasswordRequest:
       type: object
@@ -1724,6 +1816,32 @@ components:
           format: date-time
 
     # ── Admin ─────────────────────────────────────────────────────────────────
+    AdminUserUpdateRequest:
+      description: |
+        Update user metadata. Password changes must use `POST /aa/authenticate/user/reset-password`.
+        SuperAdmin accounts (`account_type=0`) cannot be targeted. Cannot set `account_type` to 0.
+      type: object
+      required: [account_name]
+      properties:
+        account_name:
+          type: string
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+        phone_number:
+          type: string
+        address:
+          type: string
+        description:
+          type: string
+        account_type:
+          type: integer
+          format: int32
+          enum: [1, 2]
+          description: "1=Admin, 2=Normal (cannot set to 0=SuperAdmin via this endpoint)"
+
     AdminUserItem:
       description: TblAccount without password — returned by GET /aa/admin/user/list
       type: object
