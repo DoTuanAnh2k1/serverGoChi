@@ -97,6 +97,7 @@ func Init() {
 			r.Use(middleware.CheckRole)
 
 			r.Get("/user/list", HandlerAdminUserList)
+			r.Post("/user/update", HandlerAdminUserUpdate)
 
 			r.Get("/ne/list", HandlerAdminNeList)
 			r.Post("/ne/create", HandlerAdminNeCreate)

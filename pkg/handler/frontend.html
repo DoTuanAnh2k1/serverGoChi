@@ -71,6 +71,13 @@ tr:hover td{background:#1e293b80}
 .user-type-0{background:#7f1d1d;color:#fca5a5}
 .user-type-1{background:#1e3a5f;color:#60a5fa}
 .user-type-2{background:#14532d;color:#4ade80}
+.btn-warning{background:#d97706;color:#fff}.btn-warning:hover{background:#b45309}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);display:none;align-items:center;justify-content:center;z-index:1000}
+.modal-overlay.open{display:flex}
+.modal-box{background:#1e293b;border-radius:10px;padding:1.5rem;width:660px;max-width:95vw;max-height:90vh;overflow-y:auto;border:1px solid #334155}
+.modal-box h3{margin-bottom:1rem;color:#60a5fa}
+.modal-footer{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1.25rem;padding-top:1rem;border-top:1px solid #334155}
+.modal-sep{border:none;border-top:1px solid #334155;margin:.75rem 0}
 </style>
 </head>
 <body>
@@ -295,6 +302,75 @@ tr:hover td{background:#1e293b80}
 <!-- Guide -->
 <div class="section" id="sec-guide">
   <div class="card guide" id="guideContent"></div>
+</div>
+
+<!-- Edit User Modal -->
+<div class="modal-overlay" id="modalEditUser" onclick="if(event.target===this)closeEditUser()">
+  <div class="modal-box">
+    <h3>Edit User: <span id="editUserTitle"></span></h3>
+    <div class="form-row">
+      <div class="form-group"><label>Full Name</label><input id="editUserFullName" placeholder="Nguyen Van A"></div>
+      <div class="form-group"><label>Email</label><input id="editUserEmail" type="email" placeholder="user@example.com"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Phone</label><input id="editUserPhone" placeholder="0901234567"></div>
+      <div class="form-group"><label>Address</label><input id="editUserAddress" placeholder="Ha Noi"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Description</label><input id="editUserDesc" placeholder="Operator team"></div>
+      <div class="form-group"><label>Account Type</label>
+        <select id="editUserType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
+          <option value="2">Normal (2)</option>
+          <option value="1">Admin (1)</option>
+          <option value="0">SuperAdmin (0)</option>
+        </select>
+      </div>
+    </div>
+    <hr class="modal-sep">
+    <p style="color:#64748b;font-size:.82rem;margin-bottom:.75rem">Password Reset — leave blank to keep unchanged</p>
+    <div class="form-row">
+      <div class="form-group"><label>New Password</label><input id="editUserNewPass" type="password" placeholder="New password (optional)"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="closeEditUser()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditUser()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit NE Modal -->
+<div class="modal-overlay" id="modalEditNe" onclick="if(event.target===this)closeEditNe()">
+  <div class="modal-box">
+    <h3>Edit NE: <span id="editNeTitle"></span></h3>
+    <div class="form-row">
+      <div class="form-group"><label>NE Name</label><input id="editNeNameInput" placeholder="HTSMF03"></div>
+      <div class="form-group"><label>Site</label><input id="editNeSite" placeholder="HCM"></div>
+      <div class="form-group"><label>Namespace</label><input id="editNeNS" placeholder="hcm-5gc"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Description</label><input id="editNeDesc" placeholder="HCM SMF Node 03"></div>
+      <div class="form-group"><label>Command URL</label><input id="editNeCmdURL" placeholder="http://10.10.1.1:8080"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Conf Mode</label><input id="editNeConfMode" placeholder="SSH"></div>
+      <div class="form-group"><label>Username</label><input id="editNeUser" placeholder="admin"></div>
+      <div class="form-group"><label>Password</label><input id="editNePass" type="password" placeholder="admin"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Master IP</label><input id="editNeMasterIP" placeholder="10.10.1.1"></div>
+      <div class="form-group"><label>Slave IP</label><input id="editNeSlaveIP" placeholder="10.10.1.2"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Master SSH Port</label><input id="editNeMasterSSH" type="number" placeholder="22"></div>
+      <div class="form-group"><label>Slave SSH Port</label><input id="editNeSlaveSSH" type="number" placeholder="22"></div>
+      <div class="form-group"><label>Master TCP Port</label><input id="editNeMasterTCP" type="number" placeholder="830"></div>
+      <div class="form-group"><label>Slave TCP Port</label><input id="editNeSlaveTCP" type="number" placeholder="830"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-outline btn-sm" onclick="closeEditNe()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveEditNe()">Save</button>
+    </div>
+  </div>
 </div>
 
 </div><!-- main -->
@@ -614,7 +690,10 @@ async function loadUsers() {
       +'<td>'+esc(u.phone_number||'-')+'</td>'
       +'<td>'+typ+'</td>'
       +'<td>'+enabled+'</td>'
-      +'<td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button></td></tr>';
+      +'<td class="actions">'
+      +'<button class="btn btn-warning btn-sm" onclick="openEditUserByName(\''+esc(u.account_name)+'\')">Edit</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button>'
+      +'</td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('usersTable').innerHTML=html;
@@ -655,7 +734,10 @@ async function loadNes(){
       +'<td>'+(n.conf_port_master_tcp||'-')+'</td>'
       +'<td>'+esc(n.conf_slave_ip||'-')+'</td>'
       +'<td>'+esc(n.description||'-')+'</td>'
-      +'<td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button></td></tr>';
+      +'<td class="actions">'
+      +'<button class="btn btn-warning btn-sm" onclick="openEditNeById('+n.id+')">Edit</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('nesTable').innerHTML=html;
@@ -691,6 +773,100 @@ async function assignNe(){const username=acNeMapUser.getValue();const neid=acNeM
 async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permission</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const perm=u.permission||'user';const badge=perm==='admin'?'<span class="badge badge-blue">admin</span>':'<span class="badge badge-green">user</span>';html+='<tr><td>'+esc(u.username)+'</td><td>'+badge+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="resetPermission(\''+esc(u.username)+'\')">Reset to user</button></td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
 async function assignRole(){const username=acRoleMapUser.getValue();const permission=document.getElementById('roleMapPerm').value;if(!username||!permission){toast('Select user and permission','error');return;}const{status}=await api('POST','/authorize/user/set',{username,permission});if(status===200){toast('Permission updated');acRoleMapUser.clear();await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
 async function resetPermission(username){if(!confirm('Reset '+username+' to user?'))return;const{status}=await api('POST','/authorize/user/delete',{username});if(status===200){toast('Reset to user');await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
+
+// ── Edit User Modal ──
+let editUserCurrent = null;
+function openEditUserByName(name) {
+  const u = cachedAdminUsers.find(x => x.account_name === name);
+  if (!u) return;
+  editUserCurrent = u;
+  document.getElementById('editUserTitle').textContent = u.account_name;
+  document.getElementById('editUserFullName').value = u.full_name || '';
+  document.getElementById('editUserEmail').value = u.email || '';
+  document.getElementById('editUserPhone').value = u.phone_number || '';
+  document.getElementById('editUserAddress').value = u.address || '';
+  document.getElementById('editUserDesc').value = u.description || '';
+  document.getElementById('editUserType').value = String(u.account_type ?? 2);
+  document.getElementById('editUserNewPass').value = '';
+  document.getElementById('modalEditUser').classList.add('open');
+}
+function closeEditUser() { document.getElementById('modalEditUser').classList.remove('open'); }
+async function saveEditUser() {
+  if (!editUserCurrent) return;
+  const name = editUserCurrent.account_name;
+  const {status} = await api('POST', '/admin/user/update', {
+    account_name: name,
+    full_name: document.getElementById('editUserFullName').value,
+    email: document.getElementById('editUserEmail').value,
+    phone_number: document.getElementById('editUserPhone').value,
+    address: document.getElementById('editUserAddress').value,
+    description: document.getElementById('editUserDesc').value,
+    account_type: parseInt(document.getElementById('editUserType').value),
+  });
+  if (status !== 200) { toast('Update failed', 'error'); return; }
+  const newPass = document.getElementById('editUserNewPass').value;
+  if (newPass) {
+    const {status: ps} = await api('POST', '/authenticate/user/set/reset-password', {username: name, new_password: newPass});
+    if (ps !== 200) { toast('Password reset failed', 'error'); return; }
+  }
+  toast('User updated');
+  closeEditUser();
+  await refreshCaches();
+  loadUsers();
+}
+
+// ── Edit NE Modal ──
+let editNeCurrent = null;
+function openEditNeById(id) {
+  const n = cachedNes.find(x => x.id === id);
+  if (!n) return;
+  editNeCurrent = n;
+  document.getElementById('editNeTitle').textContent = n.ne_name;
+  document.getElementById('editNeNameInput').value = n.ne_name || '';
+  document.getElementById('editNeSite').value = n.site_name || '';
+  document.getElementById('editNeNS').value = n.namespace || '';
+  document.getElementById('editNeDesc').value = n.description || '';
+  document.getElementById('editNeCmdURL').value = n.command_url || '';
+  document.getElementById('editNeConfMode').value = n.conf_mode || '';
+  document.getElementById('editNeUser').value = n.conf_username || '';
+  document.getElementById('editNePass').value = n.conf_password || '';
+  document.getElementById('editNeMasterIP').value = n.conf_master_ip || '';
+  document.getElementById('editNeSlaveIP').value = n.conf_slave_ip || '';
+  document.getElementById('editNeMasterSSH').value = n.conf_port_master_ssh || '';
+  document.getElementById('editNeSlaveSSH').value = n.conf_port_slave_ssh || '';
+  document.getElementById('editNeMasterTCP').value = n.conf_port_master_tcp || '';
+  document.getElementById('editNeSlaveTCP').value = n.conf_port_slave_tcp || '';
+  document.getElementById('modalEditNe').classList.add('open');
+}
+function closeEditNe() { document.getElementById('modalEditNe').classList.remove('open'); }
+async function saveEditNe() {
+  if (!editNeCurrent) return;
+  const body = {
+    id: editNeCurrent.id,
+    ne_name: document.getElementById('editNeNameInput').value,
+    site_name: document.getElementById('editNeSite').value,
+    namespace: document.getElementById('editNeNS').value,
+    description: document.getElementById('editNeDesc').value,
+    command_url: document.getElementById('editNeCmdURL').value,
+    conf_mode: document.getElementById('editNeConfMode').value,
+    conf_username: document.getElementById('editNeUser').value,
+    conf_password: document.getElementById('editNePass').value,
+    conf_master_ip: document.getElementById('editNeMasterIP').value,
+    conf_slave_ip: document.getElementById('editNeSlaveIP').value,
+    conf_port_master_ssh: parseInt(document.getElementById('editNeMasterSSH').value) || 0,
+    conf_port_slave_ssh: parseInt(document.getElementById('editNeSlaveSSH').value) || 0,
+    conf_port_master_tcp: parseInt(document.getElementById('editNeMasterTCP').value) || 0,
+    conf_port_slave_tcp: parseInt(document.getElementById('editNeSlaveTCP').value) || 0,
+    system_type: editNeCurrent.system_type || '5GC',
+  };
+  if (!body.ne_name) { toast('NE Name required', 'error'); return; }
+  const {status} = await api('POST', '/admin/ne/update', body);
+  if (status !== 200) { toast('Update failed', 'error'); return; }
+  toast('NE updated');
+  closeEditNe();
+  await refreshCaches();
+  loadNes();
+}
 
 // ── History ──
 async function loadHistory(){

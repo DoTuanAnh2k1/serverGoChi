@@ -1,7 +1,9 @@
 package handler
 
 import (
+	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler/response"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
@@ -53,4 +55,50 @@ func HandlerAdminUserList(w http.ResponseWriter, r *http.Request) {
 		result = []adminUserResp{}
 	}
 	response.Write(w, http.StatusOK, result)
+}
+
+// HandlerAdminUserUpdate updates a user's metadata fields (no password change via this endpoint).
+func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		AccountName string `json:"account_name"`
+		FullName    string `json:"full_name"`
+		Email       string `json:"email"`
+		PhoneNumber string `json:"phone_number"`
+		Address     string `json:"address"`
+		Description string `json:"description"`
+		AccountType int32  `json:"account_type"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.AccountName == "" {
+		response.Write(w, http.StatusBadRequest, "account_name is required")
+		return
+	}
+	if req.AccountName == service.SeedUsername {
+		response.Write(w, http.StatusForbidden, "cannot modify system user")
+		return
+	}
+	u, err := service.GetUserByUserName(req.AccountName)
+	if err != nil {
+		logger.Logger.Errorf("admin/user/update: get user: %v", err)
+		response.InternalError(w, "failed to retrieve user")
+		return
+	}
+	if u == nil {
+		response.NotFound(w, "user not found")
+		return
+	}
+	u.FullName = req.FullName
+	u.Email = req.Email
+	u.PhoneNumber = req.PhoneNumber
+	u.Address = req.Address
+	u.Description = req.Description
+	u.AccountType = req.AccountType
+	u.UpdatedDate = time.Now()
+	if err := service.UpdateUser(u); err != nil {
+		logger.Logger.Errorf("admin/user/update: update: %v", err)
+		response.InternalError(w, "failed to update user")
+		return
+	}
+	actor := mustUser(r)
+	saveHistory(opHistory("admin user update", req.AccountName, actor.Username), "success")
+	response.Success(w, "user updated")
 }
