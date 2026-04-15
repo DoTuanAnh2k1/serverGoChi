@@ -12,6 +12,7 @@ BUILD_DIR    := bin
 SERVER_PORT  := $(or $(SERVER_PORT),3000)
 TCP_PORT     := $(or $(TCP_LISTEN_PORT),3675)
 PPROF_PORT   := $(or $(PPROF_PORT),6060)
+SWAGGER_PORT := $(or $(SWAGGER_PORT),8080)
 
 # DB connection
 DB_DRIVER    := $(or $(DB_DRIVER),mysql)
@@ -32,7 +33,8 @@ define APP_ENV
 	CORS_ORIGINS="*" LEADER_ELECTION_ENABLED=false \
 	TCP_LISTEN_PORT=$(TCP_PORT) TCP_DATA_DIR=/tmp/mgt-subscribers \
 	CLI_LOG_EXPORT_DIR=/tmp/mgt-csv CSV_EXPORT_HOUR=23 \
-	PPROF_ENABLED=true PPROF_ADDR=:$(PPROF_PORT)
+	PPROF_ENABLED=true PPROF_ADDR=:$(PPROF_PORT) \
+	SWAGGER_PORT=$(SWAGGER_PORT)
 endef
 
 .PHONY: help up up-docker up-local up-cmd down down-cmd build build-docker import dump metric \
@@ -48,11 +50,13 @@ up: up-docker ## Start full environment in Docker (DB + app + pprof)
 up-docker: ## Start all services in Docker containers
 	JWT_SECRET_KEY=$${JWT_SECRET_KEY:-dev-secret-key} \
 	PPROF_ENABLED=true PPROF_PORT=$(PPROF_PORT) \
+	SWAGGER_PORT=$(SWAGGER_PORT) \
 	$(COMPOSE) up -d --build
 	@echo ""
 	@echo "  App:     http://localhost:$(SERVER_PORT)"
 	@echo "  Admin:   http://localhost:$(SERVER_PORT)/admin"
 	@echo "  Metrics: http://localhost:$(SERVER_PORT)/metrics"
+	@echo "  Swagger: http://localhost:$(SWAGGER_PORT)"
 	@echo "  pprof:   http://localhost:$(PPROF_PORT)/debug/pprof/"
 	@echo "  TCP:     localhost:$(TCP_PORT)"
 	@echo "  MySQL:   localhost:$(DB_PORT)"
@@ -60,10 +64,12 @@ up-docker: ## Start all services in Docker containers
 
 up-cmd: ## Start minimal stack: MySQL + cli-mgt-svc + cli-command-svc (private registry)
 	JWT_SECRET_KEY=$${JWT_SECRET_KEY:-dev-secret-key} \
+	SWAGGER_PORT=$(SWAGGER_PORT) \
 	$(COMPOSE_CMD) up -d --build
 	@echo ""
 	@echo "  App:     http://localhost:$(SERVER_PORT)"
 	@echo "  Admin:   http://localhost:$(SERVER_PORT)/admin"
+	@echo "  Swagger: http://localhost:$(SWAGGER_PORT)"
 	@echo "  TCP:     localhost:$(TCP_PORT)"
 	@echo "  MySQL:   localhost:$(DB_PORT)"
 	@echo ""

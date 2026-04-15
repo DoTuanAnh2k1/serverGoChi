@@ -35,6 +35,7 @@ services:
       - "${SERVER_PORT:-9233}:${SERVER_PORT:-9233}"
       - "${TCP_LISTEN_PORT:-3675}:${TCP_LISTEN_PORT:-3675}"
       - "${PPROF_PORT:-6060}:${PPROF_PORT:-6060}"
+      - "${SWAGGER_PORT:-8080}:${SWAGGER_PORT:-8080}"
     networks:
       mgt-net:
         aliases:
@@ -82,6 +83,9 @@ services:
       # Profiling
       PPROF_ENABLED: ${PPROF_ENABLED:-true}
       PPROF_ADDR:    ":${PPROF_PORT:-6060}"
+
+      # Swagger UI (dedicated port)
+      SWAGGER_PORT: ${SWAGGER_PORT:-8080}
 
       # Leader election (disabled in docker-compose)
       LEADER_ELECTION_ENABLED: "false"

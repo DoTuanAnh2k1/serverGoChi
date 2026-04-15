@@ -171,14 +171,12 @@ func handlerOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	w.Write(data)
 }
 
-// handlerSwaggerUI serves a Swagger UI page via CDN
-func handlerSwaggerUI(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.WriteHeader(http.StatusOK)
-	fmt.Fprint(w, swaggerUIHTML)
-}
-
-const swaggerUIHTML = `<!DOCTYPE html>
+// SwaggerUIHTML returns the Swagger UI HTML page pointing to the given spec URL.
+func SwaggerUIHTML(specURL string) string {
+	if specURL == "" {
+		specURL = "/docs/openapi.yaml"
+	}
+	return `<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -190,7 +188,7 @@ const swaggerUIHTML = `<!DOCTYPE html>
 <script src="https://unpkg.com/swagger-ui-dist/swagger-ui-bundle.js"></script>
 <script>
   SwaggerUIBundle({
-    url: "/docs/openapi.yaml",
+    url: "` + specURL + `",
     dom_id: '#swagger-ui',
     presets: [SwaggerUIBundle.presets.apis, SwaggerUIBundle.SwaggerUIStandalonePreset],
     layout: "BaseLayout"
@@ -198,3 +196,12 @@ const swaggerUIHTML = `<!DOCTYPE html>
 </script>
 </body>
 </html>`
+}
+
+// handlerSwaggerUI serves a Swagger UI page via CDN
+func handlerSwaggerUI(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.WriteHeader(http.StatusOK)
+	fmt.Fprint(w, SwaggerUIHTML("/docs/openapi.yaml"))
+}
+

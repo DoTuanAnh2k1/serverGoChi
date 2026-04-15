@@ -118,6 +118,33 @@ func Initialize() *server.Server {
 		}()
 	}
 
+	// Swagger UI server (only if SWAGGER_PORT is set)
+	if swaggerPort := os.Getenv("SWAGGER_PORT"); swaggerPort != "" {
+		swaggerAddr := ":" + swaggerPort
+		go func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+				specPath := getEnvOrDefault("API_SPEC_PATH", "api.yaml")
+				data, err := os.ReadFile(specPath)
+				if err != nil {
+					http.Error(w, "api spec not found", http.StatusNotFound)
+					return
+				}
+				w.Header().Set("Content-Type", "application/yaml")
+				w.WriteHeader(http.StatusOK)
+				w.Write(data)
+			})
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				fmt.Fprint(w, handler.SwaggerUIHTML("/openapi.yaml"))
+			})
+			logger.Logger.Infof("swagger: listening on %s", swaggerAddr)
+			if err := http.ListenAndServe(swaggerAddr, mux); err != nil {
+				logger.Logger.Errorf("swagger: %v", err)
+			}
+		}()
+	}
+
 	if cfg.Leader.Enabled {
 		ctx := context.Background()
 		go leader.Start(ctx, cfg.Leader, func(leaderCtx context.Context) {
