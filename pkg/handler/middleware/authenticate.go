@@ -12,8 +12,8 @@ import (
 
 // User for saving user information
 type User struct {
-	Username string
-	Roles    string
+	Username   string
+	Permission string
 }
 
 // Context key type
@@ -45,7 +45,7 @@ func Authenticate(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserContextKey, &User{Username: userName, Roles: roles})
+		ctx := context.WithValue(r.Context(), UserContextKey, &User{Username: userName, Permission: roles})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

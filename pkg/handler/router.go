@@ -69,12 +69,6 @@ func Init() {
 			r.Use(middleware.Authenticate)
 			r.Use(middleware.CheckRole)
 
-			r.Route("/permission", func(subRouter chi.Router) {
-				subRouter.Post("/set", HandlerPermissionSet)
-				subRouter.Post("/delete", HandlerPermissionDelete)
-				subRouter.Get("/show", HandlerPermissionShow)
-			})
-
 			r.Route("/ne", func(subRouter chi.Router) {
 				subRouter.Post("/create", HandlerNeCreate)
 				subRouter.Post("/update", HandlerNeUpdate)

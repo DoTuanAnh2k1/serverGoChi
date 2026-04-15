@@ -23,7 +23,7 @@ func neConfigBody(t *testing.T, v interface{}) *bytes.Buffer {
 	return bytes.NewBuffer(b)
 }
 
-func adminUser() *middleware.User { return &middleware.User{Username: "admin", Roles: "admin"} }
+func adminUser() *middleware.User { return &middleware.User{Username: "admin", Permission: "admin"} }
 
 // ── HandlerNeConfigCreate ─────────────────────────────────────────────────────
 

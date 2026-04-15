@@ -98,10 +98,10 @@ tr:hover td{background:#1e293b80}
   <h2>MGT Service</h2>
   <a onclick="showSection('dashboard')" class="active" data-section="dashboard" data-i18n="nav_dashboard">Dashboard</a>
   <a onclick="showSection('users')" data-section="users" data-i18n="nav_users">Users</a>
-  <a onclick="showSection('permissions')" data-section="permissions" data-i18n="nav_permissions">Permissions</a>
+  <a onclick="showSection('permissions')" data-section="permissions" data-i18n="nav_permissions">Account Types</a>
   <a onclick="showSection('nes')" data-section="nes" data-i18n="nav_nes">Network Elements</a>
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
-  <a onclick="showSection('role-mapping')" data-section="role-mapping" data-i18n="nav_role_mapping">Role Mapping</a>
+  <a onclick="showSection('role-mapping')" data-section="role-mapping" data-i18n="nav_role_mapping">User Permission</a>
   <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
   <a onclick="showSection('import')" data-section="import" data-i18n="nav_import">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
@@ -162,24 +162,18 @@ tr:hover td{background:#1e293b80}
   </div>
 </div>
 
-<!-- Permissions -->
+<!-- Account Types (info only) -->
 <div class="section" id="sec-permissions">
   <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="create_permission">Create Permission</h3>
-    <div class="form-row">
-      <div class="form-group"><label>Permission</label><input id="newPermission" placeholder="admin"></div>
-      <div class="form-group"><label>Scope</label><input id="newScope" placeholder="ext-config"></div>
-      <div class="form-group"><label>NE Type</label><input id="newNeType" placeholder="5GC"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Include Type</label><input id="newIncludeType" placeholder="include"></div>
-      <div class="form-group"><label>Path</label><input id="newPath" placeholder="/"></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createPermission()" data-i18n="create">Create</button></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="all_permissions">All Permissions</h3>
-    <div id="permissionsTable"><div class="loading">Loading...</div></div>
+    <h3 style="margin-bottom:1rem" data-i18n="all_permissions">Account Type Reference</h3>
+    <table>
+      <thead><tr><th>account_type</th><th>Label</th><th>Permission</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td><span class="user-type user-type-0">0</span></td><td>SuperAdmin</td><td><span class="badge badge-red">admin</span></td><td>Full system access, cannot be downgraded via UI</td></tr>
+        <tr><td><span class="user-type user-type-1">1</span></td><td>Admin</td><td><span class="badge badge-blue">admin</span></td><td>Can manage users, NEs, and mappings</td></tr>
+        <tr><td><span class="user-type user-type-2">2</span></td><td>Normal</td><td><span class="badge badge-green">user</span></td><td>CLI access only — limited to assigned NEs</td></tr>
+      </tbody>
+    </table>
   </div>
 </div>
 
@@ -233,18 +227,23 @@ tr:hover td{background:#1e293b80}
   </div>
 </div>
 
-<!-- Role Mapping -->
+<!-- User Permission (account_type management) -->
 <div class="section" id="sec-role-mapping">
   <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="assign_role">Assign Role to User</h3>
+    <h3 style="margin-bottom:1rem" data-i18n="assign_role">Set User Permission</h3>
     <div class="form-row">
       <div class="form-group"><label data-i18n="username">Username</label><div class="ac-wrap" id="acRoleMapUser"></div></div>
-      <div class="form-group"><label>Permission</label><div class="ac-wrap" id="acRoleMapPerm"></div></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="assignRole()" data-i18n="assign">Assign</button></div>
+      <div class="form-group"><label>Permission</label>
+        <select id="roleMapPerm" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
+          <option value="admin">admin (account_type=1)</option>
+          <option value="user" selected>user (account_type=2)</option>
+        </select>
+      </div>
+      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="assignRole()" data-i18n="assign">Set</button></div>
     </div>
   </div>
   <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="user_role_assignments">User - Role Assignments</h3>
+    <h3 style="margin-bottom:1rem" data-i18n="user_role_assignments">User Permissions</h3>
     <div id="roleMappingTable"><div class="loading">Loading...</div></div>
   </div>
 </div>
@@ -307,24 +306,24 @@ tr:hover td{background:#1e293b80}
 const API = '{{API_BASE}}';
 let TOKEN = localStorage.getItem('mgt_token') || '';
 let USERNAME = localStorage.getItem('mgt_user') || '';
-let cachedUsers = [], cachedNes = [], cachedPerms = [], cachedAdminUsers = [];
+let cachedUsers = [], cachedNes = [], cachedAdminUsers = [];
 let LANG = localStorage.getItem('mgt_lang') || 'en';
 
 // ── i18n ──
 const I18N = {
   en: {
     // nav
-    nav_dashboard:'Dashboard', nav_users:'Users', nav_permissions:'Permissions', nav_nes:'Network Elements',
-    nav_ne_mapping:'NE Mapping', nav_role_mapping:'Role Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
+    nav_dashboard:'Dashboard', nav_users:'Users', nav_permissions:'Account Types', nav_nes:'Network Elements',
+    nav_ne_mapping:'NE Mapping', nav_role_mapping:'User Permission', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     // common
     username:'Username', password:'Password', login:'Login', logout:'Logout', create:'Create', assign:'Assign',
     refresh:'Refresh', delete_btn:'Delete', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
     // sections
     create_user:'Create User', all_users:'All Users',
-    create_permission:'Create Permission', all_permissions:'All Permissions',
+    all_permissions:'Account Type Reference',
     create_ne:'Create Network Element', all_nes:'All Network Elements',
     assign_ne:'Assign NE to User', user_ne_assignments:'User - NE Assignments',
-    assign_role:'Assign Role to User', user_role_assignments:'User - Role Assignments',
+    assign_role:'Set User Permission', user_role_assignments:'User Permissions',
     operation_history:'Operation History',
     import_data:'Import Data', import_desc:'Upload a file or paste import data below.', upload_file:'Upload File', load_sample:'Load Sample', import:'Import', import_results:'Import Results',
     // guide
@@ -339,11 +338,12 @@ const I18N = {
         <li>Default admin: <code>admin</code> / <code>admin123</code></li>
       </ul>
 
-      <h3>Permissions (Roles)</h3>
+      <h3>Account Types &amp; Permissions</h3>
       <ul>
-        <li>Roles control access: <code>admin</code>, <code>operator</code>, <code>viewer</code></li>
-        <li>Create with: permission name, scope, NE type, include type, path</li>
-        <li>Only <code>admin</code> role users can manage other users</li>
+        <li>Permission is derived from <code>account_type</code> on each user account</li>
+        <li><code>0</code> (SuperAdmin) and <code>1</code> (Admin) → <b>admin</b> — can manage users, NEs, and mappings</li>
+        <li><code>2</code> (Normal) → <b>user</b> — CLI access only, limited to assigned NEs</li>
+        <li>Use <b>User Permission</b> tab to promote/demote users (sets account_type to 1 or 2)</li>
       </ul>
 
       <h3>Network Elements</h3>
@@ -356,19 +356,18 @@ const I18N = {
       <h3>NE Mapping</h3>
       <p>Assign NEs to users. Users can only access NEs assigned to them. Use the search dropdown to find users and NEs by name.</p>
 
-      <h3>Role Mapping</h3>
-      <p>Assign permissions to users. Search by username or permission name.</p>
+      <h3>User Permission</h3>
+      <p>Set a user's permission level (admin/user). Selecting a user and clicking Set updates their account_type.</p>
 
       <h3>Import</h3>
       <p>Bulk import data using a text file format:</p>
       <table><thead><tr><th>Section</th><th>Fields</th></tr></thead><tbody>
         <tr><td><code>[users]</code></td><td>username, password, email (optional)</td></tr>
         <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
-        <tr><td><code>[roles]</code></td><td>permission, scope, ne_type, include_type, path</td></tr>
-        <tr><td><code>[user_roles]</code></td><td>username, permission</td></tr>
+        <tr><td><code>[user_roles]</code></td><td>username, permission (<code>admin</code> or <code>user</code>)</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
       </tbody></table>
-      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated).</p>
+      <p>Click <b>Load Sample</b> for an example. Existing users are skipped (not duplicated).</p>
 
       <h3>History</h3>
       <p>View operation audit log. All create/delete/assign actions are recorded with timestamp, user, and result.</p>
@@ -382,15 +381,15 @@ const I18N = {
     `
   },
   vi: {
-    nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_permissions:'Phân quyền', nav_nes:'Phần tử mạng',
-    nav_ne_mapping:'Gán NE', nav_role_mapping:'Gán Role', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
+    nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_permissions:'Loại tài khoản', nav_nes:'Phần tử mạng',
+    nav_ne_mapping:'Gán NE', nav_role_mapping:'Phân quyền', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
     username:'Tên đăng nhập', password:'Mật khẩu', login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', assign:'Gán',
     refresh:'Làm mới', delete_btn:'Xóa', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
     create_user:'Tạo người dùng', all_users:'Tất cả người dùng',
-    create_permission:'Tạo quyền', all_permissions:'Tất cả quyền',
+    all_permissions:'Bảng loại tài khoản',
     create_ne:'Tạo phần tử mạng', all_nes:'Tất cả phần tử mạng',
     assign_ne:'Gán NE cho người dùng', user_ne_assignments:'Người dùng - NE',
-    assign_role:'Gán role cho người dùng', user_role_assignments:'Người dùng - Role',
+    assign_role:'Đặt quyền người dùng', user_role_assignments:'Quyền người dùng',
     operation_history:'Lịch sử thao tác',
     import_data:'Nhập dữ liệu', import_desc:'Tải file lên hoặc dán nội dung vào ô bên dưới.', upload_file:'Tải file', load_sample:'Tải mẫu', import:'Nhập', import_results:'Kết quả nhập',
     guide_html: `
@@ -404,11 +403,12 @@ const I18N = {
         <li>Admin mặc định: <code>admin</code> / <code>admin123</code></li>
       </ul>
 
-      <h3>Phân quyền (Roles)</h3>
+      <h3>Loại tài khoản &amp; Phân quyền</h3>
       <ul>
-        <li>Role kiểm soát quyền truy cập: <code>admin</code>, <code>operator</code>, <code>viewer</code></li>
-        <li>Tạo với: tên quyền, scope, NE type, include type, path</li>
-        <li>Chỉ user có role <code>admin</code> mới quản lý được người dùng khác</li>
+        <li>Quyền được suy ra từ trường <code>account_type</code> của tài khoản</li>
+        <li><code>0</code> (SuperAdmin) và <code>1</code> (Admin) → <b>admin</b> — quản lý users, NEs và mappings</li>
+        <li><code>2</code> (Normal) → <b>user</b> — chỉ truy cập CLI trên các NE được gán</li>
+        <li>Dùng tab <b>Phân quyền</b> để nâng/hạ quyền user (cập nhật account_type thành 1 hoặc 2)</li>
       </ul>
 
       <h3>Phần tử mạng (NE)</h3>
@@ -421,19 +421,18 @@ const I18N = {
       <h3>Gán NE</h3>
       <p>Gán NE cho người dùng. Người dùng chỉ truy cập được NE đã được gán. Tìm kiếm theo tên trong ô autocomplete.</p>
 
-      <h3>Gán Role</h3>
-      <p>Gán quyền cho người dùng. Tìm theo tên hoặc quyền.</p>
+      <h3>Phân quyền</h3>
+      <p>Đặt quyền cho người dùng (admin/user). Chọn user và bấm Set để cập nhật account_type.</p>
 
       <h3>Nhập liệu</h3>
       <p>Nhập dữ liệu hàng loạt từ file text:</p>
       <table><thead><tr><th>Section</th><th>Trường</th></tr></thead><tbody>
         <tr><td><code>[users]</code></td><td>username, password, email (tùy chọn)</td></tr>
         <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
-        <tr><td><code>[roles]</code></td><td>permission, scope, ne_type, include_type, path</td></tr>
-        <tr><td><code>[user_roles]</code></td><td>username, permission</td></tr>
+        <tr><td><code>[user_roles]</code></td><td>username, permission (<code>admin</code> hoặc <code>user</code>)</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
       </tbody></table>
-      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng).</p>
+      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng đã tồn tại sẽ được bỏ qua (không trùng).</p>
 
       <h3>Lịch sử</h3>
       <p>Xem nhật ký thao tác. Tất cả hành động tạo/xóa/gán đều được ghi lại với thời gian, người dùng và kết quả.</p>
@@ -565,19 +564,17 @@ function doLogout() {
   document.getElementById('loginPage').style.display = 'flex';
 }
 async function refreshCaches() {
-  const [u, n, p, au] = await Promise.all([
+  const [u, n, au] = await Promise.all([
     api('GET', '/authenticate/user/show'),
     api('GET', '/admin/ne/list'),
-    api('GET', '/authorize/permission/show'),
     api('GET', '/admin/user/list')
   ]);
   cachedUsers = Array.isArray(u.data) ? u.data : [];
   cachedNes = Array.isArray(n.data) ? n.data : [];
-  cachedPerms = Array.isArray(p.data) ? p.data : [];
   cachedAdminUsers = Array.isArray(au.data) ? au.data : [];
 }
 
-let acNeMapUser, acNeMapNe, acRoleMapUser, acRoleMapPerm;
+let acNeMapUser, acNeMapNe, acRoleMapUser;
 function enterApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -585,7 +582,6 @@ function enterApp() {
   acNeMapUser = initAC('acNeMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
   acNeMapNe = initAC('acNeMapNe', 'Search NE...', () => cachedNes.map(n => ({label: n.ne_name, value: String(n.id), sub: n.site_name + ' - ' + (n.conf_master_ip||'')})));
   acRoleMapUser = initAC('acRoleMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
-  acRoleMapPerm = initAC('acRoleMapPerm', 'Search permission...', () => { const unique=[...new Set(cachedPerms.map(p=>p.permission))]; return unique.map(p=>({label:p,value:p})); });
   refreshCaches().then(() => showSection('dashboard'));
   applyI18n();
 }
@@ -594,9 +590,10 @@ document.getElementById('loginUser').addEventListener('keydown', e => { if (e.ke
 
 // ── Dashboard ──
 async function loadDashboard() {
+  const adminCount = cachedAdminUsers.filter(u => u.account_type <= 1).length;
   document.getElementById('statsGrid').innerHTML =
     '<div class="stat-card"><div class="num">'+cachedUsers.length+'</div><div class="label">'+t('nav_users')+'</div></div>'+
-    '<div class="stat-card"><div class="num">'+cachedPerms.length+'</div><div class="label">'+t('nav_permissions')+'</div></div>'+
+    '<div class="stat-card"><div class="num">'+adminCount+'</div><div class="label">Admin Users</div></div>'+
     '<div class="stat-card"><div class="num">'+cachedNes.length+'</div><div class="label">'+t('nav_nes')+'</div></div>';
 }
 
@@ -638,10 +635,8 @@ async function createUser(){
 }
 async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const{status}=await api('POST','/authenticate/user/delete',{account_name:username});if(status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast('Failed','error');}
 
-// ── Permissions ──
-async function loadPermissions(){const data=cachedPerms;if(!data.length){document.getElementById('permissionsTable').innerHTML='<div class="empty">No permissions</div>';return;}let html='<table><thead><tr><th>ID</th><th>Permission</th><th>Scope</th><th>NE Type</th><th>Include Type</th><th>Path</th><th>Actions</th></tr></thead><tbody>';data.forEach(p=>{html+='<tr><td>'+(p.role_id||p.id||'-')+'</td><td><span class="badge badge-green">'+esc(p.permission||'-')+'</span></td><td>'+esc(p.scope||'-')+'</td><td>'+esc(p.ne_type||'-')+'</td><td>'+esc(p.include_type||'-')+'</td><td>'+esc(p.path||'-')+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="deletePermission(\''+esc(p.permission||'')+'\',\''+esc(p.scope||'')+'\',\''+esc(p.ne_type||'')+'\',\''+esc(p.include_type||'')+'\',\''+esc(p.path||'')+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('permissionsTable').innerHTML=html;}
-async function createPermission(){const permission=document.getElementById('newPermission').value;const scope=document.getElementById('newScope').value;const ne_type=document.getElementById('newNeType').value;const include_type=document.getElementById('newIncludeType').value;const path=document.getElementById('newPath').value;if(!permission){toast('Permission required','error');return;}const{status}=await api('POST','/authorize/permission/set',{permission,scope,ne_type,include_type,path});if(status===201){toast('Created');['newPermission','newScope','newNeType','newIncludeType','newPath'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadPermissions();}else toast('Failed','error');}
-async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const{status}=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast('Failed','error');}
+// ── Permissions (account type info — no API needed) ──
+function loadPermissions(){}
 
 // ── NEs ──
 async function loadNes(){
@@ -692,10 +687,10 @@ async function loadNeMapping(){const data=cachedUsers;const neIdMap={};cachedNes
 async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+username+'?'))return;const{status}=await api('POST','/authorize/ne/delete',{username,neid:String(neid)});if(status===200){toast('Removed');await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 async function assignNe(){const username=acNeMapUser.getValue();const neid=acNeMapNe.getValue();if(!username||!neid){toast('Select user and NE','error');return;}const{status}=await api('POST','/authorize/ne/set',{username,neid});if(status===200){toast('Assigned');acNeMapUser.clear();acNeMapNe.clear();await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 
-// ── Role Mapping ──
-async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const permList=u.permissions?u.permissions.split(' ').filter(Boolean):[];const permsBadges=permList.length>0?permList.map(p=>'<span class="badge badge-green">'+esc(p)+'</span>').join(' '):'<span style="color:#64748b">None</span>';const removeButtons=permList.map(p=>'<button class="btn btn-danger btn-sm" onclick="removeRole(\''+esc(u.username)+'\',\''+esc(p)+'\')">'+esc(p)+' &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+permsBadges+'</td><td class="actions">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
-async function assignRole(){const username=acRoleMapUser.getValue();const permission=acRoleMapPerm.getValue();if(!username||!permission){toast('Select user and permission','error');return;}const{status}=await api('POST','/authorize/user/set',{username,permission});if(status===200){toast('Assigned');acRoleMapUser.clear();acRoleMapPerm.clear();await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
-async function removeRole(username,permission){if(!confirm('Remove '+permission+' from '+username+'?'))return;const{status}=await api('POST','/authorize/user/delete',{username,permission});if(status===200){toast('Removed');loadRoleMapping();}else toast('Failed','error');}
+// ── User Permission (account_type based) ──
+async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permission</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const perm=u.permission||'user';const badge=perm==='admin'?'<span class="badge badge-blue">admin</span>':'<span class="badge badge-green">user</span>';html+='<tr><td>'+esc(u.username)+'</td><td>'+badge+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="resetPermission(\''+esc(u.username)+'\')">Reset to user</button></td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
+async function assignRole(){const username=acRoleMapUser.getValue();const permission=document.getElementById('roleMapPerm').value;if(!username||!permission){toast('Select user and permission','error');return;}const{status}=await api('POST','/authorize/user/set',{username,permission});if(status===200){toast('Permission updated');acRoleMapUser.clear();await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
+async function resetPermission(username){if(!confirm('Reset '+username+' to user?'))return;const{status}=await api('POST','/authorize/user/delete',{username});if(status===200){toast('Reset to user');await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
 
 // ── History ──
 async function loadHistory(){
@@ -720,7 +715,7 @@ async function loadHistory(){
 
 // ── Import ──
 function handleImportFile(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{document.getElementById('importText').value=e.target.result;};reader.readAsText(file);}
-function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password,email\nadmin,admin123,admin@vht.com\noperator1,Pass@123,op1@vht.com\n\n[nes]\nne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description\nHTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01\nHTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,SSH,10.10.2.1,22,admin,admin,HCM AMF Node 01\n\n[roles]\npermission,scope,ne_type,include_type,path\nadmin,ext-config,5GC,include,/\noperator,ext-config,5GC,include,/\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,operator\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01';}
+function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password,email\noperator1,Pass@123,op1@vht.com\nviewer1,View@123,view1@vht.com\n\n[nes]\nne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description\nHTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01\nHTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,SSH,10.10.2.1,22,admin,admin,HCM AMF Node 01\n\n[user_roles]\nusername,permission\noperator1,admin\nviewer1,user\n\n[user_nes]\nusername,ne_name\noperator1,HTSMF01\nviewer1,HTAMF01';}
 async function runImport(){const text=document.getElementById('importText').value;if(!text.trim()){toast('Paste or upload data first','error');return;}const res=await fetch(API+'/import/',{method:'POST',headers:{'Content-Type':'text/plain','Authorization':TOKEN},body:text});let data;try{data=await res.json();}catch{data=null;}if(!Array.isArray(data)||!data.length){toast('No results','error');return;}const card=document.getElementById('importResultsCard');card.style.display='block';let html='<table><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Detail</th></tr></thead><tbody>';let ok=0,err=0,skip=0;data.forEach(r=>{const badge=r.status==='ok'?'<span class="badge badge-green">ok</span>':r.status==='skip'?'<span class="badge badge-blue">skip</span>':'<span class="badge badge-red">error</span>';if(r.status==='ok')ok++;else if(r.status==='skip')skip++;else err++;html+='<tr><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td><td>'+badge+'</td><td style="font-size:.8rem">'+esc(r.detail)+'</td></tr>';});html+='</tbody></table><p style="margin-top:.75rem;font-size:.85rem;color:#94a3b8"><span class="badge badge-green">'+ok+' ok</span> <span class="badge badge-blue">'+skip+' skipped</span> <span class="badge badge-red">'+err+' errors</span></p>';document.getElementById('importResults').innerHTML=html;await refreshCaches();toast('Import: '+ok+' ok, '+skip+' skipped, '+err+' errors');}
 
 // ── Init ──

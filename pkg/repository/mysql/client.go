@@ -57,8 +57,6 @@ func (c *Client) autoMigrate() error {
 	return c.Db.AutoMigrate(
 		&db_models.TblAccount{},
 		&db_models.CliNe{},
-		&db_models.CliRole{},
-		&db_models.CliRoleUserMapping{},
 		&db_models.CliUserNeMapping{},
 		&db_models.CliOperationHistory{},
 		&db_models.CliLoginHistory{},

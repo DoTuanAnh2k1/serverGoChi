@@ -102,33 +102,7 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Roles
-	if rows, ok := sections["roles"]; ok {
-		for _, cols := range rows {
-			if len(cols) < 5 {
-				continue
-			}
-			role := &db_models.CliRole{
-				Permission:  cols[0],
-				Scope:       cols[1],
-				NeType:      cols[2],
-				IncludeType: cols[3],
-				Path:        cols[4],
-			}
-			existing, _ := db.GetCliRole(role)
-			if existing != nil {
-				results = append(results, importResult{"role", cols[0], "skip", "already exists"})
-				continue
-			}
-			if err := db.CreateCliRole(role); err != nil {
-				results = append(results, importResult{"role", cols[0], "error", err.Error()})
-			} else {
-				results = append(results, importResult{"role", cols[0], "ok", "created"})
-			}
-		}
-	}
-
-	// User-role mappings
+	// User permission (account_type): username,permission  (permission = "admin" or "user")
 	if rows, ok := sections["user_roles"]; ok {
 		for _, cols := range rows {
 			if len(cols) < 2 {
@@ -140,10 +114,19 @@ func HandlerImport(w http.ResponseWriter, r *http.Request) {
 				results = append(results, importResult{"user_role", username + " -> " + permission, "error", "user not found"})
 				continue
 			}
-			if err := db.AddRole(&db_models.CliRoleUserMapping{UserID: user.AccountID, Permission: permission}); err != nil {
+			switch permission {
+			case "admin":
+				user.AccountType = 1
+			case "user":
+				user.AccountType = 2
+			default:
+				results = append(results, importResult{"user_role", username + " -> " + permission, "error", "permission must be 'admin' or 'user'"})
+				continue
+			}
+			if err := db.UpdateUser(user); err != nil {
 				results = append(results, importResult{"user_role", username + " -> " + permission, "error", err.Error()})
 			} else {
-				results = append(results, importResult{"user_role", username + " -> " + permission, "ok", "assigned"})
+				results = append(results, importResult{"user_role", username + " -> " + permission, "ok", "updated"})
 			}
 		}
 	}

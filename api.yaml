@@ -1,10 +1,14 @@
 openapi: 3.0.3
 info:
   title: cli-mgt-svc
-  version: "2.1"
+  version: "2.2"
   description: |
-    REST API for user management, RBAC, Network Element (NE) management,
+    REST API for user management, Network Element (NE) management,
     NE connection config, NETCONF config backup, command history, and bulk import.
+
+    **Permission model:** Users have a single permission derived from `account_type`:
+    `0` (SuperAdmin) and `1` (Admin) → `admin`; `2` (Normal) → `user`.
+    Only `admin` users may call management APIs.
 
     **Authentication:** Most endpoints require `Authorization: Basic <jwt_token>`.
     Token obtained from `POST /aa/authenticate` — the `response_data` field already includes the `Basic ` prefix, paste it as-is.
@@ -20,10 +24,8 @@ tags:
     description: Health check, metrics, docs
   - name: Authentication
     description: Login, token validation, account management
-  - name: Permission
-    description: Role / permission management
   - name: User Authorization
-    description: Assign / remove permissions from users
+    description: Set user permission (admin/user) via account_type
   - name: Network Element
     description: NE CRUD and user-NE assignment
   - name: NE Config
@@ -276,81 +278,11 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
-  # ── Permission ───────────────────────────────────────────────────────────────
-  /aa/authorize/permission/set:
-    post:
-      tags: [Permission]
-      summary: Create role
-      operationId: permissionSet
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CliRole"
-      responses:
-        "201":
-          description: Created
-        "304":
-          description: Role already exists
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/permission/delete:
-    post:
-      tags: [Permission]
-      summary: Delete role
-      operationId: permissionDelete
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CliRole"
-      responses:
-        "200":
-          description: Deleted
-        "304":
-          description: Role not found
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/permission/show:
-    get:
-      tags: [Permission]
-      summary: List all roles
-      operationId: permissionShow
-      security:
-        - bearerAuth: []
-      responses:
-        "302":
-          description: Role list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CliRole"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
   # ── User Authorization ───────────────────────────────────────────────────────
   /aa/authorize/user/set:
     post:
       tags: [User Authorization]
-      summary: Assign permission to user
+      summary: Set user permission (updates account_type — "admin"→1, "user"→2)
       operationId: authorizeUserSet
       security:
         - bearerAuth: []
@@ -362,13 +294,13 @@ paths:
               $ref: "#/components/schemas/UserPermissionRequest"
       responses:
         "200":
-          description: Assigned
+          description: Permission updated
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
-        "304":
-          description: Permission already assigned
+        "400":
+          description: Invalid permission value (must be "admin" or "user")
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -379,7 +311,7 @@ paths:
   /aa/authorize/user/delete:
     post:
       tags: [User Authorization]
-      summary: Remove permission from user
+      summary: Reset user permission to "user" (sets account_type=2)
       operationId: authorizeUserDelete
       security:
         - bearerAuth: []
@@ -388,16 +320,18 @@ paths:
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/UserPermissionRequest"
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
       responses:
         "200":
-          description: Removed
+          description: Permission reset to user
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/MessageResponse"
-        "304":
-          description: Permission not found on user
         "401":
           $ref: "#/components/responses/Unauthorized"
         "404":
@@ -408,7 +342,7 @@ paths:
   /aa/authorize/user/show:
     get:
       tags: [User Authorization]
-      summary: List all users and their permissions
+      summary: List all users and their permission (derived from account_type)
       operationId: authorizeUserShow
       security:
         - bearerAuth: []
@@ -949,20 +883,17 @@ paths:
         ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
         HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
 
-        [roles]
-        permission,scope,ne_type,include_type,path
-        admin,ext-config,5GC,include,/
-
         [user_roles]
         username,permission
-        admin,admin
+        operator1,admin
+        viewer1,user
 
         [user_nes]
         username,ne_name
-        admin,HTSMF01
+        operator1,HTSMF01
         ```
 
-        Existing users/roles are skipped (idempotent). NE rows are upserted by `ne_name`.
+        Existing users are skipped (idempotent). `[user_roles]` sets account_type (admin=1, user=2).
       security:
         - bearerAuth: []
       requestBody:
@@ -1330,25 +1261,7 @@ components:
         site:
           type: string
 
-    # ── Permission ────────────────────────────────────────────────────────────
-    CliRole:
-      type: object
-      properties:
-        role_id:
-          type: integer
-          format: int64
-          readOnly: true
-        permission:
-          type: string
-        scope:
-          type: string
-        ne_type:
-          type: string
-        include_type:
-          type: string
-        path:
-          type: string
-
+    # ── User Permission ───────────────────────────────────────────────────────
     UserPermissionRequest:
       type: object
       required: [username, permission]
@@ -1357,15 +1270,18 @@ components:
           type: string
         permission:
           type: string
+          enum: [admin, user]
+          description: '"admin" sets account_type=1; "user" sets account_type=2'
 
     UserPermissionItem:
       type: object
       properties:
         username:
           type: string
-        permissions:
+        permission:
           type: string
-          description: Space-separated permission list
+          enum: [admin, user]
+          description: Derived from account_type (0/1 → admin, 2 → user)
 
     # ── Network Element ───────────────────────────────────────────────────────
     NeCreateRequest:

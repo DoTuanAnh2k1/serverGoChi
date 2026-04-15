@@ -22,9 +22,6 @@ import (
 //         401 nếu actor không phải chính user đó
 //         403 nếu old_password sai
 //         500 nếu lỗi DB khi lấy hoặc cập nhật user
-// Flow  : decode body → kiểm tra actor == username trong request →
-//         GetUserByUserName → bcrypt.Matches(old_password) →
-//         hash new_password → UpdateUser → ghi operation history
 func HandlerChangePassword(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -90,16 +87,15 @@ func HandlerChangePassword(w http.ResponseWriter, r *http.Request) {
 	response.Success(w, "password changed")
 }
 
-// HandlerAuthorizeUserSet gán một permission (role) cho user.
+// HandlerAuthorizeUserSet sets the account_type (permission) for a user.
 //
-// Input : POST body JSON { "username": string, "permission": string }
-// Output: 200 "permission added" nếu thành công
-//         304 nếu user đã có permission này rồi
+// Input : POST body JSON { "username": string, "permission": "admin"|"user" }
+// Output: 200 "permission updated" nếu thành công
+//         400 nếu permission không hợp lệ
 //         404 nếu user không tồn tại
 //         500 nếu lỗi DB
-// Flow  : decode body → lấy actor từ context → GetUserByUserName →
-//         GetAllUserRolesMappingById (kiểm tra trùng) → AddUserRole →
-//         ghi operation history
+// Flow  : decode body → GetUserByUserName → set AccountType theo permission →
+//         UpdateUser → ghi operation history
 func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -129,6 +125,19 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 		Account:     actor.Username,
 	}
 
+	var newAccountType int32
+	switch req.Permission {
+	case "admin":
+		newAccountType = 1
+	case "user":
+		newAccountType = 2
+	default:
+		log.Warnf("authorize/user/set: invalid permission %q", req.Permission)
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusBadRequest, "permission must be 'admin' or 'user'")
+		return
+	}
+
 	u, err := service.GetUserByUserName(req.Username)
 	if err != nil {
 		log.Errorf("authorize/user/set: get user: %v", err)
@@ -143,45 +152,26 @@ func HandlerAuthorizeUserSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roles, err := service.GetAllUserRolesMappingById(u.AccountID)
-	if err != nil {
-		log.Errorf("authorize/user/set: get user roles: %v", err)
+	u.AccountType = newAccountType
+	u.UpdatedDate = time.Now()
+	if err = service.UpdateUser(u); err != nil {
+		log.Errorf("authorize/user/set: update user: %v", err)
 		saveHistory(opHistory, "failure")
-		response.InternalError(w, "failed to retrieve user roles")
+		response.InternalError(w, "failed to update permission")
 		return
 	}
 
-	for _, role := range roles {
-		if role.Permission == req.Permission {
-			log.Warnf("authorize/user/set: permission %q already assigned", req.Permission)
-			saveHistory(opHistory, "failure")
-			response.Write(w, http.StatusNotModified, "permission already exists")
-			return
-		}
-	}
-
-	if err = service.AddUserRole(&db_models.CliRoleUserMapping{UserID: u.AccountID, Permission: req.Permission}); err != nil {
-		log.Errorf("authorize/user/set: add role: %v", err)
-		saveHistory(opHistory, "failure")
-		response.InternalError(w, "failed to add permission")
-		return
-	}
-
-	log.Info("authorize/user/set: permission added")
+	log.Info("authorize/user/set: permission updated")
 	saveHistory(opHistory, "success")
-	response.Success(w, "permission added")
+	response.Success(w, "permission updated")
 }
 
-// HandlerAuthorizeUserDelete gỡ bỏ một permission khỏi user.
+// HandlerAuthorizeUserDelete resets a user's permission to "user" (account_type=2).
 //
-// Input : POST body JSON { "username": string, "permission": string }
-// Output: 200 "permission removed" nếu thành công
-//         304 nếu user không có permission đó
+// Input : POST body JSON { "username": string }
+// Output: 200 "permission reset" nếu thành công
 //         404 nếu user không tồn tại
 //         500 nếu lỗi DB
-// Flow  : decode body → lấy actor từ context → GetUserByUserName →
-//         GetAllUserRolesMappingById → tìm permission khớp → DeleteUserRole →
-//         ghi operation history
 func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -202,10 +192,10 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log := logger.Logger.WithField("actor", actor.Username).WithField("target", req.Username).WithField("permission", req.Permission)
+	log := logger.Logger.WithField("actor", actor.Username).WithField("target", req.Username)
 
 	opHistory := db_models.CliOperationHistory{
-		CmdName:     fmt.Sprintf("authorize-user delete username %v permission %v", req.Username, req.Permission),
+		CmdName:     fmt.Sprintf("authorize-user delete username %v", req.Username),
 		CreatedDate: time.Now(),
 		Scope:       "cli-config",
 		Account:     actor.Username,
@@ -225,42 +215,25 @@ func HandlerAuthorizeUserDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	roles, err := service.GetAllUserRolesMappingById(u.AccountID)
-	if err != nil {
-		log.Errorf("authorize/user/delete: get user roles: %v", err)
+	u.AccountType = 2
+	u.UpdatedDate = time.Now()
+	if err = service.UpdateUser(u); err != nil {
+		log.Errorf("authorize/user/delete: update user: %v", err)
 		saveHistory(opHistory, "failure")
-		response.InternalError(w, "failed to retrieve user roles")
+		response.InternalError(w, "failed to reset permission")
 		return
 	}
 
-	for _, role := range roles {
-		if role.Permission != req.Permission {
-			continue
-		}
-		if err = service.DeleteUserRole(&db_models.CliRoleUserMapping{UserID: u.AccountID, Permission: req.Permission}); err != nil {
-			log.Errorf("authorize/user/delete: delete role: %v", err)
-			saveHistory(opHistory, "failure")
-			response.InternalError(w, "failed to delete permission")
-			return
-		}
-		log.Info("authorize/user/delete: permission removed")
-		saveHistory(opHistory, "success")
-		response.Write(w, http.StatusOK, "permission removed")
-		return
-	}
-
-	log.Warnf("authorize/user/delete: permission %q not found on user", req.Permission)
-	saveHistory(opHistory, "failure")
-	response.Write(w, http.StatusNotModified, "permission not found")
+	log.Info("authorize/user/delete: permission reset to user")
+	saveHistory(opHistory, "success")
+	response.Success(w, "permission reset")
 }
 
-// HandlerAuthorizeUserShow liệt kê tất cả user và permission hiện tại của họ.
+// HandlerAuthorizeUserShow lists all users and their current permission (derived from account_type).
 //
-// Input : GET (không có body/query params)
-// Output: 302 [ { username, permissions } ]
+// Input : GET (no body)
+// Output: 302 [ { username, permission } ]
 //         500 nếu lỗi DB
-// Flow  : lấy actor từ context → GetAllUser → với mỗi user GetRolesById →
-//         gộp kết quả thành danh sách → ghi operation history
 func HandlerAuthorizeUserShow(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -291,26 +264,23 @@ func HandlerAuthorizeUserShow(w http.ResponseWriter, r *http.Request) {
 
 	var result []userShowResp
 	for _, a := range accounts {
-		roles, err := service.GetRolesById(a.AccountID)
-		if err != nil {
-			logger.Logger.WithField("user_id", a.AccountID).Errorf("authorize/user/show: get roles: %v", err)
-		}
-		result = append(result, userShowResp{Username: a.AccountName, Permissions: roles})
+		result = append(result, userShowResp{
+			Username:   a.AccountName,
+			Permission: service.GetPermissionByUser(a),
+		})
 	}
 
 	saveHistory(opHistory, "success")
 	response.Write(w, http.StatusFound, result)
 }
 
-// HandlerAdminResetPassword cho phép admin đặt lại mật khẩu của bất kỳ user nào.
+// HandlerAdminResetPassword allows admin to reset any user's password.
 //
 // Input : POST body JSON { "username": string, "new_password": string }
 // Output: 200 "password reset" nếu thành công
 //         400 nếu thiếu username/new_password
 //         404 nếu user không tồn tại
 //         500 nếu lỗi DB
-// Flow  : decode body → lấy actor từ context → GetUserByUserName →
-//         hash new_password → UpdateUser → ghi operation history
 func HandlerAdminResetPassword(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		Username    string `json:"username"`
@@ -374,11 +344,10 @@ type userSetReq struct {
 }
 
 type userDeleteReq struct {
-	Username   string `json:"username"`
-	Permission string `json:"permission"`
+	Username string `json:"username"`
 }
 
 type userShowResp struct {
-	Username    string `json:"username"`
-	Permissions string `json:"permissions"`
+	Username   string `json:"username"`
+	Permission string `json:"permission"`
 }

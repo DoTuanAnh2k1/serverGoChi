@@ -22,18 +22,11 @@ type MockStore struct {
 	SaveHistoryCommandFn          func(h db_models.CliOperationHistory) error
 	GetCLIUserNeMappingByUserIdFn func(userID int64) (*db_models.CliUserNeMapping, error)
 	GetNeListByIdFn               func(id int64) ([]*db_models.CliNe, error)
-	GetRolesByIdFn                func(userID int64) ([]*db_models.CliRoleUserMapping, error)
-	GetCliRoleFn                  func(role *db_models.CliRole) (*db_models.CliRole, error)
-	CreateCliRoleFn               func(role *db_models.CliRole) error
-	DeleteCliRoleFn               func(role *db_models.CliRole) error
-	GetAllCliRoleFn               func() ([]*db_models.CliRole, error)
 	GetCliNeListBySystemTypeFn    func(systemType string) ([]*db_models.CliNe, error)
 	GetCliNeByNeIdFn              func(id int64) (*db_models.CliNe, error)
 	CreateCliNeFn                 func(ne *db_models.CliNe) error
 	UpdateCliNeFn                 func(ne *db_models.CliNe) error
 	DeleteCliNeByIdFn             func(id int64) error
-	AddRoleFn                     func(role *db_models.CliRoleUserMapping) error
-	DeleteRoleFn                  func(role *db_models.CliRoleUserMapping) error
 	CreateUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
 	DeleteUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
 	DeleteAllUserNeMappingByNeIdFn   func(neId int64) error
@@ -126,41 +119,6 @@ func (m *MockStore) GetNeListById(id int64) ([]*db_models.CliNe, error) {
 	return nil, nil
 }
 
-func (m *MockStore) GetRolesById(userID int64) ([]*db_models.CliRoleUserMapping, error) {
-	if m.GetRolesByIdFn != nil {
-		return m.GetRolesByIdFn(userID)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) GetCliRole(role *db_models.CliRole) (*db_models.CliRole, error) {
-	if m.GetCliRoleFn != nil {
-		return m.GetCliRoleFn(role)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) CreateCliRole(role *db_models.CliRole) error {
-	if m.CreateCliRoleFn != nil {
-		return m.CreateCliRoleFn(role)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteCliRole(role *db_models.CliRole) error {
-	if m.DeleteCliRoleFn != nil {
-		return m.DeleteCliRoleFn(role)
-	}
-	return nil
-}
-
-func (m *MockStore) GetAllCliRole() ([]*db_models.CliRole, error) {
-	if m.GetAllCliRoleFn != nil {
-		return m.GetAllCliRoleFn()
-	}
-	return nil, nil
-}
-
 func (m *MockStore) GetCliNeListBySystemType(systemType string) ([]*db_models.CliNe, error) {
 	if m.GetCliNeListBySystemTypeFn != nil {
 		return m.GetCliNeListBySystemTypeFn(systemType)
@@ -192,20 +150,6 @@ func (m *MockStore) UpdateCliNe(ne *db_models.CliNe) error {
 func (m *MockStore) DeleteCliNeById(id int64) error {
 	if m.DeleteCliNeByIdFn != nil {
 		return m.DeleteCliNeByIdFn(id)
-	}
-	return nil
-}
-
-func (m *MockStore) AddRole(role *db_models.CliRoleUserMapping) error {
-	if m.AddRoleFn != nil {
-		return m.AddRoleFn(role)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteRole(role *db_models.CliRoleUserMapping) error {
-	if m.DeleteRoleFn != nil {
-		return m.DeleteRoleFn(role)
 	}
 	return nil
 }

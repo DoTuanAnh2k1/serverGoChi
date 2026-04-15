@@ -87,55 +87,41 @@ func TestAuthenticate_DBError(t *testing.T) {
 	}
 }
 
-// ── GetRolesById ─────────────────────────────────────────────────────────────
+// ── GetPermissionByUser ───────────────────────────────────────────────────────
 
-func TestGetRolesById_Success(t *testing.T) {
-	store.SetSingleton(&testutil.MockStore{
-		GetRolesByIdFn: func(userID int64) ([]*db_models.CliRoleUserMapping, error) {
-			return []*db_models.CliRoleUserMapping{
-				{Permission: "admin"},
-				{Permission: "viewer"},
-			}, nil
-		},
-	})
-
-	roles, err := service.GetRolesById(1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+func TestGetPermissionByUser_SuperAdmin(t *testing.T) {
+	u := &db_models.TblAccount{AccountType: 0}
+	got := service.GetPermissionByUser(u)
+	if got != "admin" {
+		t.Errorf("account_type=0: got %q, want %q", got, "admin")
 	}
-	for _, want := range []string{"admin", "viewer"} {
-		if !containsWord(roles, want) {
-			t.Errorf("role %q not found in %q", want, roles)
+}
+
+func TestGetPermissionByUser_Admin(t *testing.T) {
+	u := &db_models.TblAccount{AccountType: 1}
+	got := service.GetPermissionByUser(u)
+	if got != "admin" {
+		t.Errorf("account_type=1: got %q, want %q", got, "admin")
+	}
+}
+
+func TestGetPermissionByUser_Normal(t *testing.T) {
+	u := &db_models.TblAccount{AccountType: 2}
+	got := service.GetPermissionByUser(u)
+	if got != "user" {
+		t.Errorf("account_type=2: got %q, want %q", got, "user")
+	}
+}
+
+func TestGetPermissionByUser_DefaultIsUser(t *testing.T) {
+	// Any account_type > 1 should be "user"
+	for _, at := range []int32{3, 10, 99} {
+		u := &db_models.TblAccount{AccountType: at}
+		got := service.GetPermissionByUser(u)
+		if got != "user" {
+			t.Errorf("account_type=%d: got %q, want %q", at, got, "user")
 		}
 	}
-}
-
-func TestGetRolesById_DBError(t *testing.T) {
-	dbErr := errors.New("query failed")
-	store.SetSingleton(&testutil.MockStore{
-		GetRolesByIdFn: func(userID int64) ([]*db_models.CliRoleUserMapping, error) {
-			return nil, dbErr
-		},
-	})
-
-	_, err := service.GetRolesById(1)
-	if !errors.Is(err, dbErr) {
-		t.Errorf("error: got %v, want %v", err, dbErr)
-	}
-}
-
-func TestGetRolesById_NoRoles(t *testing.T) {
-	store.SetSingleton(&testutil.MockStore{
-		GetRolesByIdFn: func(userID int64) ([]*db_models.CliRoleUserMapping, error) {
-			return []*db_models.CliRoleUserMapping{}, nil
-		},
-	})
-
-	roles, err := service.GetRolesById(1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	_ = roles // empty is valid
 }
 
 // ── UpdateLoginHistory ────────────────────────────────────────────────────────
@@ -213,19 +199,4 @@ func TestGetNeListById_Success(t *testing.T) {
 	if len(list) != 1 || list[0].NeName != "NE-HCM-01" {
 		t.Errorf("unexpected result: %v", list)
 	}
-}
-
-// ── helpers ───────────────────────────────────────────────────────────────────
-
-func containsWord(s, word string) bool {
-	for i := 0; i+len(word) <= len(s); i++ {
-		if s[i:i+len(word)] == word {
-			before := i == 0 || s[i-1] == ' '
-			after := i+len(word) == len(s) || s[i+len(word)] == ' '
-			if before && after {
-				return true
-			}
-		}
-	}
-	return false
 }

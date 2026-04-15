@@ -157,7 +157,7 @@ func userCtx(r *http.Request, u *middleware.User) *http.Request {
 func TestCheckRole_AdminAllowed(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = userCtx(req, &middleware.User{Username: "alice", Roles: "admin viewer"})
+	req = userCtx(req, &middleware.User{Username: "alice", Permission: "admin"})
 
 	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -171,7 +171,7 @@ func TestCheckRole_AdminAllowed(t *testing.T) {
 func TestCheckRole_NonAdminForbidden(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = userCtx(req, &middleware.User{Username: "bob", Roles: "viewer operator"})
+	req = userCtx(req, &middleware.User{Username: "bob", Permission: "user"})
 
 	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
@@ -186,7 +186,7 @@ func TestCheckRole_AdminCaseInsensitive(t *testing.T) {
 	for _, role := range []string{"Admin", "ADMIN", "admin"} {
 		w := httptest.NewRecorder()
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req = userCtx(req, &middleware.User{Username: "alice", Roles: role})
+		req = userCtx(req, &middleware.User{Username: "alice", Permission: role})
 
 		middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -215,7 +215,7 @@ func TestCheckRole_NoUserInContext(t *testing.T) {
 func TestCheckRole_EmptyRoles(t *testing.T) {
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = userCtx(req, &middleware.User{Username: "alice", Roles: ""})
+	req = userCtx(req, &middleware.User{Username: "alice", Permission: ""})
 
 	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

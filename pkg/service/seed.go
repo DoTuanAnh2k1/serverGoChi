@@ -30,7 +30,7 @@ func SeedDefaultUser() {
 	user := &db_models.TblAccount{
 		AccountName:    seedUsername,
 		Password:       bcrypt.Encode(seedUsername + seedPassword),
-		AccountType:    2,
+		AccountType:    0,
 		IsEnable:       true,
 		Status:         true,
 		CreatedBy:      "system",

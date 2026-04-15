@@ -155,33 +155,7 @@ admin,HTSMF01`)
 		}
 	}
 
-	// Import roles
-	if rows, ok := sections["roles"]; ok {
-		for _, cols := range rows {
-			if len(cols) < 5 {
-				continue
-			}
-			role := &db_models.CliRole{
-				Permission:  cols[0],
-				Scope:       cols[1],
-				NeType:      cols[2],
-				IncludeType: cols[3],
-				Path:        cols[4],
-			}
-			existing, _ := db.GetCliRole(role)
-			if existing != nil {
-				fmt.Printf("  [skip] role %q already exists\n", cols[0])
-				continue
-			}
-			if err := db.CreateCliRole(role); err != nil {
-				fmt.Printf("  [error] role %q: %v\n", cols[0], err)
-			} else {
-				fmt.Printf("  [ok] role %q created\n", cols[0])
-			}
-		}
-	}
-
-	// Import user-role mappings
+	// Import user permission (account_type): username,permission  (admin|user)
 	if rows, ok := sections["user_roles"]; ok {
 		for _, cols := range rows {
 			if len(cols) < 2 {
@@ -193,7 +167,16 @@ admin,HTSMF01`)
 				fmt.Printf("  [error] user_role: user %q not found\n", username)
 				continue
 			}
-			if err := db.AddRole(&db_models.CliRoleUserMapping{UserID: user.AccountID, Permission: permission}); err != nil {
+			switch permission {
+			case "admin":
+				user.AccountType = 1
+			case "user":
+				user.AccountType = 2
+			default:
+				fmt.Printf("  [error] user_role %q->%q: permission must be 'admin' or 'user'\n", username, permission)
+				continue
+			}
+			if err := db.UpdateUser(user); err != nil {
 				fmt.Printf("  [error] user_role %q->%q: %v\n", username, permission, err)
 			} else {
 				fmt.Printf("  [ok] user_role %q -> %q\n", username, permission)

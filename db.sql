@@ -8,7 +8,7 @@ CREATE TABLE `tbl_account` (
   `phone_number` varchar(255),
   `avatar` varchar(255),
   `description` varchar(255),
-  `account_type` int COMMENT '0-SuperAdmin; 1-Admin; 2-Normal',
+  `account_type` int COMMENT '0-SuperAdmin; 1-Admin; 2-Normal (maps to permission: 0/1=admin, 2=user)',
   `status` boolean COMMENT '0: deleted, 1: live',
   `is_enable` boolean COMMENT '1: active, 0: inactive',
   `force_change_pass` boolean,
@@ -52,12 +52,6 @@ CREATE TABLE `cli_ne` (
   `conf_password` varchar(255)
 );
 
-CREATE TABLE `cli_role_user_mapping` (
-  `user_id` bigint,
-  `permission` varchar(255),
-  PRIMARY KEY (`user_id`, `permission`)
-);
-
 CREATE TABLE `cli_user_ne_mapping` (
   `user_id` bigint,
   `tbl_ne_id` bigint,
@@ -77,23 +71,6 @@ CREATE TABLE `cli_operation_history` (
   `executed_time` timestamp
 );
 
-ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `user_ne` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
-
-ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `mapping_ne` FOREIGN KEY (`tbl_ne_id`) REFERENCES `cli_ne` (`id`);
-
-ALTER TABLE `cli_role_user_mapping` ADD CONSTRAINT `user_role` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
-
-ALTER TABLE `cli_login_history` ADD FOREIGN KEY (`time_login`) REFERENCES `cli_login_history` (`user_name`);
-
-CREATE TABLE `cli_role` (
-  `role_id`      bigint PRIMARY KEY AUTO_INCREMENT,
-  `include_type` varchar(255) NOT NULL,
-  `ne_type`      varchar(255) NOT NULL,
-  `scope`        varchar(255) NOT NULL,
-  `permission`   varchar(255) NOT NULL,
-  `path`         varchar(255) NOT NULL
-);
-
 CREATE TABLE `cli_config_backup` (
   `id`         bigint PRIMARY KEY AUTO_INCREMENT,
   `ne_name`    varchar(255) NOT NULL,
@@ -102,3 +79,6 @@ CREATE TABLE `cli_config_backup` (
   `size`       bigint       COMMENT 'kích thước file tính bằng byte',
   `created_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `user_ne` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
+ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `mapping_ne` FOREIGN KEY (`tbl_ne_id`) REFERENCES `cli_ne` (`id`);

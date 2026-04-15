@@ -1,7 +1,6 @@
 package service
 
 import (
-	"strings"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/bcrypt"
@@ -37,17 +36,13 @@ func GetNeListById(id int64) ([]*db_models.CliNe, error) {
 	return list, nil
 }
 
-func GetRolesById(userId int64) (string, error) {
-	roleList, err := store.GetSingleton().GetRolesById(userId)
-	if err != nil {
-		logger.Logger.WithField("user_id", userId).Errorf("auth: get roles: %v", err)
-		return "", err
+// GetPermissionByUser derives "admin" or "user" from account_type.
+// account_type 0 (SuperAdmin) and 1 (Admin) → "admin"; 2 (Normal) → "user".
+func GetPermissionByUser(u *db_models.TblAccount) string {
+	if u.AccountType <= 1 {
+		return "admin"
 	}
-	var perms []string
-	for _, r := range roleList {
-		perms = append(perms, r.Permission)
-	}
-	return strings.Join(perms, " "), nil
+	return "user"
 }
 
 func Authenticate(username, password string) (bool, error, int64) {

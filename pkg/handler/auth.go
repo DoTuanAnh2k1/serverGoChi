@@ -47,21 +47,22 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 
 	log := logger.Logger.WithField("user", req.UserName).WithField("ip", r.RemoteAddr)
 
-	ok, err, userId := service.Authenticate(req.UserName, req.Password)
+	ok, err, _ := service.Authenticate(req.UserName, req.Password)
 	if err != nil || !ok {
 		log.Warn("authenticate: login failed")
 		response.Unauthorized(w)
 		return
 	}
 
-	roles, err := service.GetRolesById(userId)
-	if err != nil {
-		log.Errorf("authenticate: get roles: %v", err)
-		response.InternalError(w, "failed to load user roles")
+	u, err := service.GetUserByUserName(req.UserName)
+	if err != nil || u == nil {
+		log.Errorf("authenticate: get user: %v", err)
+		response.InternalError(w, "failed to load user")
 		return
 	}
+	permission := service.GetPermissionByUser(u)
 
-	tokenString, err := token.CreateToken(req.UserName, roles)
+	tokenString, err := token.CreateToken(req.UserName, permission)
 	if err != nil {
 		log.Errorf("authenticate: create token: %v", err)
 		response.InternalError(w, "failed to create token")
@@ -74,7 +75,7 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Infof("authenticate: login successful — roles=%q", roles)
+	log.Infof("authenticate: login successful — permission=%q", permission)
 	response.Write(w, http.StatusOK, tokenRequestResponse{
 		Status:       "success",
 		ResponseData: tokenString,
@@ -304,14 +305,10 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 			}
 			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName})
 		}
-		role, err := service.GetRolesById(u.AccountID)
-		if err != nil {
-			logger.Logger.WithField("user_id", u.AccountID).Errorf("authenticate/user/show: get roles: %v", err)
-		}
 		result = append(result, userShowAuthenticateResp{
 			Username: u.AccountName,
 			TblNes:   nes,
-			Role:     role,
+			Role:     service.GetPermissionByUser(u),
 		})
 	}
 

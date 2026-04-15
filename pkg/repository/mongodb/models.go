@@ -112,40 +112,6 @@ func fromMUserNeMapping(m *mUserNeMapping) *db_models.CliUserNeMapping {
 	return &db_models.CliUserNeMapping{UserID: m.UserID, TblNeID: m.TblNeID}
 }
 
-// mRole mirrors db_models.CliRole.
-type mRole struct {
-	RoleID      int64  `bson:"role_id"`
-	IncludeType string `bson:"include_type"`
-	NeType      string `bson:"ne_type"`
-	Scope       string `bson:"scope"`
-	Permission  string `bson:"permission"`
-	Path        string `bson:"path"`
-}
-
-func toMRole(r *db_models.CliRole) *mRole {
-	return &mRole{
-		RoleID: r.RoleID, IncludeType: r.IncludeType, NeType: r.NeType,
-		Scope: r.Scope, Permission: r.Permission, Path: r.Path,
-	}
-}
-
-func fromMRole(m *mRole) *db_models.CliRole {
-	return &db_models.CliRole{
-		RoleID: m.RoleID, IncludeType: m.IncludeType, NeType: m.NeType,
-		Scope: m.Scope, Permission: m.Permission, Path: m.Path,
-	}
-}
-
-// mRoleUserMapping mirrors db_models.CliRoleUserMapping.
-type mRoleUserMapping struct {
-	UserID     int64  `bson:"user_id"`
-	Permission string `bson:"permission"`
-}
-
-func fromMRoleUserMapping(m *mRoleUserMapping) *db_models.CliRoleUserMapping {
-	return &db_models.CliRoleUserMapping{UserID: m.UserID, Permission: m.Permission}
-}
-
 // mConfigBackup mirrors db_models.CliConfigBackup.
 type mConfigBackup struct {
 	ID        int64     `bson:"id"`

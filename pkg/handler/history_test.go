@@ -47,7 +47,7 @@ func TestHandlerSaveHistory_Success(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/aa/history/save", body)
 	req.Header.Set("Content-Type", "application/json")
-	req = reqWithUser(req, &middleware.User{Username: "alice", Roles: "admin"})
+	req = reqWithUser(req, &middleware.User{Username: "alice", Permission: "admin"})
 	w := httptest.NewRecorder()
 
 	handler.HandlerSaveHistory(w, req)
@@ -72,7 +72,7 @@ func TestHandlerSaveHistory_MissingCmdName(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/aa/history/save", body)
 	req.Header.Set("Content-Type", "application/json")
-	req = reqWithUser(req, &middleware.User{Username: "alice", Roles: "admin"})
+	req = reqWithUser(req, &middleware.User{Username: "alice", Permission: "admin"})
 	w := httptest.NewRecorder()
 
 	handler.HandlerSaveHistory(w, req)
@@ -91,7 +91,7 @@ func TestHandlerSaveHistory_MissingNeName(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/aa/history/save", body)
 	req.Header.Set("Content-Type", "application/json")
-	req = reqWithUser(req, &middleware.User{Username: "bob", Roles: "admin"})
+	req = reqWithUser(req, &middleware.User{Username: "bob", Permission: "admin"})
 	w := httptest.NewRecorder()
 
 	handler.HandlerSaveHistory(w, req)
@@ -105,7 +105,7 @@ func TestHandlerSaveHistory_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/aa/history/save",
 		strings.NewReader("{bad json"))
 	req.Header.Set("Content-Type", "application/json")
-	req = reqWithUser(req, &middleware.User{Username: "alice", Roles: "admin"})
+	req = reqWithUser(req, &middleware.User{Username: "alice", Permission: "admin"})
 	w := httptest.NewRecorder()
 
 	handler.HandlerSaveHistory(w, req)
@@ -127,7 +127,7 @@ func TestHandlerSaveHistory_DBError(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/aa/history/save", body)
 	req.Header.Set("Content-Type", "application/json")
-	req = reqWithUser(req, &middleware.User{Username: "alice", Roles: "admin"})
+	req = reqWithUser(req, &middleware.User{Username: "alice", Permission: "admin"})
 	w := httptest.NewRecorder()
 
 	handler.HandlerSaveHistory(w, req)

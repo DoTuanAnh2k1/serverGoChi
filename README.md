@@ -21,14 +21,14 @@ Phục vụ quản lý người dùng, phân quyền, Network Element (NE), lị
 |---|---|
 | **Authentication** | Đăng nhập, sinh JWT, lịch sử đăng nhập |
 | **User Management** | Tạo / cập nhật / vô hiệu hóa tài khoản |
-| **Permission (RBAC)** | Quản lý role, gán role cho user |
+| **Permission** | Phân quyền dựa trên `account_type` (admin/user) |
 | **Network Element** | Tạo / xóa / quản lý NE (site, IP, port, namespace) |
 | **NE Config** | Lưu thông tin kết nối NE cho mode ne-config (IP, port, protocol, credential) |
 | **User-NE Authorization** | Phân quyền user truy cập NE |
 | **Config Backup** | Lưu backup config XML từ NETCONF commit (metadata DB + file disk) |
 | **History / Audit** | Lưu lịch sử lệnh, export CSV hàng ngày, tự động dọn dữ liệu cũ |
 | **Admin Frontend** | Giao diện quản trị tại `/admin` (embedded, không cần build riêng) |
-| **Import** | Import hàng loạt users/NEs/roles/configs từ file text |
+| **Import** | Import hàng loạt users/NEs/user permissions/configs từ file text |
 | **Metrics & pprof** | Runtime metrics tại `/metrics`, Go pprof tại `:6060` |
 | **TCP Subscriber Server** | Nhận kết nối TCP, lưu file khi client ngắt kết nối |
 | **Leader Election** | Chỉ một pod thực thi task định kỳ (Kubernetes Lease) |
@@ -93,14 +93,12 @@ Không cần chạy SQL thủ công.
 
 ### Schema (db.sql)
 
-File `db.sql` chứa DDL đầy đủ cho tất cả 8 bảng:
+File `db.sql` chứa DDL đầy đủ cho các bảng:
 
 | Bảng | PK | Mô tả |
 |---|---|---|
 | `tbl_account` | `account_id` bigint AI | Tài khoản người dùng — bcrypt password, `is_enable` (soft-delete), `account_type` (0=SuperAdmin / 1=Admin / 2=Normal), `only_ad` (AD-only login) |
 | `cli_ne` | `id` bigint AI | Network Element — kết nối lưu trong các cột `conf_*` (master/slave IP, SSH/TCP port, credential, `conf_mode`) |
-| `cli_role` | `role_id` bigint AI | Định nghĩa role/permission: `permission`, `scope`, `ne_type`, `include_type`, `path` |
-| `cli_role_user_mapping` | (`user_id`, `permission`) | Gán permission cho user — FK → `tbl_account` |
 | `cli_user_ne_mapping` | (`user_id`, `tbl_ne_id`) | Gán NE cho user — FK → `tbl_account`, `cli_ne` |
 | `cli_login_history` | `id` int AI | Lịch sử đăng nhập: `user_name`, `ip_address`, `time_login` |
 | `cli_operation_history` | `id` int AI | Audit log: `account`, `cmd_name`, `ne_name`, `ne_ip`, `scope`, `result`, `created_date` |
@@ -177,28 +175,22 @@ ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_maste
 HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
 HTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,NETCONF,10.10.2.1,830,admin,admin,HCM AMF Node 01
 
-[roles]
-permission,scope,ne_type,include_type,path
-admin,ext-config,5GC,include,/
-operator,ext-config,5GC,include,/
-
 [user_roles]
 username,permission
-admin,admin
-operator1,operator
+operator1,admin
+viewer1,user
 
 [user_nes]
 username,ne_name
-admin,HTSMF01
-operator1,HTAMF01
+operator1,HTSMF01
+viewer1,HTAMF01
 ```
 
 | Section | Trường | Ghi chú |
 |---|---|---|
 | `[users]` | username, password, email (tùy chọn) | Bỏ qua nếu user đã tồn tại |
 | `[nes]` | ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description | Các field sau ne_name là tùy chọn |
-| `[roles]` | permission, scope, ne_type, include_type, path | Bỏ qua nếu role đã tồn tại |
-| `[user_roles]` | username, permission | Gán permission cho user |
+| `[user_roles]` | username, permission (`admin` hoặc `user`) | Cập nhật `account_type` của user |
 | `[user_nes]` | username, ne_name | Gán NE cho user |
 
 ### Frontend
@@ -213,13 +205,12 @@ Hỗ trợ song ngữ Tiếng Việt / English.
 
 | Tab | Mô tả |
 |---|---|
-| Dashboard | Tổng quan users, permissions, NEs |
+| Dashboard | Tổng quan users, admin count, NEs |
 | Users | Tạo / vô hiệu hóa user |
-| Permissions | Tạo / xóa role |
+| Account Types | Bảng tham chiếu account_type (0=SuperAdmin / 1=Admin / 2=Normal) |
 | Network Elements | Tạo / xóa NE |
-| NE Config | Quản lý cấu hình kết nối NE (IP, port, protocol, credential) |
 | NE Mapping | Gán / xóa NE cho user |
-| Role Mapping | Gán / xóa role cho user |
+| User Permission | Đặt quyền admin/user cho từng user |
 | History | Xem lịch sử thao tác, filter theo scope và NE |
 | Import | Upload file hoặc paste data để import hàng loạt |
 | Guide | Hướng dẫn sử dụng |
@@ -245,15 +236,15 @@ Authorization: Basic <jwt_token>
 | `GET`  | `/aa/authenticate/user/show` | Danh sách user kèm NE & role |
 | `POST` | `/aa/authenticate/user/reset-password` | Admin đặt lại mật khẩu (không cần old_password) |
 
-### Permission (RBAC)
+### Permission
+Permission được suy ra từ `account_type`: `0/1` → `admin`, `2` → `user`.  
+Chỉ `admin` được gọi management API.
+
 | Method | Path | Mô tả |
 |---|---|---|
-| `POST` | `/aa/authorize/permission/set` | Tạo role |
-| `POST` | `/aa/authorize/permission/delete` | Xóa role |
-| `GET`  | `/aa/authorize/permission/show` | Danh sách role |
-| `POST` | `/aa/authorize/user/set` | Gán quyền cho user |
-| `POST` | `/aa/authorize/user/delete` | Xóa quyền của user |
-| `GET`  | `/aa/authorize/user/show` | Quyền của tất cả user |
+| `POST` | `/aa/authorize/user/set` | Đặt quyền user (`admin`/`user`, cập nhật account_type) |
+| `POST` | `/aa/authorize/user/delete` | Reset quyền về `user` (account_type=2) |
+| `GET`  | `/aa/authorize/user/show` | Quyền hiện tại của tất cả user |
 
 ### Network Element
 

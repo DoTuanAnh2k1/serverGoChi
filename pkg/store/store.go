@@ -55,18 +55,11 @@ type DatabaseStore interface {
 	SaveHistoryCommand(db_models.CliOperationHistory) error
 	GetCLIUserNeMappingByUserId(int64) (*db_models.CliUserNeMapping, error)
 	GetNeListById(int64) ([]*db_models.CliNe, error)
-	GetRolesById(int64) ([]*db_models.CliRoleUserMapping, error)
-	GetCliRole(*db_models.CliRole) (*db_models.CliRole, error)
-	CreateCliRole(*db_models.CliRole) error
-	DeleteCliRole(*db_models.CliRole) error
-	GetAllCliRole() ([]*db_models.CliRole, error)
 	GetCliNeListBySystemType(string) ([]*db_models.CliNe, error)
 	GetCliNeByNeId(int64) (*db_models.CliNe, error)
 	CreateCliNe(*db_models.CliNe) error
 	UpdateCliNe(*db_models.CliNe) error
 	DeleteCliNeById(int64) error
-	AddRole(*db_models.CliRoleUserMapping) error
-	DeleteRole(*db_models.CliRoleUserMapping) error
 	CreateUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteAllUserNeMappingByNeId(neId int64) error

@@ -8,7 +8,7 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 )
 
-// CheckRole middleware — requires the "admin" role.
+// CheckRole middleware — requires the "admin" permission (account_type 0 or 1).
 func CheckRole(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		u, ok := r.Context().Value(UserContextKey).(*User)
@@ -18,14 +18,12 @@ func CheckRole(next http.Handler) http.Handler {
 			return
 		}
 
-		for _, role := range strings.Split(u.Roles, " ") {
-			if strings.EqualFold(role, "admin") {
-				next.ServeHTTP(w, r)
-				return
-			}
+		if strings.EqualFold(u.Permission, "admin") {
+			next.ServeHTTP(w, r)
+			return
 		}
 
-		logger.Logger.WithField("user", u.Username).Warnf("middleware: check_role: forbidden — roles=%q", u.Roles)
+		logger.Logger.WithField("user", u.Username).Warnf("middleware: check_role: forbidden — permission=%q", u.Permission)
 		response.Write(w, http.StatusForbidden, "No authority")
 	})
 }
