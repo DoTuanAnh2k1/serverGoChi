@@ -38,7 +38,7 @@ define APP_ENV
 endef
 
 .PHONY: help up up-docker up-local up-cmd down down-cmd build build-docker import dump metric \
-        pprof-heap pprof-cpu pprof-goroutine test clean logs ps
+        pprof-heap pprof-cpu pprof-goroutine test clean logs logs-mgt logs-cli-command exec-mysql ps
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*?## "}; {printf "  \033[36m%-18s\033[0m %s\n", $$1, $$2}'
@@ -95,6 +95,15 @@ down: ## Stop all services and kill local processes
 
 logs: ## Tail app container logs
 	docker logs -f mgt-service
+
+logs-mgt: ## Tail cli-mgt-svc container logs
+	docker logs -f cli-mgt-svc
+
+logs-cli-command: ## Tail cli-command-svc container logs
+	docker logs -f cli-command-svc
+
+exec-mysql: ## Open MySQL shell in mgt-mysql container
+	docker exec -it mgt-mysql mysql -u$(DB_USER) -p$(DB_PASS) $(DB_NAME)
 
 ps: ## Show running containers
 	@docker ps --filter "name=mgt-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
