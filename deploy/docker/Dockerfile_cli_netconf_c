@@ -1,40 +1,41 @@
 # =============================================================================
 # Dockerfile_cli_netconf_c — CLI NETCONF C rewrite (feature/c-maapi-rewrite)
 #
-# Full mode: OpenSSH server + xác thực qua mgt-service API + MAAPI → ConfD.
-# User SSH vào container → PAM gọi mgt-service → ForceCommand chạy cli-netconf.
+# SSH Server Mode: OpenSSH server + xác thực qua mgt-service API.
+# User SSH vào container → PAM xác thực → cli-netconf tự hỏi login →
+# lấy danh sách NE từ mgt-service → user chọn NE → MAAPI connect.
 #
 # Build args:
 #   CLI_NETCONF_REPO   — Git repo URL         (default: GitHub public)
 #   CLI_NETCONF_BRANCH — Git branch           (default: feature/c-maapi-rewrite)
 #
 # Runtime env vars (đặt trong docker-compose):
-#   CONFD_IPC_ADDR   — Địa chỉ ConfD IPC     (default: 127.0.0.1)
-#   CONFD_IPC_PORT   — Port ConfD IPC         (default: 4565)
-#   MGT_SERVICE_URL  — URL mgt-service        (default: http://mgt-service:3000)
-#   NE_NAME          — Tên NE hiển thị        (default: confd)
+#   MGT_SVC_BASE     — URL gốc mgt-service   (default: http://mgt-service:3000)
+#   LOG_LEVEL        — Log level              (default: info)
+#   SEED_USERNAME    — User để sync users     (default: anhdt195)
+#   SEED_PASSWORD    — Password seed user     (default: 123)
 #
 # Truy cập:
 #   ssh <username>@<host> -p 2222
 # =============================================================================
 
 # ── Build stage ──────────────────────────────────────────────────────────────
+# Khi CLI_NETCONF_SRC được set (local path), build từ local source.
+# Mặc định vẫn clone từ GitHub nếu dùng bên ngoài docker-compose.
 FROM ubuntu:24.04 AS builder
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git gcc make libxml2-dev libreadline-dev ca-certificates \
+        gcc make libxml2-dev libreadline-dev ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-ARG CLI_NETCONF_REPO=https://github.com/DoTuanAnh2k1/cli-netconf.git
-ARG CLI_NETCONF_BRANCH=feature/c-maapi-rewrite
-
 WORKDIR /build
-RUN git clone --branch ${CLI_NETCONF_BRANCH} --depth=1 ${CLI_NETCONF_REPO} .
 
-# libconfd-server.so và libcrypto-server.so đã có trong repo
-# Đổi tên để linker tìm đúng: -lconfd, -lcrypto
-RUN cp libconfd-server.so libconfd.so \
-    && cp libcrypto-server.so libcrypto.so
+# Copy toàn bộ source từ build context (local cli-netconf repo)
+COPY src/ src/
+COPY include/ include/
+COPY Makefile .
+COPY libconfd-server.so libconfd.so
+COPY libcrypto-server.so libcrypto.so
 
 # Build với rpath trỏ thẳng tới /usr/lib/cli trong runtime container
 RUN make CONFD_LIB=/build/libconfd.so \
@@ -67,8 +68,10 @@ COPY <<'AUTH_SCRIPT' /usr/local/bin/auth-mgt.sh
 # Gọi POST /aa/authenticate lên mgt-service.
 # Input: PAM_USER (env), password (stdin từ pam_exec expose_authtok).
 # Output: exit 0 = auth OK, exit 1 = auth fail.
+# Đọc MGT URL từ /etc/mgt-url vì sshd child không kế thừa env container.
 
-MGT_URL="${MGT_SERVICE_URL:-http://mgt-service:3000}"
+MGT_URL=$(cat /etc/mgt-url 2>/dev/null)
+MGT_URL="${MGT_URL:-http://mgt-service:3000}"
 read -r PASS
 
 RESP=$(curl -sf --max-time 5 -X POST "$MGT_URL/aa/authenticate" \
@@ -90,18 +93,27 @@ AUTH_SCRIPT
 
 RUN chmod +x /usr/local/bin/auth-mgt.sh
 
-# ── CLI wrapper — chạy khi user login (ForceCommand) ────────────────────────
+# ── CLI wrapper — SSH Server Mode (không set CONFD env → CLI tự login + chọn NE)
 COPY <<'CLI_WRAPPER' /usr/local/bin/cli-wrapper.sh
 #!/bin/bash
-export LD_LIBRARY_PATH=/usr/lib/cli
-export CONFD_IPC_ADDR="${CONFD_IPC_ADDR:-127.0.0.1}"
-export CONFD_IPC_PORT="${CONFD_IPC_PORT:-4565}"
-export NE_NAME="${NE_NAME:-confd}"
-export MAAPI_USER="${USER:-admin}"
+# Wrapper chạy cli-netconf ở SSH Server Mode.
+# KHÔNG set CONFD_IPC_ADDR/PORT → CLI chạy SSH server mode.
+# Truyền MGT_SVC_TOKEN + MGT_SVC_USER từ PAM → CLI skip login, vào thẳng chọn NE.
 
-# Đưa JWT token vào env nếu có (để cli-netconf gọi history API)
+export LD_LIBRARY_PATH=/usr/lib/cli
+export MGT_SVC_BASE=$(cat /etc/mgt-url 2>/dev/null || echo "http://mgt-service:3000")
+export MAAPI_USER="${USER:-admin}"
+export LOG_LEVEL=$(cat /etc/cli-log-level 2>/dev/null || echo "info")
+export LOG_FILE="/var/log/cli-netconf/${USER:-unknown}.log"
+
+# PAM auth đã lưu JWT token → truyền cho CLI để skip login prompt
 TOKEN_FILE="/tmp/cli-tokens/$USER"
-[ -f "$TOKEN_FILE" ] && export MGT_JWT_TOKEN="$(cat "$TOKEN_FILE")"
+if [ -f "$TOKEN_FILE" ]; then
+    export MGT_SVC_TOKEN="$(cat "$TOKEN_FILE")"
+    export MGT_SVC_USER="$USER"
+fi
+
+mkdir -p /var/log/cli-netconf
 
 exec /usr/local/bin/cli-netconf
 CLI_WRAPPER
@@ -134,17 +146,71 @@ PAM_CFG
 RUN useradd -m -s /bin/bash -G sudo cliuser \
     && echo "cliuser:!" | chpasswd
 
+# ── Sync users script — fetch từ mgt-service, tạo system users cho SSH ───────
+COPY <<'SYNC_SCRIPT' /usr/local/bin/sync-users.sh
+#!/bin/bash
+# sshd cần user tồn tại trong /etc/passwd trước khi PAM auth chạy.
+# Script này lấy danh sách user từ mgt-service và tạo system users.
+
+MGT_URL="${MGT_SVC_BASE:-http://mgt-service:3000}"
+SEED_USER="${SEED_USERNAME:-anhdt195}"
+SEED_PASS="${SEED_PASSWORD:-123}"
+
+TOKEN=$(curl -sf --max-time 10 -X POST "$MGT_URL/aa/authenticate" \
+  -H "Content-Type: application/json" \
+  -d "{\"username\":\"$SEED_USER\",\"password\":\"$SEED_PASS\"}" 2>/dev/null \
+  | jq -r '.response_data // empty' 2>/dev/null)
+
+if [ -z "$TOKEN" ]; then
+  echo "sync-users: cannot login to mgt-service, creating seed user only"
+  id "$SEED_USER" &>/dev/null || useradd -m -s /bin/bash "$SEED_USER" 2>/dev/null
+  exit 0
+fi
+
+USERS=$(curl -sf --max-time 10 -H "Authorization: $TOKEN" \
+  "$MGT_URL/aa/authenticate/user/show" 2>/dev/null)
+
+if [ -n "$USERS" ]; then
+  printf '%s' "$USERS" | jq -r '
+    if type == "array" then .[].username
+    else empty end
+  ' 2>/dev/null | while read -r USERNAME; do
+    if [ -n "$USERNAME" ] && ! id "$USERNAME" &>/dev/null; then
+      useradd -m -s /bin/bash "$USERNAME" 2>/dev/null
+      echo "  sync-users: created $USERNAME"
+    fi
+  done
+  echo "sync-users: done"
+else
+  echo "sync-users: cannot fetch user list, creating seed user only"
+  id "$SEED_USER" &>/dev/null || useradd -m -s /bin/bash "$SEED_USER" 2>/dev/null
+fi
+SYNC_SCRIPT
+
+RUN chmod +x /usr/local/bin/sync-users.sh
+
 # ── Entrypoint ───────────────────────────────────────────────────────────────
 COPY <<'ENTRYPOINT' /entrypoint.sh
 #!/bin/bash
 ssh-keygen -A 2>/dev/null
 
-echo "=== CLI NETCONF (C/MAAPI) Full Mode ==="
-echo "  CONFD_IPC_ADDR:  ${CONFD_IPC_ADDR:-127.0.0.1}"
-echo "  CONFD_IPC_PORT:  ${CONFD_IPC_PORT:-4565}"
-echo "  MGT_SERVICE_URL: ${MGT_SERVICE_URL:-http://mgt-service:3000}"
-echo "  NE_NAME:         ${NE_NAME:-confd}"
-echo "  SSH port:        22"
+# Ghi config ra file (sshd child processes không kế thừa env container)
+printf '%s' "${MGT_SVC_BASE:-http://mgt-service:3000}" > /etc/mgt-url
+printf '%s' "${LOG_LEVEL:-info}" > /etc/cli-log-level
+mkdir -p /var/log/cli-netconf
+chmod 1777 /var/log/cli-netconf
+
+echo "=== CLI NETCONF SSH Server Mode ==="
+echo "  MGT_SVC_BASE:  ${MGT_SVC_BASE:-http://mgt-service:3000}"
+echo "  LOG_LEVEL:     ${LOG_LEVEL:-info}"
+echo "  SSH port:      22"
+echo ""
+
+# Sync users từ mgt-service
+/usr/local/bin/sync-users.sh
+
+echo ""
+echo "  SSH listening on port 22"
 echo ""
 
 exec /usr/sbin/sshd -D -e
@@ -154,9 +220,9 @@ RUN chmod +x /entrypoint.sh
 
 EXPOSE 22
 
-ENV CONFD_IPC_ADDR=127.0.0.1 \
-    CONFD_IPC_PORT=4565 \
-    MGT_SERVICE_URL=http://mgt-service:3000 \
-    NE_NAME=confd
+ENV MGT_SVC_BASE=http://mgt-service:3000 \
+    LOG_LEVEL=info \
+    SEED_USERNAME=anhdt195 \
+    SEED_PASSWORD=123
 
 ENTRYPOINT ["/entrypoint.sh"]

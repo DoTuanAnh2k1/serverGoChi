@@ -187,10 +187,8 @@ services:
     ports:
       - "${NETCONF_SSH_PORT:-2222}:22"
     environment:
-      CONFD_IPC_ADDR:    ${CONFD_IPC_ADDR:-127.0.0.1}
-      CONFD_IPC_PORT:    ${CONFD_IPC_PORT:-4565}
-      MGT_SERVICE_URL:   http://cli-mgt-svc:${SERVER_PORT:-9233}
-      NE_NAME:           ${NE_NAME:-confd}
+      MGT_SVC_BASE:      http://cli-mgt-svc:${SERVER_PORT:-9233}
+      LOG_LEVEL:         ${LOG_LEVEL:-info}
       SEED_USERNAME:     ${SEED_USERNAME:-anhdt195}
       SEED_PASSWORD:     ${SEED_PASSWORD:-123}
     networks:

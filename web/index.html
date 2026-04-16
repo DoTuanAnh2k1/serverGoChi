@@ -71,6 +71,7 @@ tr:hover td{background:#1e293b80}
 .user-type-0{background:#7f1d1d;color:#fca5a5}
 .user-type-1{background:#1e3a5f;color:#60a5fa}
 .user-type-2{background:#14532d;color:#4ade80}
+body.role-user .admin-only{display:none !important}
 </style>
 </head>
 <body>
@@ -103,7 +104,7 @@ tr:hover td{background:#1e293b80}
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
   <a onclick="showSection('role-mapping')" data-section="role-mapping" data-i18n="nav_role_mapping">Role Mapping</a>
   <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
-  <a onclick="showSection('import')" data-section="import" data-i18n="nav_import">Import</a>
+  <a onclick="showSection('import')" data-section="import" data-i18n="nav_import" class="admin-only">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
   <div class="lang-switch">
     <select id="langSelect" onchange="setLang(this.value)">
@@ -129,7 +130,7 @@ tr:hover td{background:#1e293b80}
 
 <!-- Users -->
 <div class="section" id="sec-users">
-  <div class="card">
+  <div class="card admin-only">
     <h3 style="margin-bottom:1rem" data-i18n="create_user">Create User</h3>
     <div class="form-row">
       <div class="form-group"><label>Username *</label><input id="newUsername" placeholder="username"></div>
@@ -164,7 +165,7 @@ tr:hover td{background:#1e293b80}
 
 <!-- Permissions -->
 <div class="section" id="sec-permissions">
-  <div class="card">
+  <div class="card admin-only">
     <h3 style="margin-bottom:1rem" data-i18n="create_permission">Create Permission</h3>
     <div class="form-row">
       <div class="form-group"><label>Permission</label><input id="newPermission" placeholder="admin"></div>
@@ -185,7 +186,7 @@ tr:hover td{background:#1e293b80}
 
 <!-- NEs -->
 <div class="section" id="sec-nes">
-  <div class="card">
+  <div class="card admin-only">
     <h3 style="margin-bottom:1rem" data-i18n="create_ne">Create Network Element</h3>
     <div class="form-row">
       <div class="form-group"><label>NE Name</label><input id="neCreateName" placeholder="HTSMF03"></div>
@@ -219,7 +220,7 @@ tr:hover td{background:#1e293b80}
 
 <!-- NE Mapping -->
 <div class="section" id="sec-ne-mapping">
-  <div class="card">
+  <div class="card admin-only">
     <h3 style="margin-bottom:1rem" data-i18n="assign_ne">Assign NE to User</h3>
     <div class="form-row">
       <div class="form-group"><label data-i18n="username">Username</label><div class="ac-wrap" id="acNeMapUser"></div></div>
@@ -235,7 +236,7 @@ tr:hover td{background:#1e293b80}
 
 <!-- Role Mapping -->
 <div class="section" id="sec-role-mapping">
-  <div class="card">
+  <div class="card admin-only">
     <h3 style="margin-bottom:1rem" data-i18n="assign_role">Assign Role to User</h3>
     <div class="form-row">
       <div class="form-group"><label data-i18n="username">Username</label><div class="ac-wrap" id="acRoleMapUser"></div></div>
@@ -273,7 +274,7 @@ tr:hover td{background:#1e293b80}
 </div>
 
 <!-- Import -->
-<div class="section" id="sec-import">
+<div class="section admin-only" id="sec-import">
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="import_data">Import Data</h3>
     <p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem" data-i18n="import_desc">Upload a file or paste import data below.</p>
@@ -309,6 +310,16 @@ let TOKEN = localStorage.getItem('mgt_token') || '';
 let USERNAME = localStorage.getItem('mgt_user') || '';
 let cachedUsers = [], cachedNes = [], cachedPerms = [], cachedAdminUsers = [];
 let LANG = localStorage.getItem('mgt_lang') || 'en';
+let IS_ADMIN = false;
+
+function detectRole() {
+  try {
+    const jwt = TOKEN.replace('Basic ', '');
+    const payload = JSON.parse(atob(jwt.split('.')[1]));
+    IS_ADMIN = payload.aud === 'admin';
+  } catch { IS_ADMIN = false; }
+  document.body.classList.toggle('role-user', !IS_ADMIN);
+}
 
 // ── i18n ──
 const I18N = {
@@ -581,9 +592,10 @@ let acNeMapUser, acNeMapNe, acRoleMapUser, acRoleMapPerm;
 function enterApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').style.display = 'block';
-  document.getElementById('currentUser').textContent = USERNAME;
+  detectRole();
+  document.getElementById('currentUser').textContent = USERNAME + (IS_ADMIN ? ' (admin)' : '');
   acNeMapUser = initAC('acNeMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
-  acNeMapNe = initAC('acNeMapNe', 'Search NE...', () => cachedNes.map(n => ({label: n.ne_name, value: String(n.id), sub: n.site_name + ' - ' + (n.conf_master_ip||'')})));
+  acNeMapNe = initAC('acNeMapNe', 'Search NE...', () => cachedNes.map(n => ({label: n.ne_name + ' (' + (n.namespace||'-') + ')', value: String(n.id), sub: 'ID:' + n.id + ' | ' + (n.site_name||'-') + ' | ' + (n.conf_master_ip||'')})));
   acRoleMapUser = initAC('acRoleMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
   acRoleMapPerm = initAC('acRoleMapPerm', 'Search permission...', () => { const unique=[...new Set(cachedPerms.map(p=>p.permission))]; return unique.map(p=>({label:p,value:p})); });
   refreshCaches().then(() => showSection('dashboard'));
@@ -606,7 +618,7 @@ async function loadUsers() {
   if(!data.length){document.getElementById('usersTable').innerHTML='<div class="empty">No users found</div>';return;}
   const typeLabel = {0:'SuperAdmin',1:'Admin',2:'Normal'};
   const typeClass = {0:'user-type-0',1:'user-type-1',2:'user-type-2'};
-  let html='<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Full Name</th><th>Phone</th><th>Type</th><th>Enabled</th><th>Actions</th></tr></thead><tbody>';
+  let html='<table><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Full Name</th><th>Phone</th><th>Type</th><th>Enabled</th><th class="admin-only">Actions</th></tr></thead><tbody>';
   data.forEach(u=>{
     const typ='<span class="user-type '+esc(typeClass[u.account_type]||'')+'">'+esc(typeLabel[u.account_type]||String(u.account_type))+'</span>';
     const enabled=u.is_enable?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>';
@@ -617,7 +629,7 @@ async function loadUsers() {
       +'<td>'+esc(u.phone_number||'-')+'</td>'
       +'<td>'+typ+'</td>'
       +'<td>'+enabled+'</td>'
-      +'<td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button></td></tr>';
+      +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button></td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('usersTable').innerHTML=html;
@@ -639,7 +651,7 @@ async function createUser(){
 async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const{status}=await api('POST','/authenticate/user/delete',{account_name:username});if(status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast('Failed','error');}
 
 // ── Permissions ──
-async function loadPermissions(){const data=cachedPerms;if(!data.length){document.getElementById('permissionsTable').innerHTML='<div class="empty">No permissions</div>';return;}let html='<table><thead><tr><th>ID</th><th>Permission</th><th>Scope</th><th>NE Type</th><th>Include Type</th><th>Path</th><th>Actions</th></tr></thead><tbody>';data.forEach(p=>{html+='<tr><td>'+(p.role_id||p.id||'-')+'</td><td><span class="badge badge-green">'+esc(p.permission||'-')+'</span></td><td>'+esc(p.scope||'-')+'</td><td>'+esc(p.ne_type||'-')+'</td><td>'+esc(p.include_type||'-')+'</td><td>'+esc(p.path||'-')+'</td><td class="actions"><button class="btn btn-danger btn-sm" onclick="deletePermission(\''+esc(p.permission||'')+'\',\''+esc(p.scope||'')+'\',\''+esc(p.ne_type||'')+'\',\''+esc(p.include_type||'')+'\',\''+esc(p.path||'')+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('permissionsTable').innerHTML=html;}
+async function loadPermissions(){const data=cachedPerms;if(!data.length){document.getElementById('permissionsTable').innerHTML='<div class="empty">No permissions</div>';return;}let html='<table><thead><tr><th>ID</th><th>Permission</th><th>Scope</th><th>NE Type</th><th>Include Type</th><th>Path</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(p=>{html+='<tr><td>'+(p.role_id||p.id||'-')+'</td><td><span class="badge badge-green">'+esc(p.permission||'-')+'</span></td><td>'+esc(p.scope||'-')+'</td><td>'+esc(p.ne_type||'-')+'</td><td>'+esc(p.include_type||'-')+'</td><td>'+esc(p.path||'-')+'</td><td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deletePermission(\''+esc(p.permission||'')+'\',\''+esc(p.scope||'')+'\',\''+esc(p.ne_type||'')+'\',\''+esc(p.include_type||'')+'\',\''+esc(p.path||'')+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('permissionsTable').innerHTML=html;}
 async function createPermission(){const permission=document.getElementById('newPermission').value;const scope=document.getElementById('newScope').value;const ne_type=document.getElementById('newNeType').value;const include_type=document.getElementById('newIncludeType').value;const path=document.getElementById('newPath').value;if(!permission){toast('Permission required','error');return;}const{status}=await api('POST','/authorize/permission/set',{permission,scope,ne_type,include_type,path});if(status===201){toast('Created');['newPermission','newScope','newNeType','newIncludeType','newPath'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadPermissions();}else toast('Failed','error');}
 async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const{status}=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast('Failed','error');}
 
@@ -647,7 +659,7 @@ async function deletePermission(permission,scope,ne_type,include_type,path){if(!
 async function loadNes(){
   const data=cachedNes;
   if(!data.length){document.getElementById('nesTable').innerHTML='<div class="empty">No NEs</div>';return;}
-  let html='<table><thead><tr><th>ID</th><th>NE Name</th><th>Site</th><th>Namespace</th><th>Command URL</th><th>Mode</th><th>Master IP</th><th>SSH Port</th><th>TCP Port</th><th>Slave IP</th><th>Description</th><th>Actions</th></tr></thead><tbody>';
+  let html='<table><thead><tr><th>ID</th><th>NE Name</th><th>Site</th><th>Namespace</th><th>Command URL</th><th>Mode</th><th>Master IP</th><th>SSH Port</th><th>TCP Port</th><th>Slave IP</th><th>Description</th><th class="admin-only">Actions</th></tr></thead><tbody>';
   data.forEach(n=>{
     html+='<tr><td>'+n.id+'</td>'
       +'<td><span class="badge badge-blue">'+esc(n.ne_name||'-')+'</span></td>'
@@ -660,7 +672,7 @@ async function loadNes(){
       +'<td>'+(n.conf_port_master_tcp||'-')+'</td>'
       +'<td>'+esc(n.conf_slave_ip||'-')+'</td>'
       +'<td>'+esc(n.description||'-')+'</td>'
-      +'<td class="actions"><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button></td></tr>';
+      +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button></td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('nesTable').innerHTML=html;
@@ -688,12 +700,12 @@ async function createNe(){
 }
 
 // ── NE Mapping ──
-async function loadNeMapping(){const data=cachedUsers;const neIdMap={};cachedNes.forEach(n=>{neIdMap[n.ne_name]=n.id;});if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>NEs</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const nes=(u.tblNes||[]);const nesBadges=nes.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' ('+esc(n.site)+')</span>').join(' ')||'<span style="color:#64748b">None</span>';const removeButtons=nes.map(n=>{const neid=neIdMap[n.ne]||'';return '<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+neid+')">'+esc(n.ne)+' &times;</button>';}).join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+nesBadges+'</td><td class="actions">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('neMappingTable').innerHTML=html;}
+async function loadNeMapping(){const data=cachedUsers;if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>NEs</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(u=>{const nes=(u.tblNes||[]);const nesBadges=nes.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' <span class="ac-sub">('+esc(n.namespace||'-')+')</span></span>').join(' ')||'<span style="color:#64748b">None</span>';const removeButtons=nes.map(n=>'<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+n.id+')">'+esc(n.ne)+' ('+esc(n.namespace||'-')+') &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+nesBadges+'</td><td class="actions admin-only">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('neMappingTable').innerHTML=html;}
 async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+username+'?'))return;const{status}=await api('POST','/authorize/ne/delete',{username,neid:String(neid)});if(status===200){toast('Removed');await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 async function assignNe(){const username=acNeMapUser.getValue();const neid=acNeMapNe.getValue();if(!username||!neid){toast('Select user and NE','error');return;}const{status}=await api('POST','/authorize/ne/set',{username,neid});if(status===200){toast('Assigned');acNeMapUser.clear();acNeMapNe.clear();await refreshCaches();loadNeMapping();}else toast('Failed','error');}
 
 // ── Role Mapping ──
-async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permissions</th><th>Actions</th></tr></thead><tbody>';data.forEach(u=>{const permList=u.permissions?u.permissions.split(' ').filter(Boolean):[];const permsBadges=permList.length>0?permList.map(p=>'<span class="badge badge-green">'+esc(p)+'</span>').join(' '):'<span style="color:#64748b">None</span>';const removeButtons=permList.map(p=>'<button class="btn btn-danger btn-sm" onclick="removeRole(\''+esc(u.username)+'\',\''+esc(p)+'\')">'+esc(p)+' &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+permsBadges+'</td><td class="actions">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
+async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permissions</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(u=>{const permList=u.permissions?u.permissions.split(' ').filter(Boolean):[];const permsBadges=permList.length>0?permList.map(p=>'<span class="badge badge-green">'+esc(p)+'</span>').join(' '):'<span style="color:#64748b">None</span>';const removeButtons=permList.map(p=>'<button class="btn btn-danger btn-sm" onclick="removeRole(\''+esc(u.username)+'\',\''+esc(p)+'\')">'+esc(p)+' &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+permsBadges+'</td><td class="actions admin-only">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
 async function assignRole(){const username=acRoleMapUser.getValue();const permission=acRoleMapPerm.getValue();if(!username||!permission){toast('Select user and permission','error');return;}const{status}=await api('POST','/authorize/user/set',{username,permission});if(status===200){toast('Assigned');acRoleMapUser.clear();acRoleMapPerm.clear();await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
 async function removeRole(username,permission){if(!confirm('Remove '+permission+' from '+username+'?'))return;const{status}=await api('POST','/authorize/user/delete',{username,permission});if(status===200){toast('Removed');loadRoleMapping();}else toast('Failed','error');}
 

@@ -311,7 +311,7 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 			if err != nil || ne == nil {
 				continue
 			}
-			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName})
+			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName, ID: ne.ID, Namespace: ne.Namespace})
 		}
 		result = append(result, userShowAuthenticateResp{
 			Username: u.AccountName,
@@ -354,6 +354,8 @@ type userShowAuthenticateResp struct {
 }
 
 type tblNe struct {
-	Ne   string `json:"ne"`
-	Site string `json:"site"`
+	Ne        string `json:"ne"`
+	Site      string `json:"site"`
+	ID        int64  `json:"id"`
+	Namespace string `json:"namespace"`
 }
