@@ -32,8 +32,8 @@ func HandlerAdminNeCreate(w http.ResponseWriter, r *http.Request) {
 		response.Write(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	if req.NeName == "" {
-		response.Write(w, http.StatusBadRequest, "ne_name is required")
+	if req.NeName == "" || req.Namespace == "" || req.ConfMasterIP == "" || req.ConfPortMasterTCP == 0 || req.CommandURL == "" {
+		response.Write(w, http.StatusBadRequest, "ne_name, namespace, conf_master_ip, conf_port_master_tcp and command_url are required")
 		return
 	}
 	if req.SystemType == "" {

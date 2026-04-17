@@ -1,4 +1,4 @@
-// CLI tool to import users, NEs, user-NE mappings, and user-role mappings
+// CLI tool to import users, NEs, user-NE mappings, and permissions
 // from a text file into the database.
 //
 // Usage:
@@ -8,22 +8,17 @@
 // File format (sections separated by blank lines, # comments allowed):
 //
 //	[users]
-//	username,password
-//	admin,admin123
-//	operator1,Pass@123
+//	username,password,email
+//	admin,admin123,admin@vht.com
 //
 //	[nes]
-//	name,site_name,ip_address,port,namespace,description
-//	HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
-//
-//	[roles]
-//	permission,scope,ne_type,include_type,path
-//	admin,ext-config,5GC,include,/
+//	ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
+//	HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
 //
 //	[user_roles]
 //	username,permission
 //	admin,admin
-//	operator1,operator
+//	operator1,user
 //
 //	[user_nes]
 //	username,ne_name
@@ -60,16 +55,12 @@ func main() {
 		fmt.Println("\nFile format example:")
 		fmt.Println(`
 [users]
-username,password
-admin,admin123
+username,password,email
+admin,admin123,admin@vht.com
 
 [nes]
-name,site_name,ip_address,port,namespace,description
-HTSMF01,HCM,10.10.1.1,22,hcm-5gc,HCM SMF Node 01
-
-[roles]
-permission,scope,ne_type,include_type,path
-admin,ext-config,5GC,include,/
+ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
+HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
 
 [user_roles]
 username,permission

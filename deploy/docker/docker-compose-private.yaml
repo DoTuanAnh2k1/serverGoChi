@@ -147,22 +147,6 @@ services:
     volumes:
       - app_data:/data
 
-  frontend:
-    build:
-      context: ../..
-      dockerfile: deploy/docker/Dockerfile_frontend_private
-    container_name: mgt-frontend
-    restart: unless-stopped
-    depends_on:
-      - cli-mgt-svc
-    ports:
-      - "${FRONTEND_PORT:-8080}:${FRONTEND_PORT:-8080}"
-    networks:
-      - mgt-net
-    environment:
-      MGT_API_URL: http://cli-mgt-svc:${SERVER_PORT:-9233}/aa
-      FRONTEND_PORT: ${FRONTEND_PORT:-8080}
-
   cli-command-svc:
     image: cli # TODO: điền image name vào đây
     container_name: cli-command-svc

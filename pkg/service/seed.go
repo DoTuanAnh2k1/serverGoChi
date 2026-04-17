@@ -20,8 +20,7 @@ const (
 func SeedDefaultUser() {
 	existing, err := GetUserByUserName(SeedUsername)
 	if err != nil {
-		logger.Logger.Errorf("seed: check user %q: %v", SeedUsername, err)
-		return
+		logger.Logger.Errorf("seed: check user %q: %v — will retry", SeedUsername, err)
 	}
 	if existing != nil {
 		logger.Logger.Infof("seed: user %q already exists, skip", SeedUsername)
@@ -44,8 +43,8 @@ func SeedDefaultUser() {
 	}
 
 	if err := AddUser(user); err != nil {
-		logger.Logger.Errorf("seed: create user %q: %v", SeedUsername, err)
-		return
+		// Seed user is critical — panic so container restarts and retries
+		logger.Logger.Fatalf("seed: cannot create default user %q: %v", SeedUsername, err)
 	}
 	logger.Logger.Infof("seed: created default user %q", SeedUsername)
 }

@@ -3,12 +3,12 @@ package store
 import (
 	"time"
 
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/config"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/mongodb"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/mysql"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/repository/postgres"
-	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
-	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
 var (
@@ -27,18 +27,19 @@ func SetSingleton(s DatabaseStore) {
 func Init() {
 	cfg := config.GetDatabaseConfig()
 	switch cfg.DbType {
-	case "mysql":
+	case "mysql", "mariadb":
 		store = mysql.GetInstance()
 	case "mongodb":
 		store = mongodb.GetInstance()
 	case "postgres":
 		store = postgres.GetInstance()
 	default:
-		panic("unsupported database type")
+		panic("unsupported database type: " + cfg.DbType)
 	}
+
 	err := store.Init(cfg)
 	if err != nil {
-		panic("cant init store")
+		panic("store: failed to connect: " + err.Error())
 	}
 }
 

@@ -18,18 +18,12 @@ HNSMF01,HN,hn-5gc,http://10.20.1.1:8080,NETCONF,10.20.1.1,830,admin,admin,Ha Noi
 HNAMF01,HN,hn-5gc,http://10.20.2.1:8080,NETCONF,10.20.2.1,830,admin,admin,Ha Noi AMF Node 01
 DNUPF01,DN,dn-5gc,http://10.30.3.1:8080,SSH,10.30.3.1,22,admin,admin,Da Nang UPF Node 01
 
-[roles]
-permission,scope,ne_type,include_type,path
-admin,ext-config,5GC,include,/
-operator,ext-config,5GC,include,/
-viewer,ext-config,5GC,include,/
-
 [user_roles]
 username,permission
 admin,admin
-operator1,operator
-operator2,operator
-viewer1,viewer
+operator1,admin
+operator2,user
+viewer1,user
 
 [user_nes]
 username,ne_name

@@ -24,6 +24,9 @@ func GetTblIdByUserId(userId int64) (int64, error) {
 		logger.Logger.WithField("user_id", userId).Errorf("auth: get user-ne mapping: %v", err)
 		return 0, err
 	}
+	if mapping == nil {
+		return 0, nil
+	}
 	return mapping.TblNeID, nil
 }
 
@@ -50,6 +53,10 @@ func Authenticate(username, password string) (bool, error, int64) {
 	if err != nil {
 		logger.Logger.WithField("user", username).Errorf("auth: get user: %v", err)
 		return false, err, -1
+	}
+	if u == nil {
+		logger.Logger.WithField("user", username).Warn("auth: user not found")
+		return false, nil, -1
 	}
 	if !u.IsEnable {
 		logger.Logger.WithField("user", username).Warn("auth: login attempt on disabled account")

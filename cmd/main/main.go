@@ -25,22 +25,43 @@ import (
 )
 
 func main() {
-	svr := Initialize()
+	log.Println("[1/7] Loading config...")
+	cfg := loadConfig()
+
+	log.Println("[2/7] Initializing logger...")
+	config.Init(cfg)
+	logger.Init(cfg.Log.Level, cfg.Log.DbLevel)
+
+	log.Println("[3/7] Connecting to database...")
+	store.Init()
+
+	log.Println("[4/7] Initializing HTTP router...")
+	handler.Init()
+
+	log.Println("[5/7] Starting TCP subscriber server...")
+	startTCPServer()
+
+	log.Println("[6/7] Starting optional services (pprof, swagger, leader)...")
+	startOptionalServices(cfg)
+
+	log.Println("[7/7] Starting HTTP server...")
+	svr := server.NewServer(handler.Router)
 	svr.Start()
-	stopOrKillServer(svr)
+
+	// Seed default data after server is running
+	go func() {
+		log.Println("[seed] Ensuring default user exists...")
+		service.SeedDefaultUser()
+		service.SeedDefaultNes()
+		log.Println("[seed] Done.")
+	}()
+
+	waitForShutdown(svr)
 }
 
-func stopOrKillServer(svr *server.Server) {
-	signals := make(chan os.Signal, 1)
-	signal.Notify(signals, syscall.SIGTERM, syscall.SIGKILL, syscall.SIGINT, os.Interrupt)
-	sig := <-signals
-	fmt.Println("Receive Signal from OS - Release resource")
-	fmt.Println(sig)
-	svr.Stop()
-	os.Exit(0)
-}
+// ── Config ──────────────────────────────────────────────────────────────────
 
-func Initialize() *server.Server {
+func loadConfig() *config_models.Config {
 	if err := godotenv.Load(); err != nil {
 		log.Println("Warning: .env file not found, using system environment variables")
 	}
@@ -50,7 +71,7 @@ func Initialize() *server.Server {
 		expiryHours = 24
 	}
 
-	cfg := &config_models.Config{
+	return &config_models.Config{
 		Svr: config_models.ServerConfig{
 			Host: os.Getenv("SERVER_HOST"),
 			Port: os.Getenv("SERVER_PORT"),
@@ -65,16 +86,16 @@ func Initialize() *server.Server {
 				Name:     os.Getenv("MYSQL_DB_NAME"),
 			},
 			Mongo: config_models.MongoConfig{
-				URI:      getEnvOrDefault("MONGODB_URI", "mongodb://localhost:27017"),
-				Database: getEnvOrDefault("MONGODB_DB_NAME", "cli_db"),
+				URI:      env("MONGODB_URI", "mongodb://localhost:27017"),
+				Database: env("MONGODB_DB_NAME", "cli_db"),
 			},
 			Postgres: config_models.PostgresConfig{
-				Host:     getEnvOrDefault("POSTGRES_HOST", "localhost"),
-				Port:     getEnvOrDefault("POSTGRES_PORT", "5432"),
+				Host:     env("POSTGRES_HOST", "localhost"),
+				Port:     env("POSTGRES_PORT", "5432"),
 				User:     os.Getenv("POSTGRES_USER"),
 				Password: os.Getenv("POSTGRES_PASSWORD"),
-				Name:     getEnvOrDefault("POSTGRES_DB_NAME", "cli_db"),
-				SSLMode:  getEnvOrDefault("POSTGRES_SSLMODE", "disable"),
+				Name:     env("POSTGRES_DB_NAME", "cli_db"),
+				SSLMode:  env("POSTGRES_SSLMODE", "disable"),
 			},
 		},
 		Log: config_models.LogConfig{
@@ -87,80 +108,16 @@ func Initialize() *server.Server {
 		},
 		Router: config_models.RouterConfig{
 			BasePath: os.Getenv("ROUTER_BASE_PATH"),
-			Origins:  getEnvOrDefault("CORS_ORIGINS", "*"),
-			Methods:  getEnvOrDefault("CORS_METHODS", "GET,POST,DELETE,PUT,OPTIONS"),
-			Headers:  getEnvOrDefault("CORS_HEADERS", "Content-Type,Authorization"),
+			Origins:  env("CORS_ORIGINS", "*"),
+			Methods:  env("CORS_METHODS", "GET,POST,DELETE,PUT,OPTIONS"),
+			Headers:  env("CORS_HEADERS", "Content-Type,Authorization"),
 		},
-		Leader: buildLeaderConfig(),
+		Leader: loadLeaderConfig(),
 	}
-
-	config.Init(cfg)
-	logger.Init(cfg.Log.Level, cfg.Log.DbLevel)
-	handler.Init()
-	store.Init()
-	service.SeedDefaultUser()
-	service.SeedDefaultNes()
-
-	tcpAddr := ":" + getEnvOrDefault("TCP_LISTEN_PORT", "3675")
-	tcpDataDir := getEnvOrDefault("TCP_DATA_DIR", ".")
-	tcp := tcpserver.New(tcpAddr, tcpDataDir)
-	if err := tcp.Start(); err != nil {
-		log.Fatalf("tcp server: %v", err)
-	}
-
-	// pprof server on port 6060 (only if PPROF_ENABLED=true)
-	if os.Getenv("PPROF_ENABLED") == "true" {
-		pprofAddr := getEnvOrDefault("PPROF_ADDR", ":6060")
-		go func() {
-			logger.Logger.Infof("pprof: listening on %s", pprofAddr)
-			if err := http.ListenAndServe(pprofAddr, nil); err != nil {
-				logger.Logger.Errorf("pprof: %v", err)
-			}
-		}()
-	}
-
-	// Swagger UI server (only if SWAGGER_PORT is set)
-	if swaggerPort := os.Getenv("SWAGGER_PORT"); swaggerPort != "" {
-		swaggerAddr := ":" + swaggerPort
-		go func() {
-			mux := http.NewServeMux()
-			mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
-				specPath := getEnvOrDefault("API_SPEC_PATH", "api.yaml")
-				data, err := os.ReadFile(specPath)
-				if err != nil {
-					http.Error(w, "api spec not found", http.StatusNotFound)
-					return
-				}
-				w.Header().Set("Content-Type", "application/yaml")
-				w.WriteHeader(http.StatusOK)
-				w.Write(data)
-			})
-			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-				w.Header().Set("Content-Type", "text/html; charset=utf-8")
-				fmt.Fprint(w, handler.SwaggerUIHTML("/openapi.yaml"))
-			})
-			logger.Logger.Infof("swagger: listening on %s", swaggerAddr)
-			if err := http.ListenAndServe(swaggerAddr, mux); err != nil {
-				logger.Logger.Errorf("swagger: %v", err)
-			}
-		}()
-	}
-
-	if cfg.Leader.Enabled {
-		ctx := context.Background()
-		go leader.Start(ctx, cfg.Leader, func(leaderCtx context.Context) {
-			leader.RunTasks(leaderCtx, cfg.Leader)
-		})
-	} else {
-		logger.Logger.Info("leader election disabled (LEADER_ELECTION_ENABLED=false)")
-	}
-
-	return server.NewServer(handler.Router)
 }
 
-func buildLeaderConfig() config_models.LeaderConfig {
+func loadLeaderConfig() config_models.LeaderConfig {
 	enabled := os.Getenv("LEADER_ELECTION_ENABLED") == "true"
-
 	leaseDuration, _ := strconv.Atoi(os.Getenv("LEASE_DURATION_SECONDS"))
 	renewDeadline, _ := strconv.Atoi(os.Getenv("RENEW_DEADLINE_SECONDS"))
 	retryPeriod, _ := strconv.Atoi(os.Getenv("RETRY_PERIOD_SECONDS"))
@@ -171,20 +128,90 @@ func buildLeaderConfig() config_models.LeaderConfig {
 
 	return config_models.LeaderConfig{
 		Enabled:              enabled,
-		LeaseName:            getEnvOrDefault("LEASE_LOCK_NAME", "mgt-service-leader"),
-		Namespace:            getEnvOrDefault("LEASE_LOCK_NAMESPACE", "default"),
-		PodName:              getEnvOrDefault("POD_NAME", "unknown-pod"),
+		LeaseName:            env("LEASE_LOCK_NAME", "mgt-service-leader"),
+		Namespace:            env("LEASE_LOCK_NAMESPACE", "default"),
+		PodName:              env("POD_NAME", "unknown-pod"),
 		LeaseDurationSeconds: leaseDuration,
 		RenewDeadlineSeconds: renewDeadline,
 		RetryPeriodSeconds:   retryPeriod,
-		CSVExportDir:         getEnvOrDefault("CSV_EXPORT_DIR", "/data/csv"),
+		CSVExportDir:         env("CSV_EXPORT_DIR", "/data/csv"),
 		CSVExportHour:        csvExportHour,
 	}
 }
 
-func getEnvOrDefault(key, defaultVal string) string {
+// ── Services ────────────────────────────────────────────────────────────────
+
+func startTCPServer() {
+	addr := ":" + env("TCP_LISTEN_PORT", "3675")
+	dataDir := env("TCP_DATA_DIR", ".")
+	tcp := tcpserver.New(addr, dataDir)
+	if err := tcp.Start(); err != nil {
+		log.Fatalf("tcp server: %v", err)
+	}
+}
+
+func startOptionalServices(cfg *config_models.Config) {
+	// pprof
+	if os.Getenv("PPROF_ENABLED") == "true" {
+		addr := env("PPROF_ADDR", ":6060")
+		go func() {
+			logger.Logger.Infof("pprof: listening on %s", addr)
+			if err := http.ListenAndServe(addr, nil); err != nil {
+				logger.Logger.Errorf("pprof: %v", err)
+			}
+		}()
+	}
+
+	// Swagger UI
+	if port := os.Getenv("SWAGGER_PORT"); port != "" {
+		addr := ":" + port
+		go func() {
+			mux := http.NewServeMux()
+			mux.HandleFunc("/openapi.yaml", func(w http.ResponseWriter, r *http.Request) {
+				data, err := os.ReadFile(env("API_SPEC_PATH", "api.yaml"))
+				if err != nil {
+					http.Error(w, "api spec not found", http.StatusNotFound)
+					return
+				}
+				w.Header().Set("Content-Type", "application/yaml")
+				w.Write(data)
+			})
+			mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				fmt.Fprint(w, handler.SwaggerUIHTML("/openapi.yaml"))
+			})
+			logger.Logger.Infof("swagger: listening on %s", addr)
+			if err := http.ListenAndServe(addr, mux); err != nil {
+				logger.Logger.Errorf("swagger: %v", err)
+			}
+		}()
+	}
+
+	// Leader election
+	if cfg.Leader.Enabled {
+		go leader.Start(context.Background(), cfg.Leader, func(ctx context.Context) {
+			leader.RunTasks(ctx, cfg.Leader)
+		})
+	} else {
+		logger.Logger.Info("leader election disabled")
+	}
+}
+
+// ── Shutdown ────────────────────────────────────────────────────────────────
+
+func waitForShutdown(svr *server.Server) {
+	signals := make(chan os.Signal, 1)
+	signal.Notify(signals, syscall.SIGTERM, syscall.SIGINT, os.Interrupt)
+	sig := <-signals
+	log.Printf("Received %s, shutting down...", sig)
+	svr.Stop()
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+func env(key, fallback string) string {
 	if v := os.Getenv(key); v != "" {
 		return v
 	}
-	return defaultVal
+	return fallback
 }
