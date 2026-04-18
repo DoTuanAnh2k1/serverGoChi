@@ -8,6 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/bcrypt"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler/middleware"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
@@ -252,5 +253,186 @@ func TestHandlerAuthorizeUserShow_ReturnsPermissions(t *testing.T) {
 	}
 	if perms["bob"] != "user" {
 		t.Errorf("bob permission: got %q, want %q", perms["bob"], "user")
+	}
+}
+
+// ── HandlerChangePassword ─────────────────────────────────────────────────────
+
+func TestHandlerChangePassword_Success(t *testing.T) {
+	hashed := bcrypt.Encode("alice" + "old-pass")
+	var savedPassword string
+	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
+			return &db_models.TblAccount{AccountID: 1, AccountName: name, Password: hashed}, nil
+		},
+		UpdateUserFn: func(u *db_models.TblAccount) error {
+			savedPassword = u.Password
+			return nil
+		},
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{
+		"username":     "alice",
+		"old_password": "old-pass",
+		"new_password": "brand-new-pass",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerChangePassword(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status: got %d, want 200", w.Code)
+	}
+	if savedPassword == "" {
+		t.Fatal("UpdateUser was not called with hashed new password")
+	}
+	if !bcrypt.Matches("alice"+"brand-new-pass", savedPassword) {
+		t.Error("new password hash does not match expected plaintext")
+	}
+}
+
+func TestHandlerChangePassword_WrongOldPassword(t *testing.T) {
+	hashed := bcrypt.Encode("alice" + "real-pass")
+	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
+			return &db_models.TblAccount{AccountID: 1, AccountName: name, Password: hashed}, nil
+		},
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{
+		"username":     "alice",
+		"old_password": "wrong-pass",
+		"new_password": "new-pass",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerChangePassword(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status: got %d, want 403", w.Code)
+	}
+}
+
+func TestHandlerChangePassword_DifferentTargetUserRejected(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{
+		"username":     "bob",
+		"old_password": "x",
+		"new_password": "y",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerChangePassword(w, req)
+
+	if w.Code != http.StatusUnauthorized {
+		t.Errorf("status: got %d, want 401 (cannot change another user's password)", w.Code)
+	}
+}
+
+func TestHandlerChangePassword_InvalidBody(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{})
+
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader([]byte("not-json")))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerChangePassword(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400", w.Code)
+	}
+}
+
+// ── HandlerAdminResetPassword ─────────────────────────────────────────────────
+
+func TestHandlerAdminResetPassword_Success(t *testing.T) {
+	var savedPassword string
+	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
+			return &db_models.TblAccount{AccountID: 5, AccountName: name, AccountType: 2}, nil
+		},
+		UpdateUserFn: func(u *db_models.TblAccount) error {
+			savedPassword = u.Password
+			return nil
+		},
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{"username": "bob", "new_password": "fresh-pass"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerAdminResetPassword(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Errorf("status: got %d, want 200", w.Code)
+	}
+	if !bcrypt.Matches("bob"+"fresh-pass", savedPassword) {
+		t.Error("password hash does not match expected username+plaintext")
+	}
+}
+
+func TestHandlerAdminResetPassword_MissingFields(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{})
+
+	body, _ := json.Marshal(map[string]string{"username": "bob"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerAdminResetPassword(w, req)
+
+	if w.Code != http.StatusBadRequest {
+		t.Errorf("status: got %d, want 400", w.Code)
+	}
+}
+
+func TestHandlerAdminResetPassword_UserNotFound(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) { return nil, nil },
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{"username": "ghost", "new_password": "p"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerAdminResetPassword(w, req)
+
+	if w.Code != http.StatusNotFound {
+		t.Errorf("status: got %d, want 404", w.Code)
+	}
+}
+
+func TestHandlerAdminResetPassword_RejectsSuperAdminTarget(t *testing.T) {
+	store.SetSingleton(&testutil.MockStore{
+		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
+			return &db_models.TblAccount{AccountID: 1, AccountName: name, AccountType: 0}, nil
+		},
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
+	})
+
+	body, _ := json.Marshal(map[string]string{"username": "root", "new_password": "p"})
+	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
+	req = injectUser(req, "alice")
+	w := httptest.NewRecorder()
+
+	handler.HandlerAdminResetPassword(w, req)
+
+	if w.Code != http.StatusForbidden {
+		t.Errorf("status: got %d, want 403 (cannot reset SuperAdmin password)", w.Code)
 	}
 }

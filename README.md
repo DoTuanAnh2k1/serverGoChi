@@ -141,9 +141,9 @@ Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / Eng
 | Tab | Mô tả |
 |---|---|
 | Dashboard | Tổng quan users, NEs |
-| Users | Tạo (username*, email*, password* + optional fields) / vô hiệu hóa / sửa user |
-| Network Elements | Tạo (ne_name*, namespace*, master_ip*, master_tcp_port*, command_url* + optional) / sửa / xóa NE |
-| NE Mapping | Gán / xóa NE cho user (autocomplete search) |
+| Users | Tạo (có password + confirm password) / sửa thông tin / admin reset password / đổi mật khẩu của chính mình / vô hiệu hóa |
+| Network Elements | Tạo / sửa (inline edit) / xóa NE |
+| NE Mapping | Gán nhiều NE cho 1 user (multi-select chips) / xóa mapping |
 | History | Lịch sử thao tác, filter theo scope (cli-config/ne-command/ne-config) và NE |
 | Import | Upload file hoặc paste data để import hàng loạt |
 | Guide | Hướng dẫn sử dụng (song ngữ) |
@@ -171,7 +171,7 @@ Header: `Authorization: Basic <jwt_token>` (token từ `/aa/authenticate` đã c
 |---|---|---|
 | `POST` | `/aa/authenticate` | Đăng nhập, lấy JWT |
 | `POST` | `/aa/validate-token` | Kiểm tra token |
-| `POST` | `/aa/change-password` | Đổi mật khẩu |
+| `POST` | `/aa/change-password/` | Đổi mật khẩu của chính mình (yêu cầu old_password) |
 | `POST` | `/aa/authenticate/user/set` | Tạo / kích hoạt lại user |
 | `POST` | `/aa/authenticate/user/delete` | Vô hiệu hóa user |
 | `GET`  | `/aa/authenticate/user/show` | Danh sách user kèm NE & role |

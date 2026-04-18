@@ -1,7 +1,7 @@
 openapi: 3.0.3
 info:
   title: cli-mgt-svc
-  version: "2.3"
+  version: "2.4"
   description: |
     REST API for user management, Network Element (NE) management,
     NE connection config, NETCONF config backup, command history, and bulk import.
@@ -164,10 +164,13 @@ paths:
         "401":
           $ref: "#/components/responses/Unauthorized"
 
-  /aa/change-password:
+  /aa/change-password/:
     post:
       tags: [Authentication]
       summary: Change own password (requires old password)
+      description: |
+        Only allows a user to change their own password — `username` in the body
+        must match the authenticated user, else 401.
       operationId: changePassword
       security:
         - bearerAuth: []

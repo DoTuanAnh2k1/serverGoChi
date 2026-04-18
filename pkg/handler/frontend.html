@@ -39,7 +39,7 @@ tr:hover td{background:#1e293b80}
 .badge-blue{background:#1e3a5f;color:#60a5fa}
 .badge-green{background:#14532d;color:#4ade80}
 .badge-red{background:#7f1d1d;color:#fca5a5}
-.toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.85rem;z-index:9999;animation:slideIn .3s ease}
+.toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.85rem;z-index:9999;animation:slideIn .3s ease;max-width:480px;word-break:break-word;line-height:1.4;white-space:pre-wrap;cursor:pointer}
 .toast-success{background:#065f46;color:#6ee7b7;border:1px solid #059669}
 .toast-error{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
@@ -72,6 +72,14 @@ tr:hover td{background:#1e293b80}
 .user-type-1{background:#1e3a5f;color:#60a5fa}
 .user-type-2{background:#14532d;color:#4ade80}
 body.role-user .admin-only{display:none !important}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:9000}
+.modal-overlay.show{display:flex}
+.modal-box{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:1.5rem;width:480px;max-width:92vw;max-height:90vh;overflow-y:auto}
+.modal-box h3{color:#60a5fa;margin-bottom:1rem}
+.modal-actions{display:flex;gap:.5rem;justify-content:flex-end;margin-top:1rem}
+.chips{display:flex;flex-wrap:wrap;gap:.35rem;margin-bottom:.4rem;min-height:1.5rem}
+.chip{background:#334155;color:#e2e8f0;padding:.2rem .55rem;border-radius:4px;font-size:.8rem;display:inline-flex;align-items:center;gap:.4rem}
+.chip-x{cursor:pointer;color:#94a3b8;font-weight:bold;line-height:1}.chip-x:hover{color:#fca5a5}
 </style>
 </head>
 <body>
@@ -119,7 +127,8 @@ body.role-user .admin-only{display:none !important}
   <h1 id="pageTitle">Dashboard</h1>
   <div>
     <span style="color:#64748b;font-size:.85rem;margin-right:1rem" id="currentUser"></span>
-    <button class="btn btn-outline btn-sm" onclick="doLogout()" data-i18n="logout">Logout</button>
+    <button class="btn btn-outline btn-sm" onclick="openChangePasswordModal()" data-i18n="change_my_password">Change Password</button>
+    <button class="btn btn-outline btn-sm" onclick="doLogout()" data-i18n="logout" style="margin-left:.4rem">Logout</button>
   </div>
 </div>
 
@@ -135,7 +144,10 @@ body.role-user .admin-only{display:none !important}
     <div class="form-row">
       <div class="form-group"><label>Username *</label><input id="newUsername" placeholder="username"></div>
       <div class="form-group"><label>Email *</label><input id="newEmail" placeholder="user@example.com" type="email"></div>
+    </div>
+    <div class="form-row">
       <div class="form-group"><label>Password *</label><input id="newPassword" type="password" placeholder="password"></div>
+      <div class="form-group"><label data-i18n="confirm_password">Confirm Password *</label><input id="newPassword2" type="password" placeholder="re-enter password"></div>
     </div>
     <span class="optional-toggle" onclick="document.getElementById('userOptFields').classList.toggle('show')">+ Optional fields</span>
     <div id="userOptFields" class="optional-fields">
@@ -187,7 +199,7 @@ body.role-user .admin-only{display:none !important}
 <!-- NEs -->
 <div class="section" id="sec-nes">
   <div class="card admin-only">
-    <h3 style="margin-bottom:1rem" data-i18n="create_ne">Create Network Element</h3>
+    <h3 id="neFormTitle" style="margin-bottom:1rem" data-i18n="create_ne">Create Network Element</h3>
     <div class="form-row">
       <div class="form-group"><label>NE Name *</label><input id="neCreateName" placeholder="HTSMF03" required></div>
       <div class="form-group"><label>Namespace *</label><input id="neCreateNS" placeholder="hcm-5gc" required></div>
@@ -220,7 +232,8 @@ body.role-user .admin-only{display:none !important}
         <div class="form-group"><label>Slave TCP Port</label><input id="neCreateSlaveTCP" placeholder="830" type="number"></div>
       </div>
     </div>
-    <button class="btn btn-primary" onclick="createNe()" data-i18n="create" style="margin-top:.5rem">Create</button>
+    <button id="neSubmitBtn" class="btn btn-primary" onclick="submitNe()" data-i18n="create" style="margin-top:.5rem">Create</button>
+    <button id="neCancelBtn" class="btn btn-outline" onclick="cancelEditNe()" data-i18n="cancel" style="margin-top:.5rem;display:none">Cancel</button>
   </div>
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="all_nes">All Network Elements</h3>
@@ -234,7 +247,7 @@ body.role-user .admin-only{display:none !important}
     <h3 style="margin-bottom:1rem" data-i18n="assign_ne">Assign NE to User</h3>
     <div class="form-row">
       <div class="form-group"><label data-i18n="username">Username</label><div class="ac-wrap" id="acNeMapUser"></div></div>
-      <div class="form-group"><label data-i18n="ne">Network Element</label><div class="ac-wrap" id="acNeMapNe"></div></div>
+      <div class="form-group" style="flex:2"><label data-i18n="nes_multi">Network Elements (select multiple)</label><div class="chips" id="neMapChips"></div><div class="ac-wrap" id="acNeMapNe"></div></div>
       <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="assignNe()" data-i18n="assign">Assign</button></div>
     </div>
   </div>
@@ -312,6 +325,18 @@ body.role-user .admin-only{display:none !important}
 </div><!-- main -->
 </div><!-- app -->
 
+<!-- Modal -->
+<div class="modal-overlay" id="modal">
+  <div class="modal-box">
+    <h3 id="modalTitle"></h3>
+    <div id="modalBody"></div>
+    <div class="modal-actions">
+      <button class="btn btn-outline" onclick="closeModal()" data-i18n="cancel">Cancel</button>
+      <button id="modalConfirm" class="btn btn-primary" data-i18n="save">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── Config ──
 // {{API_BASE}} is replaced by the server. For embedded mode it's '/aa', for standalone it's configured via env.
@@ -338,12 +363,20 @@ const I18N = {
     nav_dashboard:'Dashboard', nav_users:'Users', nav_permissions:'Permissions', nav_nes:'Network Elements',
     nav_ne_mapping:'NE Mapping', nav_role_mapping:'Role Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     // common
-    username:'Username', password:'Password', login:'Login', logout:'Logout', create:'Create', assign:'Assign',
+    username:'Username', password:'Password', confirm_password:'Confirm Password *', password_mismatch:'Passwords do not match',
+    user_required_fields:'Username, email, password and confirm password are required',
+    login:'Login', logout:'Logout', create:'Create', edit:'Edit', update:'Update', cancel:'Cancel', save:'Save', assign:'Assign',
     refresh:'Refresh', delete_btn:'Delete', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
+    nes_multi:'Network Elements (select multiple)', select_user_and_nes:'Select a user and at least one NE',
+    assigned:'Assigned', failed:'Failed', login_failed:'Login failed', network_error:'Network error — please check your connection',
+    change_my_password:'Change Password', old_password:'Old Password', new_password:'New Password',
+    password_changed:'Password changed', wrong_old_password:'Wrong old password', all_fields_required:'All fields are required',
+    reset_password:'Reset Password', reset_password_for:'Reset password for', password_reset_done:'Password has been reset',
+    edit_user:'Edit User', user_updated:'User updated',
     // sections
     create_user:'Create User', all_users:'All Users',
     create_permission:'Create Permission', all_permissions:'All Permissions',
-    create_ne:'Create Network Element', all_nes:'All Network Elements',
+    create_ne:'Create Network Element', edit_ne:'Edit Network Element', all_nes:'All Network Elements',
     assign_ne:'Assign NE to User', user_ne_assignments:'User - NE Assignments',
     assign_role:'Assign Role to User', user_role_assignments:'User - Role Assignments',
     operation_history:'Operation History',
@@ -404,11 +437,19 @@ const I18N = {
   vi: {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_permissions:'Phân quyền', nav_nes:'Phần tử mạng',
     nav_ne_mapping:'Gán NE', nav_role_mapping:'Gán Role', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
-    username:'Tên đăng nhập', password:'Mật khẩu', login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', assign:'Gán',
+    username:'Tên đăng nhập', password:'Mật khẩu', confirm_password:'Nhập lại mật khẩu *', password_mismatch:'Mật khẩu nhập lại không khớp',
+    user_required_fields:'Tên đăng nhập, email, mật khẩu và nhập lại mật khẩu là bắt buộc',
+    login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', edit:'Sửa', update:'Cập nhật', cancel:'Hủy', save:'Lưu', assign:'Gán',
     refresh:'Làm mới', delete_btn:'Xóa', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
+    nes_multi:'Phần tử mạng (chọn nhiều)', select_user_and_nes:'Hãy chọn user và ít nhất một NE',
+    assigned:'Đã gán', failed:'Lỗi', login_failed:'Đăng nhập thất bại', network_error:'Lỗi kết nối — vui lòng kiểm tra mạng',
+    change_my_password:'Đổi mật khẩu', old_password:'Mật khẩu cũ', new_password:'Mật khẩu mới',
+    password_changed:'Đã đổi mật khẩu', wrong_old_password:'Mật khẩu cũ không đúng', all_fields_required:'Vui lòng điền đủ các trường',
+    reset_password:'Đặt lại mật khẩu', reset_password_for:'Đặt lại mật khẩu cho', password_reset_done:'Đã đặt lại mật khẩu',
+    edit_user:'Sửa người dùng', user_updated:'Đã cập nhật người dùng',
     create_user:'Tạo người dùng', all_users:'Tất cả người dùng',
     create_permission:'Tạo quyền', all_permissions:'Tất cả quyền',
-    create_ne:'Tạo phần tử mạng', all_nes:'Tất cả phần tử mạng',
+    create_ne:'Tạo phần tử mạng', edit_ne:'Sửa phần tử mạng', all_nes:'Tất cả phần tử mạng',
     assign_ne:'Gán NE cho người dùng', user_ne_assignments:'Người dùng - NE',
     assign_role:'Gán role cho người dùng', user_role_assignments:'Người dùng - Role',
     operation_history:'Lịch sử thao tác',
@@ -491,21 +532,49 @@ async function api(method, path, body) {
   const opts = {method, headers: {'Content-Type':'application/json'}};
   if (TOKEN) opts.headers['Authorization'] = TOKEN;
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(API + path, opts);
-  let data;
+  let res, data = null, error = '';
+  try { res = await fetch(API + path, opts); }
+  catch (e) { return {status: 0, data: null, error: (e && e.message) || t('network_error')}; }
   try { data = await res.json(); } catch { data = null; }
-  return {status: res.status, data};
+  if (res.status >= 400) {
+    if (data && typeof data === 'object') {
+      error = data.error || (data.message && data.message !== 'OK' ? data.message : '') || '';
+    } else if (typeof data === 'string') {
+      error = data;
+    }
+    if (!error) error = 'HTTP ' + res.status;
+  }
+  return {status: res.status, data, error};
+}
+
+function failMsg(res, fallback) {
+  if (res && res.error) return res.error;
+  return fallback || t('failed');
 }
 
 function toast(msg, type='success') {
   const el = document.createElement('div');
   el.className = 'toast toast-' + type;
   el.textContent = msg;
+  el.addEventListener('click', () => el.remove());
   document.body.appendChild(el);
-  setTimeout(() => el.remove(), 3000);
+  setTimeout(() => el.remove(), type === 'error' ? 6000 : 3000);
 }
 
 function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+
+// ── Modal ──
+function openModal(title, bodyHTML, onConfirm, confirmLabel) {
+  document.getElementById('modalTitle').textContent = title;
+  document.getElementById('modalBody').innerHTML = bodyHTML;
+  document.getElementById('modal').classList.add('show');
+  const oldBtn = document.getElementById('modalConfirm');
+  const newBtn = oldBtn.cloneNode(true);
+  newBtn.textContent = confirmLabel || t('save');
+  oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+  newBtn.addEventListener('click', () => onConfirm());
+}
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
 
 // ── Autocomplete ──
 function initAC(containerId, placeholder, getItems) {
@@ -551,6 +620,72 @@ function initAC(containerId, placeholder, getItems) {
   return { getValue: () => selectedValue || input.value, clear: () => { input.value = ''; selectedValue = ''; } };
 }
 
+function initMultiAC(containerId, chipsContainerId, placeholder, getItems) {
+  const wrap = document.getElementById(containerId);
+  const chipsBox = document.getElementById(chipsContainerId);
+  const input = document.createElement('input');
+  input.placeholder = placeholder;
+  input.autocomplete = 'off';
+  const list = document.createElement('div');
+  list.className = 'ac-list';
+  wrap.appendChild(input);
+  wrap.appendChild(list);
+  const selected = new Map(); // value -> label
+  let activeIdx = -1;
+
+  function renderChips() {
+    chipsBox.innerHTML = [...selected.entries()].map(([v,l]) =>
+      '<span class="chip">' + esc(l) + '<span class="chip-x" data-val="' + esc(v) + '">&times;</span></span>'
+    ).join('');
+  }
+  chipsBox.addEventListener('click', e => {
+    const x = e.target.closest('.chip-x');
+    if (!x) return;
+    selected.delete(x.dataset.val);
+    renderChips();
+  });
+
+  function render(query) {
+    const items = getItems().filter(i => !selected.has(String(i.value)));
+    const q = query.toLowerCase();
+    const filtered = q ? items.filter(i => i.label.toLowerCase().includes(q) || (i.sub||'').toLowerCase().includes(q)) : items;
+    activeIdx = -1;
+    if (filtered.length === 0) { list.innerHTML = '<div class="ac-item" style="color:#64748b">No matches</div>'; list.classList.add('show'); return; }
+    list.innerHTML = filtered.map((item, idx) =>
+      '<div class="ac-item" data-val="' + esc(item.value) + '" data-label="' + esc(item.label) + '" data-idx="' + idx + '">'
+      + esc(item.label) + (item.sub ? '<span class="ac-sub">' + esc(item.sub) + '</span>' : '') + '</div>'
+    ).join('');
+    list.classList.add('show');
+  }
+  input.addEventListener('focus', () => render(input.value));
+  input.addEventListener('input', () => render(input.value));
+  input.addEventListener('keydown', e => {
+    const items = list.querySelectorAll('.ac-item[data-val]');
+    if (e.key === 'ArrowDown') { e.preventDefault(); activeIdx = Math.min(activeIdx+1, items.length-1); items.forEach((el,i) => el.classList.toggle('active', i===activeIdx)); }
+    else if (e.key === 'ArrowUp') { e.preventDefault(); activeIdx = Math.max(activeIdx-1, 0); items.forEach((el,i) => el.classList.toggle('active', i===activeIdx)); }
+    else if (e.key === 'Enter') { e.preventDefault(); if (activeIdx >= 0 && items[activeIdx]) items[activeIdx].click(); }
+    else if (e.key === 'Escape') { list.classList.remove('show'); }
+    else if (e.key === 'Backspace' && !input.value && selected.size) {
+      const lastKey = [...selected.keys()].pop();
+      selected.delete(lastKey); renderChips();
+    }
+  });
+  list.addEventListener('click', e => {
+    const item = e.target.closest('.ac-item[data-val]');
+    if (!item) return;
+    selected.set(item.dataset.val, item.dataset.label);
+    input.value = '';
+    renderChips();
+    render('');
+    input.focus();
+  });
+  document.addEventListener('click', e => { if (!wrap.contains(e.target)) list.classList.remove('show'); });
+  return {
+    getValues: () => [...selected.keys()],
+    clear: () => { selected.clear(); input.value = ''; renderChips(); }
+  };
+}
+
 // ── Section navigation ──
 function showSection(name) {
   document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
@@ -570,12 +705,12 @@ function showSection(name) {
 async function doLogin() {
   const username = document.getElementById('loginUser').value;
   const password = document.getElementById('loginPass').value;
-  const {status, data} = await api('POST', '/authenticate', {username, password});
-  if (status === 200 && data && data.response_data) {
-    TOKEN = data.response_data; USERNAME = username;
+  const res = await api('POST', '/authenticate', {username, password});
+  if (res.status === 200 && res.data && res.data.response_data) {
+    TOKEN = res.data.response_data; USERNAME = username;
     localStorage.setItem('mgt_token', TOKEN); localStorage.setItem('mgt_user', USERNAME);
     enterApp();
-  } else { toast('Login failed', 'error'); }
+  } else { toast(failMsg(res, t('login_failed')), 'error'); }
 }
 function doLogout() {
   TOKEN = ''; USERNAME = '';
@@ -603,7 +738,7 @@ function enterApp() {
   detectRole();
   document.getElementById('currentUser').textContent = USERNAME + (IS_ADMIN ? ' (admin)' : '');
   acNeMapUser = initAC('acNeMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
-  acNeMapNe = initAC('acNeMapNe', 'Search NE...', () => cachedNes.map(n => ({label: n.ne_name + ' (' + (n.namespace||'-') + ')', value: String(n.id), sub: 'ID:' + n.id + ' | ' + (n.site_name||'-') + ' | ' + (n.conf_master_ip||'')})));
+  acNeMapNe = initMultiAC('acNeMapNe', 'neMapChips', 'Search NEs (add multiple)...', () => cachedNes.map(n => ({label: n.ne_name + ' (' + (n.namespace||'-') + ')', value: String(n.id), sub: 'ID:' + n.id + ' | ' + (n.site_name||'-') + ' | ' + (n.conf_master_ip||'')})));
   acRoleMapUser = initAC('acRoleMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
   acRoleMapPerm = initAC('acRoleMapPerm', 'Search permission...', () => { const unique=[...new Set(cachedPerms.map(p=>p.permission))]; return unique.map(p=>({label:p,value:p})); });
   refreshCaches().then(() => showSection('dashboard'));
@@ -637,7 +772,11 @@ async function loadUsers() {
       +'<td>'+esc(u.phone_number||'-')+'</td>'
       +'<td>'+typ+'</td>'
       +'<td>'+enabled+'</td>'
-      +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button></td></tr>';
+      +'<td class="actions admin-only">'
+      +(u.account_type===0?'':'<button class="btn btn-outline btn-sm" onclick="openEditUserModal(\''+esc(u.account_name)+'\')">'+t('edit')+'</button>')
+      +(u.account_type===0?'':'<button class="btn btn-outline btn-sm" onclick="openResetPasswordModal(\''+esc(u.account_name)+'\')">'+t('reset_password')+'</button>')
+      +'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button>'
+      +'</td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('usersTable').innerHTML=html;
@@ -646,22 +785,89 @@ async function createUser(){
   const account_name=document.getElementById('newUsername').value;
   const email=document.getElementById('newEmail').value;
   const password=document.getElementById('newPassword').value;
-  if(!account_name||!email||!password){toast('Username, email and password are required','error');return;}
+  const password2=document.getElementById('newPassword2').value;
+  if(!account_name||!email||!password||!password2){toast(t('user_required_fields'),'error');return;}
+  if(password!==password2){toast(t('password_mismatch'),'error');return;}
   const full_name=document.getElementById('newFullName').value;
   const phone_number=document.getElementById('newPhone').value;
   const address=document.getElementById('newAddress').value;
   const description=document.getElementById('newDescription').value;
   const account_type=parseInt(document.getElementById('newAccountType').value)||2;
-  const{status}=await api('POST','/authenticate/user/set',{account_name,password,email,full_name,phone_number,address,description,account_type});
-  if(status===201){toast('User created');['newUsername','newEmail','newPassword','newFullName','newPhone','newAddress','newDescription'].forEach(id=>document.getElementById(id).value='');document.getElementById('newAccountType').value='2';await refreshCaches();loadUsers();}
-  else toast('Failed','error');
+  const res=await api('POST','/authenticate/user/set',{account_name,password,email,full_name,phone_number,address,description,account_type});
+  if(res.status===201){toast('User created');['newUsername','newEmail','newPassword','newPassword2','newFullName','newPhone','newAddress','newDescription'].forEach(id=>document.getElementById(id).value='');document.getElementById('newAccountType').value='2';await refreshCaches();loadUsers();}
+  else toast(failMsg(res),'error');
 }
-async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const{status}=await api('POST','/authenticate/user/delete',{account_name:username});if(status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast('Failed','error');}
+async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const res=await api('POST','/authenticate/user/delete',{account_name:username});if(res.status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast(failMsg(res),'error');}
+
+function openChangePasswordModal(){
+  const body =
+    '<div class="form-group"><label>'+t('old_password')+'</label><input id="cpOld" type="password"></div>'+
+    '<div class="form-group"><label>'+t('new_password')+'</label><input id="cpNew" type="password"></div>'+
+    '<div class="form-group"><label>'+t('confirm_password')+'</label><input id="cpNew2" type="password"></div>';
+  openModal(t('change_my_password'), body, async () => {
+    const oldp=document.getElementById('cpOld').value;
+    const np=document.getElementById('cpNew').value;
+    const np2=document.getElementById('cpNew2').value;
+    if(!oldp||!np||!np2){toast(t('all_fields_required'),'error');return;}
+    if(np!==np2){toast(t('password_mismatch'),'error');return;}
+    const res=await api('POST','/change-password/',{username:USERNAME,old_password:oldp,new_password:np});
+    if(res.status===200){toast(t('password_changed'));closeModal();}
+    else if(res.status===403)toast(t('wrong_old_password'),'error');
+    else toast(failMsg(res),'error');
+  }, t('save'));
+}
+
+function openResetPasswordModal(username){
+  const body =
+    '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem">'+t('reset_password_for')+': <b>'+esc(username)+'</b></p>'+
+    '<div class="form-group"><label>'+t('new_password')+'</label><input id="rpNew" type="password" autofocus></div>'+
+    '<div class="form-group"><label>'+t('confirm_password')+'</label><input id="rpNew2" type="password"></div>';
+  openModal(t('reset_password'), body, async () => {
+    const np=document.getElementById('rpNew').value;
+    const np2=document.getElementById('rpNew2').value;
+    if(!np||!np2){toast(t('all_fields_required'),'error');return;}
+    if(np!==np2){toast(t('password_mismatch'),'error');return;}
+    const res=await api('POST','/authenticate/user/reset-password',{username,new_password:np});
+    if(res.status===200){toast(t('password_reset_done'));closeModal();}
+    else toast(failMsg(res),'error');
+  }, t('save'));
+}
+
+function openEditUserModal(username){
+  const u=cachedAdminUsers.find(x=>x.account_name===username);
+  if(!u){toast('User not found','error');return;}
+  const body =
+    '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem"><b>'+esc(u.account_name)+'</b></p>'+
+    '<div class="form-row"><div class="form-group"><label>Full Name</label><input id="euFull" value="'+esc(u.full_name||'')+'"></div>'+
+    '<div class="form-group"><label>Email</label><input id="euEmail" type="email" value="'+esc(u.email||'')+'"></div></div>'+
+    '<div class="form-row"><div class="form-group"><label>Phone</label><input id="euPhone" value="'+esc(u.phone_number||'')+'"></div>'+
+    '<div class="form-group"><label>Address</label><input id="euAddr" value="'+esc(u.address||'')+'"></div></div>'+
+    '<div class="form-group"><label>Description</label><input id="euDesc" value="'+esc(u.description||'')+'"></div>'+
+    '<div class="form-group"><label>Account Type</label>'+
+    '<select id="euType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">'+
+    '<option value="2"'+(u.account_type===2?' selected':'')+'>Normal (2)</option>'+
+    '<option value="1"'+(u.account_type===1?' selected':'')+'>Admin (1)</option>'+
+    '</select></div>';
+  openModal(t('edit_user'), body, async () => {
+    const payload={
+      account_name:u.account_name,
+      full_name:document.getElementById('euFull').value,
+      email:document.getElementById('euEmail').value,
+      phone_number:document.getElementById('euPhone').value,
+      address:document.getElementById('euAddr').value,
+      description:document.getElementById('euDesc').value,
+      account_type:parseInt(document.getElementById('euType').value)||2,
+    };
+    const res=await api('POST','/admin/user/update',payload);
+    if(res.status===200){toast(t('user_updated'));closeModal();await refreshCaches();loadUsers();}
+    else toast(failMsg(res),'error');
+  }, t('save'));
+}
 
 // ── Permissions ──
 async function loadPermissions(){const data=cachedPerms;if(!data.length){document.getElementById('permissionsTable').innerHTML='<div class="empty">No permissions</div>';return;}let html='<table><thead><tr><th>ID</th><th>Permission</th><th>Scope</th><th>NE Type</th><th>Include Type</th><th>Path</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(p=>{html+='<tr><td>'+(p.role_id||p.id||'-')+'</td><td><span class="badge badge-green">'+esc(p.permission||'-')+'</span></td><td>'+esc(p.scope||'-')+'</td><td>'+esc(p.ne_type||'-')+'</td><td>'+esc(p.include_type||'-')+'</td><td>'+esc(p.path||'-')+'</td><td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deletePermission(\''+esc(p.permission||'')+'\',\''+esc(p.scope||'')+'\',\''+esc(p.ne_type||'')+'\',\''+esc(p.include_type||'')+'\',\''+esc(p.path||'')+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('permissionsTable').innerHTML=html;}
-async function createPermission(){const permission=document.getElementById('newPermission').value;const scope=document.getElementById('newScope').value;const ne_type=document.getElementById('newNeType').value;const include_type=document.getElementById('newIncludeType').value;const path=document.getElementById('newPath').value;if(!permission){toast('Permission required','error');return;}const{status}=await api('POST','/authorize/permission/set',{permission,scope,ne_type,include_type,path});if(status===201){toast('Created');['newPermission','newScope','newNeType','newIncludeType','newPath'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadPermissions();}else toast('Failed','error');}
-async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const{status}=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast('Failed','error');}
+async function createPermission(){const permission=document.getElementById('newPermission').value;const scope=document.getElementById('newScope').value;const ne_type=document.getElementById('newNeType').value;const include_type=document.getElementById('newIncludeType').value;const path=document.getElementById('newPath').value;if(!permission){toast('Permission required','error');return;}const res=await api('POST','/authorize/permission/set',{permission,scope,ne_type,include_type,path});if(res.status===201){toast('Created');['newPermission','newScope','newNeType','newIncludeType','newPath'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadPermissions();}else toast(failMsg(res),'error');}
+async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const res=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(res.status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast(failMsg(res),'error');}
 
 // ── NEs ──
 async function loadNes(){
@@ -680,13 +886,53 @@ async function loadNes(){
       +'<td>'+(n.conf_port_master_tcp||'-')+'</td>'
       +'<td>'+esc(n.conf_slave_ip||'-')+'</td>'
       +'<td>'+esc(n.description||'-')+'</td>'
-      +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button></td></tr>';
+      +'<td class="actions admin-only">'
+      +'<button class="btn btn-outline btn-sm" onclick="startEditNe('+n.id+')">'+t('edit')+'</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteNe('+n.id+',\''+esc(n.ne_name)+'\')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
   });
   html+='</tbody></table>';
   document.getElementById('nesTable').innerHTML=html;
 }
-async function deleteNe(id,name){if(!confirm(t('delete_btn')+' '+name+'?'))return;const{status}=await api('POST','/authorize/ne/remove',{id});if(status===200){toast('Deleted');await refreshCaches();loadNes();}else toast('Failed','error');}
-async function createNe(){
+async function deleteNe(id,name){if(!confirm(t('delete_btn')+' '+name+'?'))return;const res=await api('POST','/authorize/ne/remove',{id});if(res.status===200){toast('Deleted');await refreshCaches();loadNes();}else toast(failMsg(res),'error');}
+let editingNeId=null;
+const NE_FIELDS=['neCreateName','neCreateSite','neCreateNS','neCreateDesc','neCreateCmdURL','neCreateUser','neCreatePass','neCreateMasterIP','neCreateSlaveIP','neCreateMasterSSH','neCreateSlaveSSH','neCreateMasterTCP','neCreateSlaveTCP'];
+function resetNeForm(){
+  NE_FIELDS.forEach(id=>document.getElementById(id).value='');
+  document.getElementById('neCreateConfMode').value='SSH';
+}
+function startEditNe(id){
+  const ne=cachedNes.find(n=>n.id===id);
+  if(!ne){toast('NE not found','error');return;}
+  editingNeId=ne.id;
+  document.getElementById('neCreateName').value=ne.ne_name||'';
+  document.getElementById('neCreateNS').value=ne.namespace||'';
+  document.getElementById('neCreateMasterIP').value=ne.conf_master_ip||'';
+  document.getElementById('neCreateMasterTCP').value=ne.conf_port_master_tcp||'';
+  document.getElementById('neCreateCmdURL').value=ne.command_url||'';
+  document.getElementById('neCreateConfMode').value=ne.conf_mode||'SSH';
+  document.getElementById('neCreateSite').value=ne.site_name||'';
+  document.getElementById('neCreateDesc').value=ne.description||'';
+  document.getElementById('neCreateUser').value=ne.conf_username||'';
+  document.getElementById('neCreatePass').value=ne.conf_password||'';
+  document.getElementById('neCreateSlaveIP').value=ne.conf_slave_ip||'';
+  document.getElementById('neCreateMasterSSH').value=ne.conf_port_master_ssh||'';
+  document.getElementById('neCreateSlaveSSH').value=ne.conf_port_slave_ssh||'';
+  document.getElementById('neCreateSlaveTCP').value=ne.conf_port_slave_tcp||'';
+  document.getElementById('neOptFields').classList.add('show');
+  document.getElementById('neFormTitle').textContent=t('edit_ne')+' #'+ne.id+' — '+(ne.ne_name||'');
+  document.getElementById('neSubmitBtn').textContent=t('update');
+  document.getElementById('neCancelBtn').style.display='inline-block';
+  window.scrollTo({top:0,behavior:'smooth'});
+}
+function cancelEditNe(){
+  editingNeId=null;
+  resetNeForm();
+  document.getElementById('neFormTitle').textContent=t('create_ne');
+  document.getElementById('neSubmitBtn').textContent=t('create');
+  document.getElementById('neCancelBtn').style.display='none';
+}
+async function submitNe(){
   const ne_name=document.getElementById('neCreateName').value;
   const site_name=document.getElementById('neCreateSite').value;
   const namespace=document.getElementById('neCreateNS').value;
@@ -702,20 +948,39 @@ async function createNe(){
   const conf_port_master_tcp=parseInt(document.getElementById('neCreateMasterTCP').value)||0;
   const conf_port_slave_tcp=parseInt(document.getElementById('neCreateSlaveTCP').value)||0;
   if(!ne_name||!namespace||!conf_master_ip||!conf_port_master_tcp||!command_url){toast('NE Name, Namespace, Master IP, Master TCP Port and Command URL are required','error');return;}
-  const{status}=await api('POST','/admin/ne/create',{ne_name,site_name,namespace,description,command_url,conf_mode,conf_master_ip,conf_slave_ip,conf_port_master_ssh,conf_port_slave_ssh,conf_port_master_tcp,conf_port_slave_tcp,conf_username,conf_password,system_type:'5GC'});
-  if(status===201){toast('Created');['neCreateName','neCreateSite','neCreateNS','neCreateDesc','neCreateCmdURL','neCreateConfMode','neCreateUser','neCreatePass','neCreateMasterIP','neCreateSlaveIP','neCreateMasterSSH','neCreateSlaveSSH','neCreateMasterTCP','neCreateSlaveTCP'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadNes();}
-  else toast('Failed','error');
+  const payload={ne_name,site_name,namespace,description,command_url,conf_mode,conf_master_ip,conf_slave_ip,conf_port_master_ssh,conf_port_slave_ssh,conf_port_master_tcp,conf_port_slave_tcp,conf_username,conf_password,system_type:'5GC'};
+  if(editingNeId){
+    payload.id=editingNeId;
+    const res=await api('POST','/admin/ne/update',payload);
+    if(res.status===200){toast('Updated');cancelEditNe();await refreshCaches();loadNes();}
+    else toast(failMsg(res),'error');
+  }else{
+    const res=await api('POST','/admin/ne/create',payload);
+    if(res.status===201){toast('Created');resetNeForm();await refreshCaches();loadNes();}
+    else toast(failMsg(res),'error');
+  }
 }
 
 // ── NE Mapping ──
 async function loadNeMapping(){const data=cachedUsers;if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>NEs</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(u=>{const nes=(u.tblNes||[]);const nesBadges=nes.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' <span class="ac-sub">('+esc(n.namespace||'-')+')</span></span>').join(' ')||'<span style="color:#64748b">None</span>';const removeButtons=nes.map(n=>'<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+n.id+')">'+esc(n.ne)+' ('+esc(n.namespace||'-')+') &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+nesBadges+'</td><td class="actions admin-only">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('neMappingTable').innerHTML=html;}
-async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+username+'?'))return;const{status}=await api('POST','/authorize/ne/delete',{username,neid:String(neid)});if(status===200){toast('Removed');await refreshCaches();loadNeMapping();}else toast('Failed','error');}
-async function assignNe(){const username=acNeMapUser.getValue();const neid=acNeMapNe.getValue();if(!username||!neid){toast('Select user and NE','error');return;}const{status}=await api('POST','/authorize/ne/set',{username,neid});if(status===200){toast('Assigned');acNeMapUser.clear();acNeMapNe.clear();await refreshCaches();loadNeMapping();}else toast('Failed','error');}
+async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+username+'?'))return;const res=await api('POST','/authorize/ne/delete',{username,neid:String(neid)});if(res.status===200){toast('Removed');await refreshCaches();loadNeMapping();}else toast(failMsg(res),'error');}
+async function assignNe(){
+  const username=acNeMapUser.getValue();
+  const neids=acNeMapNe.getValues();
+  if(!username||!neids.length){toast(t('select_user_and_nes'),'error');return;}
+  const results=await Promise.all(neids.map(neid=>api('POST','/authorize/ne/set',{username,neid})));
+  const ok=results.filter(r=>r.status===200).length;
+  const fails=results.filter(r=>r.status!==200);
+  if(ok)toast(t('assigned')+': '+ok+(fails.length?(', '+t('failed')+': '+fails.length):''));
+  if(fails.length)toast(failMsg(fails[0]),'error');
+  acNeMapUser.clear();acNeMapNe.clear();
+  await refreshCaches();loadNeMapping();
+}
 
 // ── Role Mapping ──
 async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permissions</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(u=>{const permList=u.permissions?u.permissions.split(' ').filter(Boolean):[];const permsBadges=permList.length>0?permList.map(p=>'<span class="badge badge-green">'+esc(p)+'</span>').join(' '):'<span style="color:#64748b">None</span>';const removeButtons=permList.map(p=>'<button class="btn btn-danger btn-sm" onclick="removeRole(\''+esc(u.username)+'\',\''+esc(p)+'\')">'+esc(p)+' &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+permsBadges+'</td><td class="actions admin-only">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
-async function assignRole(){const username=acRoleMapUser.getValue();const permission=acRoleMapPerm.getValue();if(!username||!permission){toast('Select user and permission','error');return;}const{status}=await api('POST','/authorize/user/set',{username,permission});if(status===200){toast('Assigned');acRoleMapUser.clear();acRoleMapPerm.clear();await refreshCaches();loadRoleMapping();}else toast('Failed','error');}
-async function removeRole(username,permission){if(!confirm('Remove '+permission+' from '+username+'?'))return;const{status}=await api('POST','/authorize/user/delete',{username,permission});if(status===200){toast('Removed');loadRoleMapping();}else toast('Failed','error');}
+async function assignRole(){const username=acRoleMapUser.getValue();const permission=acRoleMapPerm.getValue();if(!username||!permission){toast('Select user and permission','error');return;}const res=await api('POST','/authorize/user/set',{username,permission});if(res.status===200){toast('Assigned');acRoleMapUser.clear();acRoleMapPerm.clear();await refreshCaches();loadRoleMapping();}else toast(failMsg(res),'error');}
+async function removeRole(username,permission){if(!confirm('Remove '+permission+' from '+username+'?'))return;const res=await api('POST','/authorize/user/delete',{username,permission});if(res.status===200){toast('Removed');loadRoleMapping();}else toast(failMsg(res),'error');}
 
 // ── History ──
 async function loadHistory(){
@@ -741,7 +1006,30 @@ async function loadHistory(){
 // ── Import ──
 function handleImportFile(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{document.getElementById('importText').value=e.target.result;};reader.readAsText(file);}
 function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password,email\nadmin,admin123,admin@vht.com\noperator1,Pass@123,op1@vht.com\n\n[nes]\nne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description\nHTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01\nHTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,NETCONF,10.10.2.1,830,admin,admin,HCM AMF Node 01\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,user\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01';}
-async function runImport(){const text=document.getElementById('importText').value;if(!text.trim()){toast('Paste or upload data first','error');return;}const res=await fetch(API+'/import/',{method:'POST',headers:{'Content-Type':'text/plain','Authorization':TOKEN},body:text});let data;try{data=await res.json();}catch{data=null;}if(!Array.isArray(data)||!data.length){toast('No results','error');return;}const card=document.getElementById('importResultsCard');card.style.display='block';let html='<table><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Detail</th></tr></thead><tbody>';let ok=0,err=0,skip=0;data.forEach(r=>{const badge=r.status==='ok'?'<span class="badge badge-green">ok</span>':r.status==='skip'?'<span class="badge badge-blue">skip</span>':'<span class="badge badge-red">error</span>';if(r.status==='ok')ok++;else if(r.status==='skip')skip++;else err++;html+='<tr><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td><td>'+badge+'</td><td style="font-size:.8rem">'+esc(r.detail)+'</td></tr>';});html+='</tbody></table><p style="margin-top:.75rem;font-size:.85rem;color:#94a3b8"><span class="badge badge-green">'+ok+' ok</span> <span class="badge badge-blue">'+skip+' skipped</span> <span class="badge badge-red">'+err+' errors</span></p>';document.getElementById('importResults').innerHTML=html;await refreshCaches();toast('Import: '+ok+' ok, '+skip+' skipped, '+err+' errors');}
+async function runImport(){
+  const text=document.getElementById('importText').value;
+  if(!text.trim()){toast('Paste or upload data first','error');return;}
+  let res, data=null;
+  try{res=await fetch(API+'/import/',{method:'POST',headers:{'Content-Type':'text/plain','Authorization':TOKEN},body:text});}
+  catch(e){toast(e.message||t('network_error'),'error');return;}
+  try{data=await res.json();}catch{data=null;}
+  if(res.status>=400||!Array.isArray(data)){
+    let msg='';
+    if(data&&typeof data==='object')msg=data.error||data.message||'';
+    else if(typeof data==='string')msg=data;
+    toast(msg||('Import failed (HTTP '+res.status+')'),'error');
+    return;
+  }
+  if(!data.length){toast('No results','error');return;}
+  const card=document.getElementById('importResultsCard');card.style.display='block';
+  let html='<table><thead><tr><th>Type</th><th>Name</th><th>Status</th><th>Detail</th></tr></thead><tbody>';
+  let ok=0,err=0,skip=0;
+  data.forEach(r=>{const badge=r.status==='ok'?'<span class="badge badge-green">ok</span>':r.status==='skip'?'<span class="badge badge-blue">skip</span>':'<span class="badge badge-red">error</span>';if(r.status==='ok')ok++;else if(r.status==='skip')skip++;else err++;html+='<tr><td>'+esc(r.type)+'</td><td>'+esc(r.name)+'</td><td>'+badge+'</td><td style="font-size:.8rem">'+esc(r.detail)+'</td></tr>';});
+  html+='</tbody></table><p style="margin-top:.75rem;font-size:.85rem;color:#94a3b8"><span class="badge badge-green">'+ok+' ok</span> <span class="badge badge-blue">'+skip+' skipped</span> <span class="badge badge-red">'+err+' errors</span></p>';
+  document.getElementById('importResults').innerHTML=html;
+  await refreshCaches();
+  toast('Import: '+ok+' ok, '+skip+' skipped, '+err+' errors', err?'error':'success');
+}
 
 // ── Init ──
 applyI18n();
