@@ -107,10 +107,8 @@ body.role-user .admin-only{display:none !important}
   <h2>MGT Service</h2>
   <a onclick="showSection('dashboard')" class="active" data-section="dashboard" data-i18n="nav_dashboard">Dashboard</a>
   <a onclick="showSection('users')" data-section="users" data-i18n="nav_users">Users</a>
-  <a onclick="showSection('permissions')" data-section="permissions" data-i18n="nav_permissions">Permissions</a>
   <a onclick="showSection('nes')" data-section="nes" data-i18n="nav_nes">Network Elements</a>
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
-  <a onclick="showSection('role-mapping')" data-section="role-mapping" data-i18n="nav_role_mapping">Role Mapping</a>
   <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
   <a onclick="showSection('import')" data-section="import" data-i18n="nav_import" class="admin-only">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
@@ -175,27 +173,6 @@ body.role-user .admin-only{display:none !important}
   </div>
 </div>
 
-<!-- Permissions -->
-<div class="section" id="sec-permissions">
-  <div class="card admin-only">
-    <h3 style="margin-bottom:1rem" data-i18n="create_permission">Create Permission</h3>
-    <div class="form-row">
-      <div class="form-group"><label>Permission</label><input id="newPermission" placeholder="admin"></div>
-      <div class="form-group"><label>Scope</label><input id="newScope" placeholder="ext-config"></div>
-      <div class="form-group"><label>NE Type</label><input id="newNeType" placeholder="5GC"></div>
-    </div>
-    <div class="form-row">
-      <div class="form-group"><label>Include Type</label><input id="newIncludeType" placeholder="include"></div>
-      <div class="form-group"><label>Path</label><input id="newPath" placeholder="/"></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createPermission()" data-i18n="create">Create</button></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="all_permissions">All Permissions</h3>
-    <div id="permissionsTable"><div class="loading">Loading...</div></div>
-  </div>
-</div>
-
 <!-- NEs -->
 <div class="section" id="sec-nes">
   <div class="card admin-only">
@@ -257,22 +234,6 @@ body.role-user .admin-only{display:none !important}
   </div>
 </div>
 
-<!-- Role Mapping -->
-<div class="section" id="sec-role-mapping">
-  <div class="card admin-only">
-    <h3 style="margin-bottom:1rem" data-i18n="assign_role">Assign Role to User</h3>
-    <div class="form-row">
-      <div class="form-group"><label data-i18n="username">Username</label><div class="ac-wrap" id="acRoleMapUser"></div></div>
-      <div class="form-group"><label>Permission</label><div class="ac-wrap" id="acRoleMapPerm"></div></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="assignRole()" data-i18n="assign">Assign</button></div>
-    </div>
-  </div>
-  <div class="card">
-    <h3 style="margin-bottom:1rem" data-i18n="user_role_assignments">User - Role Assignments</h3>
-    <div id="roleMappingTable"><div class="loading">Loading...</div></div>
-  </div>
-</div>
-
 <!-- History -->
 <div class="section" id="sec-history">
   <div class="card">
@@ -301,10 +262,11 @@ body.role-user .admin-only{display:none !important}
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="import_data">Import Data</h3>
     <p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem" data-i18n="import_desc">Upload a file or paste import data below.</p>
-    <div style="margin-bottom:1rem">
+    <div style="margin-bottom:1rem;display:flex;gap:.4rem;flex-wrap:wrap">
       <input type="file" id="importFile" accept=".txt,.csv" style="display:none" onchange="handleImportFile(event)">
       <button class="btn btn-outline btn-sm" onclick="document.getElementById('importFile').click()" data-i18n="upload_file">Upload File</button>
       <button class="btn btn-outline btn-sm" onclick="fillSampleImport()" data-i18n="load_sample">Load Sample</button>
+      <button class="btn btn-outline btn-sm" onclick="doExport()" data-i18n="export_data">Export data.txt</button>
     </div>
     <div class="form-group">
       <textarea id="importText" rows="20" style="width:100%;padding:.75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem;font-family:monospace;resize:vertical;outline:none" placeholder="[users]&#10;username,password&#10;admin,admin123"></textarea>
@@ -343,7 +305,7 @@ body.role-user .admin-only{display:none !important}
 const API = '{{API_BASE}}';
 let TOKEN = localStorage.getItem('mgt_token') || '';
 let USERNAME = localStorage.getItem('mgt_user') || '';
-let cachedUsers = [], cachedNes = [], cachedPerms = [], cachedAdminUsers = [];
+let cachedUsers = [], cachedNes = [], cachedAdminUsers = [];
 let LANG = localStorage.getItem('mgt_lang') || 'en';
 let IS_ADMIN = false;
 
@@ -360,8 +322,8 @@ function detectRole() {
 const I18N = {
   en: {
     // nav
-    nav_dashboard:'Dashboard', nav_users:'Users', nav_permissions:'Permissions', nav_nes:'Network Elements',
-    nav_ne_mapping:'NE Mapping', nav_role_mapping:'Role Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
+    nav_dashboard:'Dashboard', nav_users:'Users', nav_nes:'Network Elements',
+    nav_ne_mapping:'NE Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     // common
     username:'Username', password:'Password', confirm_password:'Confirm Password *', password_mismatch:'Passwords do not match',
     user_required_fields:'Username, email, password and confirm password are required',
@@ -375,12 +337,10 @@ const I18N = {
     edit_user:'Edit User', user_updated:'User updated',
     // sections
     create_user:'Create User', all_users:'All Users',
-    create_permission:'Create Permission', all_permissions:'All Permissions',
     create_ne:'Create Network Element', edit_ne:'Edit Network Element', all_nes:'All Network Elements',
     assign_ne:'Assign NE to User', user_ne_assignments:'User - NE Assignments',
-    assign_role:'Assign Role to User', user_role_assignments:'User - Role Assignments',
     operation_history:'Operation History',
-    import_data:'Import Data', import_desc:'Upload a file or paste import data below.', upload_file:'Upload File', load_sample:'Load Sample', import:'Import', import_results:'Import Results',
+    import_data:'Import Data', import_desc:'Upload a file or paste import data below.', upload_file:'Upload File', load_sample:'Load Sample', import:'Import', import_results:'Import Results', export_data:'Export data.txt',
     // guide
     guide_html: `
       <h3>Getting Started</h3>
@@ -393,13 +353,6 @@ const I18N = {
         <li>Default admin: <code>admin</code> / <code>admin123</code></li>
       </ul>
 
-      <h3>Permissions (Roles)</h3>
-      <ul>
-        <li>Roles control access: <code>admin</code>, <code>operator</code>, <code>viewer</code></li>
-        <li>Create with: permission name, scope, NE type, include type, path</li>
-        <li>Only <code>admin</code> role users can manage other users</li>
-      </ul>
-
       <h3>Network Elements</h3>
       <ul>
         <li>NEs are 5G core nodes (SMF, AMF, UPF, etc.)</li>
@@ -410,18 +363,15 @@ const I18N = {
       <h3>NE Mapping</h3>
       <p>Assign NEs to users. Users can only access NEs assigned to them. Use the search dropdown to find users and NEs by name.</p>
 
-      <h3>Role Mapping</h3>
-      <p>Assign permissions to users. Search by username or permission name.</p>
-
-      <h3>Import</h3>
-      <p>Bulk import data using a text file format:</p>
+      <h3>Import / Export</h3>
+      <p>Bulk import data using a text file format. Click <b>Export data.txt</b> to generate a snapshot in the same format — you can edit it and import it back.</p>
       <table><thead><tr><th>Section</th><th>Fields</th></tr></thead><tbody>
         <tr><td><code>[users]</code></td><td>username, password, email (optional)</td></tr>
         <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission (admin or user)</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
       </tbody></table>
-      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated).</p>
+      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated). Exported user rows use a placeholder password (<code>changeme</code>) because stored passwords are bcrypt-hashed and cannot be recovered.</p>
 
       <h3>History</h3>
       <p>View operation audit log. All create/delete/assign actions are recorded with timestamp, user, and result.</p>
@@ -435,8 +385,8 @@ const I18N = {
     `
   },
   vi: {
-    nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_permissions:'Phân quyền', nav_nes:'Phần tử mạng',
-    nav_ne_mapping:'Gán NE', nav_role_mapping:'Gán Role', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
+    nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_nes:'Phần tử mạng',
+    nav_ne_mapping:'Gán NE', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
     username:'Tên đăng nhập', password:'Mật khẩu', confirm_password:'Nhập lại mật khẩu *', password_mismatch:'Mật khẩu nhập lại không khớp',
     user_required_fields:'Tên đăng nhập, email, mật khẩu và nhập lại mật khẩu là bắt buộc',
     login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', edit:'Sửa', update:'Cập nhật', cancel:'Hủy', save:'Lưu', assign:'Gán',
@@ -448,12 +398,10 @@ const I18N = {
     reset_password:'Đặt lại mật khẩu', reset_password_for:'Đặt lại mật khẩu cho', password_reset_done:'Đã đặt lại mật khẩu',
     edit_user:'Sửa người dùng', user_updated:'Đã cập nhật người dùng',
     create_user:'Tạo người dùng', all_users:'Tất cả người dùng',
-    create_permission:'Tạo quyền', all_permissions:'Tất cả quyền',
     create_ne:'Tạo phần tử mạng', edit_ne:'Sửa phần tử mạng', all_nes:'Tất cả phần tử mạng',
     assign_ne:'Gán NE cho người dùng', user_ne_assignments:'Người dùng - NE',
-    assign_role:'Gán role cho người dùng', user_role_assignments:'Người dùng - Role',
     operation_history:'Lịch sử thao tác',
-    import_data:'Nhập dữ liệu', import_desc:'Tải file lên hoặc dán nội dung vào ô bên dưới.', upload_file:'Tải file', load_sample:'Tải mẫu', import:'Nhập', import_results:'Kết quả nhập',
+    import_data:'Nhập dữ liệu', import_desc:'Tải file lên hoặc dán nội dung vào ô bên dưới.', upload_file:'Tải file', load_sample:'Tải mẫu', import:'Nhập', import_results:'Kết quả nhập', export_data:'Xuất data.txt',
     guide_html: `
       <h3>Bắt đầu</h3>
       <p>MGT Service là nền tảng quản lý các phần tử mạng lõi 5G. Sử dụng trang này để quản lý người dùng, phân quyền, NE và các mapping.</p>
@@ -463,13 +411,6 @@ const I18N = {
         <li><b>Tạo</b> — Nhập tên và mật khẩu, bấm Tạo</li>
         <li><b>Vô hiệu hóa</b> — Bấm nút Vô hiệu hóa (xóa mềm, có thể kích hoạt lại)</li>
         <li>Admin mặc định: <code>admin</code> / <code>admin123</code></li>
-      </ul>
-
-      <h3>Phân quyền (Roles)</h3>
-      <ul>
-        <li>Role kiểm soát quyền truy cập: <code>admin</code>, <code>operator</code>, <code>viewer</code></li>
-        <li>Tạo với: tên quyền, scope, NE type, include type, path</li>
-        <li>Chỉ user có role <code>admin</code> mới quản lý được người dùng khác</li>
       </ul>
 
       <h3>Phần tử mạng (NE)</h3>
@@ -482,18 +423,15 @@ const I18N = {
       <h3>Gán NE</h3>
       <p>Gán NE cho người dùng. Người dùng chỉ truy cập được NE đã được gán. Tìm kiếm theo tên trong ô autocomplete.</p>
 
-      <h3>Gán Role</h3>
-      <p>Gán quyền cho người dùng. Tìm theo tên hoặc quyền.</p>
-
-      <h3>Nhập liệu</h3>
-      <p>Nhập dữ liệu hàng loạt từ file text:</p>
+      <h3>Nhập liệu / Xuất liệu</h3>
+      <p>Nhập dữ liệu hàng loạt từ file text. Bấm <b>Xuất data.txt</b> để tải snapshot cùng định dạng — có thể chỉnh sửa rồi nhập lại.</p>
       <table><thead><tr><th>Section</th><th>Trường</th></tr></thead><tbody>
         <tr><td><code>[users]</code></td><td>username, password, email (tùy chọn)</td></tr>
         <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission (admin hoặc user)</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
       </tbody></table>
-      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng).</p>
+      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng). Bản xuất dùng mật khẩu placeholder <code>changeme</code> vì mật khẩu gốc đã được bcrypt-hash, không khôi phục được.</p>
 
       <h3>Lịch sử</h3>
       <p>Xem nhật ký thao tác. Tất cả hành động tạo/xóa/gán đều được ghi lại với thời gian, người dùng và kết quả.</p>
@@ -694,10 +632,8 @@ function showSection(name) {
   document.getElementById('pageTitle').textContent = t('nav_' + name.replace('-','_')) || name;
   if (name === 'dashboard') loadDashboard();
   if (name === 'users') loadUsers();
-  if (name === 'permissions') loadPermissions();
   if (name === 'nes') loadNes();
   if (name === 'ne-mapping') loadNeMapping();
-  if (name === 'role-mapping') loadRoleMapping();
   if (name === 'history') loadHistory();
 }
 
@@ -719,19 +655,17 @@ function doLogout() {
   document.getElementById('loginPage').style.display = 'flex';
 }
 async function refreshCaches() {
-  const [u, n, p, au] = await Promise.all([
+  const [u, n, au] = await Promise.all([
     api('GET', '/authenticate/user/show'),
     api('GET', '/admin/ne/list'),
-    api('GET', '/authorize/permission/show'),
     api('GET', '/admin/user/list')
   ]);
   cachedUsers = Array.isArray(u.data) ? u.data : [];
   cachedNes = Array.isArray(n.data) ? n.data : [];
-  cachedPerms = Array.isArray(p.data) ? p.data : [];
   cachedAdminUsers = Array.isArray(au.data) ? au.data : [];
 }
 
-let acNeMapUser, acNeMapNe, acRoleMapUser, acRoleMapPerm;
+let acNeMapUser, acNeMapNe;
 function enterApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -739,8 +673,6 @@ function enterApp() {
   document.getElementById('currentUser').textContent = USERNAME + (IS_ADMIN ? ' (admin)' : '');
   acNeMapUser = initAC('acNeMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
   acNeMapNe = initMultiAC('acNeMapNe', 'neMapChips', 'Search NEs (add multiple)...', () => cachedNes.map(n => ({label: n.ne_name + ' (' + (n.namespace||'-') + ')', value: String(n.id), sub: 'ID:' + n.id + ' | ' + (n.site_name||'-') + ' | ' + (n.conf_master_ip||'')})));
-  acRoleMapUser = initAC('acRoleMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
-  acRoleMapPerm = initAC('acRoleMapPerm', 'Search permission...', () => { const unique=[...new Set(cachedPerms.map(p=>p.permission))]; return unique.map(p=>({label:p,value:p})); });
   refreshCaches().then(() => showSection('dashboard'));
   applyI18n();
 }
@@ -751,7 +683,6 @@ document.getElementById('loginUser').addEventListener('keydown', e => { if (e.ke
 async function loadDashboard() {
   document.getElementById('statsGrid').innerHTML =
     '<div class="stat-card"><div class="num">'+cachedUsers.length+'</div><div class="label">'+t('nav_users')+'</div></div>'+
-    '<div class="stat-card"><div class="num">'+cachedPerms.length+'</div><div class="label">'+t('nav_permissions')+'</div></div>'+
     '<div class="stat-card"><div class="num">'+cachedNes.length+'</div><div class="label">'+t('nav_nes')+'</div></div>';
 }
 
@@ -864,17 +795,20 @@ function openEditUserModal(username){
   }, t('save'));
 }
 
-// ── Permissions ──
-async function loadPermissions(){const data=cachedPerms;if(!data.length){document.getElementById('permissionsTable').innerHTML='<div class="empty">No permissions</div>';return;}let html='<table><thead><tr><th>ID</th><th>Permission</th><th>Scope</th><th>NE Type</th><th>Include Type</th><th>Path</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(p=>{html+='<tr><td>'+(p.role_id||p.id||'-')+'</td><td><span class="badge badge-green">'+esc(p.permission||'-')+'</span></td><td>'+esc(p.scope||'-')+'</td><td>'+esc(p.ne_type||'-')+'</td><td>'+esc(p.include_type||'-')+'</td><td>'+esc(p.path||'-')+'</td><td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deletePermission(\''+esc(p.permission||'')+'\',\''+esc(p.scope||'')+'\',\''+esc(p.ne_type||'')+'\',\''+esc(p.include_type||'')+'\',\''+esc(p.path||'')+'\')">'+t('delete_btn')+'</button></td></tr>';});html+='</tbody></table>';document.getElementById('permissionsTable').innerHTML=html;}
-async function createPermission(){const permission=document.getElementById('newPermission').value;const scope=document.getElementById('newScope').value;const ne_type=document.getElementById('newNeType').value;const include_type=document.getElementById('newIncludeType').value;const path=document.getElementById('newPath').value;if(!permission){toast('Permission required','error');return;}const res=await api('POST','/authorize/permission/set',{permission,scope,ne_type,include_type,path});if(res.status===201){toast('Created');['newPermission','newScope','newNeType','newIncludeType','newPath'].forEach(id=>document.getElementById(id).value='');await refreshCaches();loadPermissions();}else toast(failMsg(res),'error');}
-async function deletePermission(permission,scope,ne_type,include_type,path){if(!confirm(t('delete_btn')+' '+permission+'?'))return;const res=await api('POST','/authorize/permission/delete',{permission,scope,ne_type,include_type,path});if(res.status===200){toast('Deleted');await refreshCaches();loadPermissions();}else toast(failMsg(res),'error');}
-
 // ── NEs ──
+const NE_PAGE_SIZE=6;
+let nesPage=1;
+function gotoNesPage(p){nesPage=p;loadNes();}
 async function loadNes(){
   const data=cachedNes;
   if(!data.length){document.getElementById('nesTable').innerHTML='<div class="empty">No NEs</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/NE_PAGE_SIZE));
+  if(nesPage>totalPages)nesPage=totalPages;
+  if(nesPage<1)nesPage=1;
+  const start=(nesPage-1)*NE_PAGE_SIZE;
+  const slice=data.slice(start,start+NE_PAGE_SIZE);
   let html='<table><thead><tr><th>ID</th><th>NE Name</th><th>Site</th><th>Namespace</th><th>Command URL</th><th>Mode</th><th>Master IP</th><th>SSH Port</th><th>TCP Port</th><th>Slave IP</th><th>Description</th><th class="admin-only">Actions</th></tr></thead><tbody>';
-  data.forEach(n=>{
+  slice.forEach(n=>{
     html+='<tr><td>'+n.id+'</td>'
       +'<td><span class="badge badge-blue">'+esc(n.ne_name||'-')+'</span></td>'
       +'<td>'+esc(n.site_name||'-')+'</td>'
@@ -892,6 +826,18 @@ async function loadNes(){
       +'</td></tr>';
   });
   html+='</tbody></table>';
+  if(totalPages>1){
+    const pageBtns=[];
+    for(let i=1;i<=totalPages;i++){
+      pageBtns.push('<button class="btn btn-sm '+(i===nesPage?'btn-primary':'btn-outline')+'" onclick="gotoNesPage('+i+')">'+i+'</button>');
+    }
+    html+='<div style="display:flex;gap:.3rem;justify-content:flex-end;align-items:center;margin-top:.75rem;flex-wrap:wrap">'
+      +'<span style="color:#94a3b8;font-size:.8rem;margin-right:.5rem">'+(start+1)+'–'+Math.min(start+NE_PAGE_SIZE,data.length)+' / '+data.length+'</span>'
+      +'<button class="btn btn-outline btn-sm" '+(nesPage===1?'disabled':'')+' onclick="gotoNesPage('+(nesPage-1)+')">&laquo;</button>'
+      +pageBtns.join('')
+      +'<button class="btn btn-outline btn-sm" '+(nesPage===totalPages?'disabled':'')+' onclick="gotoNesPage('+(nesPage+1)+')">&raquo;</button>'
+      +'</div>';
+  }
   document.getElementById('nesTable').innerHTML=html;
 }
 async function deleteNe(id,name){if(!confirm(t('delete_btn')+' '+name+'?'))return;const res=await api('POST','/authorize/ne/remove',{id});if(res.status===200){toast('Deleted');await refreshCaches();loadNes();}else toast(failMsg(res),'error');}
@@ -977,11 +923,6 @@ async function assignNe(){
   await refreshCaches();loadNeMapping();
 }
 
-// ── Role Mapping ──
-async function loadRoleMapping(){const{data}=await api('GET','/authorize/user/show');if(!Array.isArray(data)||!data.length){document.getElementById('roleMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>Permissions</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(u=>{const permList=u.permissions?u.permissions.split(' ').filter(Boolean):[];const permsBadges=permList.length>0?permList.map(p=>'<span class="badge badge-green">'+esc(p)+'</span>').join(' '):'<span style="color:#64748b">None</span>';const removeButtons=permList.map(p=>'<button class="btn btn-danger btn-sm" onclick="removeRole(\''+esc(u.username)+'\',\''+esc(p)+'\')">'+esc(p)+' &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+permsBadges+'</td><td class="actions admin-only">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('roleMappingTable').innerHTML=html;}
-async function assignRole(){const username=acRoleMapUser.getValue();const permission=acRoleMapPerm.getValue();if(!username||!permission){toast('Select user and permission','error');return;}const res=await api('POST','/authorize/user/set',{username,permission});if(res.status===200){toast('Assigned');acRoleMapUser.clear();acRoleMapPerm.clear();await refreshCaches();loadRoleMapping();}else toast(failMsg(res),'error');}
-async function removeRole(username,permission){if(!confirm('Remove '+permission+' from '+username+'?'))return;const res=await api('POST','/authorize/user/delete',{username,permission});if(res.status===200){toast('Removed');loadRoleMapping();}else toast(failMsg(res),'error');}
-
 // ── History ──
 async function loadHistory(){
   const limit=document.getElementById('historyLimit').value;
@@ -1003,8 +944,48 @@ async function loadHistory(){
   document.getElementById('historyTable').innerHTML=html;
 }
 
-// ── Import ──
+// ── Import / Export ──
 function handleImportFile(event){const file=event.target.files[0];if(!file)return;const reader=new FileReader();reader.onload=e=>{document.getElementById('importText').value=e.target.result;};reader.readAsText(file);}
+function csvSafe(v){return String(v==null?'':v).replace(/[,\r\n]+/g,' ').trim();}
+function buildExportText(){
+  const lines=[];
+  lines.push('# Exported '+new Date().toISOString()+' from MGT Service');
+  lines.push('# Passwords cannot be exported (bcrypt-hashed); using placeholder "changeme".');
+  lines.push('');
+  const users=(cachedAdminUsers||[]).filter(u=>u.account_type!==0);
+  lines.push('[users]');
+  lines.push('username,password,email');
+  users.forEach(u=>lines.push([csvSafe(u.account_name),'changeme',csvSafe(u.email||'')].join(',')));
+  lines.push('');
+  lines.push('[nes]');
+  lines.push('ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description');
+  (cachedNes||[]).forEach(n=>lines.push([
+    csvSafe(n.ne_name),csvSafe(n.site_name),csvSafe(n.namespace),csvSafe(n.command_url),
+    csvSafe(n.conf_mode),csvSafe(n.conf_master_ip),csvSafe(n.conf_port_master_ssh||''),
+    csvSafe(n.conf_username),csvSafe(n.conf_password),csvSafe(n.description)
+  ].join(',')));
+  lines.push('');
+  lines.push('[user_roles]');
+  lines.push('username,permission');
+  users.forEach(u=>{const perm=u.account_type===1?'admin':'user';lines.push([csvSafe(u.account_name),perm].join(','));});
+  lines.push('');
+  lines.push('[user_nes]');
+  lines.push('username,ne_name');
+  (cachedUsers||[]).forEach(u=>{(u.tblNes||[]).forEach(n=>lines.push([csvSafe(u.username),csvSafe(n.ne)].join(',')));});
+  lines.push('');
+  return lines.join('\n');
+}
+function doExport(){
+  const text=buildExportText();
+  const blob=new Blob([text],{type:'text/plain;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const stamp=new Date().toISOString().replace(/[:T]/g,'-').replace(/\..+/,'');
+  a.href=url;a.download='data-'+stamp+'.txt';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
+  toast('Exported '+a.download);
+}
 function fillSampleImport(){document.getElementById('importText').value='[users]\nusername,password,email\nadmin,admin123,admin@vht.com\noperator1,Pass@123,op1@vht.com\n\n[nes]\nne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description\nHTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01\nHTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,NETCONF,10.10.2.1,830,admin,admin,HCM AMF Node 01\n\n[user_roles]\nusername,permission\nadmin,admin\noperator1,user\n\n[user_nes]\nusername,ne_name\nadmin,HTSMF01\noperator1,HTAMF01';}
 async function runImport(){
   const text=document.getElementById('importText').value;

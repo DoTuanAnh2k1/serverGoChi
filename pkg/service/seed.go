@@ -57,26 +57,22 @@ var seedNes = []db_models.CliNe{
 	{NeName: "UPF-01", SiteName: "HN-DC-02", SystemType: "5GC", Description: "User Plane Function"},
 }
 
-// SeedDefaultNes creates basic NEs if they don't already exist.
-// Idempotent: skips any NE whose name already exists in the 5GC system type.
+// SeedDefaultNes creates the default NE set only when the 5GC NE table is empty.
+// If any NE already exists (from prior seed or user imports), seeding is skipped
+// entirely to avoid re-introducing default NEs an operator may have deleted.
 func SeedDefaultNes() {
 	existing, err := GetNeListBySystemType("5GC")
 	if err != nil {
 		logger.Logger.Errorf("seed: list existing NEs: %v", err)
 		return
 	}
-
-	existingNames := make(map[string]bool, len(existing))
-	for _, ne := range existing {
-		existingNames[ne.NeName] = true
+	if len(existing) > 0 {
+		logger.Logger.Infof("seed: %d NEs already exist, skip default NE seeding", len(existing))
+		return
 	}
 
 	for i := range seedNes {
 		ne := seedNes[i]
-		if existingNames[ne.NeName] {
-			logger.Logger.Infof("seed: NE %q already exists, skip", ne.NeName)
-			continue
-		}
 		if err := CreateNe(&ne); err != nil {
 			logger.Logger.Errorf("seed: create NE %q: %v", ne.NeName, err)
 			continue

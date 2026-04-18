@@ -49,7 +49,6 @@ func Init() {
 
 		router.Route("/change-password", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
-			r.Use(middleware.CheckRole)
 			r.Post("/", HandlerChangePassword)
 		})
 

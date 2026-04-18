@@ -169,8 +169,9 @@ paths:
       tags: [Authentication]
       summary: Change own password (requires old password)
       description: |
-        Only allows a user to change their own password — `username` in the body
-        must match the authenticated user, else 401.
+        Any authenticated user (including Normal role) may call this endpoint to
+        change their own password. The `username` in the body must match the
+        authenticated user — otherwise the request returns 401.
       operationId: changePassword
       security:
         - bearerAuth: []
