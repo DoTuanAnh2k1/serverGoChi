@@ -5,41 +5,41 @@ project, change the package name, and use.
 
 ## Files
 
-- `MgtServiceClient.java` — client class. One **instance per user** (holds their token).
+- `MgtServiceClient.java` — all-static client; one method per HTTP endpoint plus typed wrappers.
 - `MgtModels.java` — record types for every response shape + a minimal JSON parser.
 - `MgtHistoryClient.java` — standalone example covering only `POST /aa/history/save`.
 
-## Shape of state
+## State model
 
-- **Shared (process-wide, static):** `baseUrl` + the underlying `HttpClient`. Set once at
-  startup via `MgtServiceClient.init(url)`.
-- **Per-user (instance field):** the `token` (JWT with `"Basic "` prefix). Each logged-in
-  user holds their own `MgtServiceClient` instance.
+- **Shared, set once:** `baseUrl` and the shared `HttpClient`, configured via
+  `MgtServiceClient.init(url)`.
+- **Per call:** the caller passes the `token` as the first argument to every
+  authorized method. The client does not own or cache it — you keep the token
+  wherever it fits your session model.
 
-This separation is important: do **not** share one client across users — the
-token is per-instance, so concurrent users get their own.
+The token string already contains the `"Basic "` prefix — use it verbatim.
 
 ## Quick start
 
 ```java
-// 1. Once at startup — configure where mgt-svc lives.
+// Once at startup
 MgtServiceClient.init("http://mgt-svc:3000");
 
-// 2. Per user — login creates a dedicated client with the user's token already stored.
-MgtServiceClient alice = MgtServiceClient.login("alice", "pass");
+// 1. Login — caller keeps the returned token per user / session.
+MgtModels.AuthResult auth = MgtServiceClient.authenticateTyped("alice", "pass");
+String token = auth.token();          // "Basic eyJ..."
 
-// 3. Use the client — the token rides on every request automatically.
-List<MgtModels.Ne> nes = alice.listNeTyped();
-for (MgtModels.Ne ne : nes) {
-    System.out.println(ne.ne() + " → " + ne.confMasterIp() + ":" + ne.confPortMasterSsh());
-}
+// 2. Authorized calls: token as the first argument.
+List<MgtModels.Ne> nes = MgtServiceClient.listNeTyped(token);
+nes.forEach(n -> System.out.println(n.ne() + " → " + n.confMasterIp()));
 
-// 4. Need the raw token string (e.g. to forward elsewhere)?
-String jwt = alice.getToken();     // "Basic eyJ..."
+// 3. Save command history.
+MgtServiceClient.historySave(token,
+        "show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success");
 
-// 5. Already have a token (e.g. forwarded from browser / another service)?
-MgtServiceClient bob = MgtServiceClient.withToken("Basic eyJ...");
-bob.historySave("show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success");
+// 4. Typed history query.
+List<MgtModels.History> recent =
+        MgtServiceClient.historyListTyped(token, 50, "ne-command", null, "alice");
 ```
 
 ## Raw vs. typed methods
@@ -49,62 +49,53 @@ Endpoints that return JSON objects/arrays also have a `*Typed` variant that
 parses the body into a `MgtModels.*` record and throws `MgtApiException` if the
 status is not 2xx.
 
-| Raw                     | Typed                     | Returns                                 |
-|-------------------------|---------------------------|-----------------------------------------|
-| `authenticate`          | `authenticateTyped`       | `MgtModels.AuthResult`                  |
-| `validateToken`         | `validateTokenTyped`      | `MgtModels.ValidateTokenResult`         |
-| `showUsers`             | `showUsersTyped`          | `List<MgtModels.UserShow>`              |
-| `authorizeUserShow`     | `authorizeUserShowTyped`  | `List<MgtModels.UserPermission>`        |
-| `neShow`                | `neShowTyped`             | `List<MgtModels.NeShow>`                |
-| `listNe`                | `listNeTyped`             | `List<MgtModels.Ne>`                    |
-| `listNeMonitor`         | `listNeMonitorTyped`      | `List<MgtModels.NeMonitor>`             |
-| `neConfigList`          | `neConfigListTyped`       | `List<MgtModels.NeConfig>`              |
-| `configBackupSave`      | `configBackupSaveTyped`   | `MgtModels.ConfigBackupSaveResult`      |
-| `configBackupList`      | `configBackupListTyped`   | `List<MgtModels.ConfigBackup>`          |
-| `configBackupGet`       | `configBackupGetTyped`    | `MgtModels.ConfigBackupDetail`          |
-| `historyList`           | `historyListTyped`        | `List<MgtModels.History>`               |
-| `adminUserList`         | `adminUserListTyped`      | `List<MgtModels.AdminUser>`             |
-| `adminNeList`           | `adminNeListTyped`        | `List<MgtModels.CliNe>`                 |
-| `importBulk`            | `importBulkTyped`         | `List<MgtModels.ImportResult>`          |
-| `subscribersFiles`      | `subscribersFilesTyped`   | `List<MgtModels.SubscriberFile>`        |
-| `subscribersFile`       | `subscribersFileTyped`    | `MgtModels.SubscriberFileContent`       |
+| Raw                      | Typed                       | Returns                                 |
+|--------------------------|-----------------------------|-----------------------------------------|
+| `authenticate(u, p)`     | `authenticateTyped(u, p)`   | `MgtModels.AuthResult`                  |
+| `validateToken(t)`       | `validateTokenTyped(t)`     | `MgtModels.ValidateTokenResult`         |
+| `showUsers(tok)`         | `showUsersTyped(tok)`       | `List<MgtModels.UserShow>`              |
+| `authorizeUserShow(tok)` | `authorizeUserShowTyped`    | `List<MgtModels.UserPermission>`        |
+| `neShow(tok)`            | `neShowTyped(tok)`          | `List<MgtModels.NeShow>`                |
+| `listNe(tok)`            | `listNeTyped(tok)`          | `List<MgtModels.Ne>`                    |
+| `listNeMonitor(tok)`     | `listNeMonitorTyped(tok)`   | `List<MgtModels.NeMonitor>`             |
+| `neConfigList(tok)`      | `neConfigListTyped(tok)`    | `List<MgtModels.NeConfig>`              |
+| `configBackupSave(tok,…)`| `configBackupSaveTyped`     | `MgtModels.ConfigBackupSaveResult`      |
+| `configBackupList(tok,…)`| `configBackupListTyped`     | `List<MgtModels.ConfigBackup>`          |
+| `configBackupGet(tok,id)`| `configBackupGetTyped`      | `MgtModels.ConfigBackupDetail`          |
+| `historyList(tok,…)`     | `historyListTyped`          | `List<MgtModels.History>`               |
+| `adminUserList(tok)`     | `adminUserListTyped`        | `List<MgtModels.AdminUser>`             |
+| `adminNeList(tok)`       | `adminNeListTyped`          | `List<MgtModels.CliNe>`                 |
+| `importBulk(tok, body)`  | `importBulkTyped`           | `List<MgtModels.ImportResult>`          |
+| `subscribersFiles(tok)`  | `subscribersFilesTyped`     | `List<MgtModels.SubscriberFile>`        |
+| `subscribersFile(tok,i)` | `subscribersFileTyped`      | `MgtModels.SubscriberFileContent`       |
 
 Write/update endpoints (`*Create`, `*Update`, `*Delete`, `*Assign`, etc.) return
 the generic `Response` — inspect `status()` or `as(MgtModels.Envelope::from)`
 for `{status, code, message}` payloads.
 
-### Ad-hoc parsing
+### No-auth endpoints
 
-If an endpoint isn't covered by a `*Typed` variant, parse on the fly:
+`health()`, `healthDb()`, `authenticate(u, p)`, and `validateToken(t)` do not
+take a token parameter — they do not require an Authorization header.
+
+### Ad-hoc calls
+
+If an endpoint isn't covered here, use the generic helpers:
 
 ```java
-MgtServiceClient.Response r = client.post("/aa/admin/user/update", ...);
-MgtModels.Envelope env = r.as(MgtModels.Envelope::from);
-if (Boolean.TRUE.equals(env.status())) ...
+// With auth
+MgtServiceClient.getAuth(token,  "/aa/something");
+MgtServiceClient.postAuth(token, "/aa/something",
+        MgtServiceClient.toJson(MgtServiceClient.map("k", "v")));
+
+// No auth
+MgtServiceClient.postUnauth("/health-like-path", "...");
 ```
 
-Or drop to the map/list level:
+And parse:
 
 ```java
-Object parsed = MgtModels.parse(r.body());  // Map / List / String / Long / Double / Boolean / null
-```
-
-## Building a per-user client cache
-
-A common pattern is "one logged-in user → one `MgtServiceClient`". Keep a map
-keyed by username (or session id) and look up per request:
-
-```java
-private static final Map<String, MgtServiceClient> SESSIONS = new ConcurrentHashMap<>();
-
-public MgtServiceClient clientFor(String user, String pass) throws Exception {
-    MgtServiceClient c = SESSIONS.get(user);
-    if (c == null || !c.isAuthenticated()) {
-        c = MgtServiceClient.login(user, pass);
-        SESSIONS.put(user, c);
-    }
-    return c;
-}
+Object parsed = MgtModels.parse(response.body());  // Map / List / String / Long / Double / Boolean / null
 ```
 
 ## Endpoint coverage
@@ -123,10 +114,3 @@ All 35 endpoints in `api.yaml`, grouped:
 - Admin (frontend API): `adminUserList`, `adminUserUpdate`, `adminNeList`, `adminNeCreate`, `adminNeUpdate`
 - Import: `importBulk`
 - Subscribers: `subscribersFiles`, `subscribersFile`
-
-Need an endpoint not listed here? Use the generic helpers:
-
-```java
-client.get("/aa/something");
-client.post("/aa/something", MgtServiceClient.toJson(MgtServiceClient.map("k", "v")));
-```

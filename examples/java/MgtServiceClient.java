@@ -16,39 +16,41 @@ import java.util.Map;
 import java.util.function.Function;
 
 /**
- * Java client for cli-mgt-svc HTTP API.
+ * Static Java client for cli-mgt-svc HTTP API.
  *
- * Shared state (configured once at process startup):
- *   - baseUrl + HttpClient  → static, set via {@link #init(String)}
+ * Shared state:
+ *   - {@code baseUrl} and the shared {@link HttpClient} — configured once via {@link #init}.
  *
- * Per-user state:
- *   - token (JWT with "Basic " prefix) → field on each instance
+ * Token handling:
+ *   - The caller owns the token. Pass it as the first argument to every authorized
+ *     method. The token string already includes the {@code "Basic "} prefix — use
+ *     verbatim what {@link #authenticate} returned.
  *
  * Typical usage:
  * <pre>{@code
  *   // Once at startup
  *   MgtServiceClient.init("http://mgt-svc:3000");
  *
- *   // Per user — each logged-in user holds their own client
- *   MgtServiceClient client = MgtServiceClient.login("alice", "pass");
- *   List<MgtModels.Ne> nes = client.listNeTyped();
- *   String jwt = client.getToken();   // "Basic eyJ..."
+ *   // Login — caller keeps the returned token per user / session.
+ *   String token = MgtServiceClient.authenticateTyped("alice", "pass").token();
  *
- *   // Or if you already have a token (e.g. forwarded from the browser):
- *   MgtServiceClient client = MgtServiceClient.withToken("Basic eyJ...");
+ *   // Subsequent authorized calls take the token explicitly.
+ *   List<MgtModels.Ne> nes = MgtServiceClient.listNeTyped(token);
+ *   MgtServiceClient.historySave(token, "show running-config", "HTSMF01",
+ *                                "10.10.1.1", "ne-command", "success");
  * }</pre>
  *
  * Java 17+ — uses java.net.http.HttpClient and records, no external dependencies.
  */
 public final class MgtServiceClient {
 
-    // ── Shared, process-wide ────────────────────────────────────────────────
-
     private static final HttpClient HTTP = HttpClient.newBuilder()
             .connectTimeout(Duration.ofSeconds(5))
             .build();
 
     private static volatile String baseUrl;
+
+    private MgtServiceClient() {}
 
     /** Configure the mgt-service base URL. Call once at startup. */
     public static void init(String url) {
@@ -59,36 +61,7 @@ public final class MgtServiceClient {
     /** @return the configured base URL, or {@code null} if {@link #init} was not called. */
     public static String getBaseUrl() { return baseUrl; }
 
-    // ── Per-instance state (one per authenticated user) ─────────────────────
-
-    private String token;   // includes "Basic " prefix
-
-    /** Create a client with no token — call {@link #authenticate} before using authorized endpoints. */
-    public MgtServiceClient() {}
-
-    /** Create a client with a token already known (e.g. forwarded from the browser). */
-    public MgtServiceClient(String token) { this.token = token; }
-
-    /**
-     * Convenience factory: creates a client, calls {@link #authenticate}, returns it.
-     * Throws {@link MgtApiException} if the login fails.
-     */
-    public static MgtServiceClient login(String username, String password) throws Exception {
-        MgtServiceClient c = new MgtServiceClient();
-        Response r = c.authenticate(username, password);
-        if (!r.ok()) throw new MgtApiException(r.status(), r.body());
-        return c;
-    }
-
-    /** Alias for {@link #MgtServiceClient(String)} — readable at call sites. */
-    public static MgtServiceClient withToken(String token) { return new MgtServiceClient(token); }
-
-    public String  getToken()         { return token; }
-    public void    setToken(String t) { this.token = t; }
-    public void    clearToken()       { this.token = null; }
-    public boolean isAuthenticated()  { return token != null && !token.isEmpty(); }
-
-    // ── Response container (nested, static — doesn't depend on instance state) ──
+    // ── Response container ──────────────────────────────────────────────────
 
     /** Status + body container with typed parse helpers. */
     public record Response(int status, String body) {
@@ -112,31 +85,29 @@ public final class MgtServiceClient {
         }
     }
 
-    // ── Health / Docs ────────────────────────────────────────────────────────
+    // ── Health / Docs (no auth) ──────────────────────────────────────────────
 
-    public Response health()   throws Exception { return get("/health"); }
-    public Response healthDb() throws Exception { return get("/aa/heath-check-db"); }
+    public static Response health()   throws Exception { return send(unauth("/health").GET().build()); }
+    public static Response healthDb() throws Exception { return send(unauth("/aa/heath-check-db").GET().build()); }
 
-    // ── Auth ─────────────────────────────────────────────────────────────────
+    // ── Auth (no token required to call these) ───────────────────────────────
 
-    /** POST /aa/authenticate. On 200, stores the token on this instance. */
-    public Response authenticate(String username, String password) throws Exception {
-        Response r = postRaw("/aa/authenticate", toJson(map("username", username, "password", password)), false);
-        if (r.ok()) {
-            MgtModels.AuthResult auth = r.as(MgtModels.AuthResult::from);
-            if (auth != null && auth.token() != null && !auth.token().isEmpty()) token = auth.token();
-        }
-        return r;
+    /** POST /aa/authenticate. Returns the raw response — extract the token with {@link Response#as}. */
+    public static Response authenticate(String username, String password) throws Exception {
+        return postUnauth("/aa/authenticate", toJson(map("username", username, "password", password)));
     }
 
-    /** POST /aa/validate-token. Body: {"token": "<basic-prefixed jwt>"} */
-    public Response validateToken(String tokenWithBasicPrefix) throws Exception {
-        return postRaw("/aa/validate-token", toJson(map("token", tokenWithBasicPrefix)), false);
+    /** POST /aa/validate-token. {@code tokenToValidate} is the value being checked. */
+    public static Response validateToken(String tokenToValidate) throws Exception {
+        return postUnauth("/aa/validate-token", toJson(map("token", tokenToValidate)));
     }
 
-    /** POST /aa/change-password/. Self-service — username must equal the caller. */
-    public Response changePassword(String username, String oldPassword, String newPassword) throws Exception {
-        return post("/aa/change-password/", toJson(map(
+    // ── Auth-required endpoints ──────────────────────────────────────────────
+    // Every method below takes the caller's token as the first argument.
+
+    /** POST /aa/change-password/. Self-service — {@code username} must equal the caller. */
+    public static Response changePassword(String token, String username, String oldPassword, String newPassword) throws Exception {
+        return postAuth(token, "/aa/change-password/", toJson(map(
                 "username", username,
                 "old_password", oldPassword,
                 "new_password", newPassword)));
@@ -149,51 +120,44 @@ public final class MgtServiceClient {
      * Required keys in extras: account_name, password. Optional: full_name, email, address,
      * phone_number, avatar, description, account_type (0/1/2), only_ad.
      */
-    public Response createUser(Map<String, Object> userFields) throws Exception {
-        return post("/aa/authenticate/user/set", toJson(userFields));
+    public static Response createUser(String token, Map<String, Object> userFields) throws Exception {
+        return postAuth(token, "/aa/authenticate/user/set", toJson(userFields));
     }
 
-    /** POST /aa/authenticate/user/delete — disable a user. */
-    public Response disableUser(String accountName) throws Exception {
-        return post("/aa/authenticate/user/delete", toJson(map("account_name", accountName)));
+    public static Response disableUser(String token, String accountName) throws Exception {
+        return postAuth(token, "/aa/authenticate/user/delete", toJson(map("account_name", accountName)));
     }
 
-    /** GET /aa/authenticate/user/show — list users with NEs and roles. */
-    public Response showUsers() throws Exception {
-        return get("/aa/authenticate/user/show");
+    public static Response showUsers(String token) throws Exception {
+        return getAuth(token, "/aa/authenticate/user/show");
     }
 
-    /** POST /aa/authenticate/user/reset-password — admin reset. */
-    public Response adminResetPassword(String username, String newPassword) throws Exception {
-        return post("/aa/authenticate/user/reset-password", toJson(map(
+    public static Response adminResetPassword(String token, String username, String newPassword) throws Exception {
+        return postAuth(token, "/aa/authenticate/user/reset-password", toJson(map(
                 "username", username,
                 "new_password", newPassword)));
     }
 
     // ── User Authorization ───────────────────────────────────────────────────
 
-    /** POST /aa/authorize/user/set — set permission ("admin" → account_type=1, "user" → 2). */
-    public Response authorizeUserSet(String username, String permission) throws Exception {
-        return post("/aa/authorize/user/set", toJson(map(
+    public static Response authorizeUserSet(String token, String username, String permission) throws Exception {
+        return postAuth(token, "/aa/authorize/user/set", toJson(map(
                 "username", username,
                 "permission", permission)));
     }
 
-    /** POST /aa/authorize/user/delete — reset permission to "user". */
-    public Response authorizeUserDelete(String username) throws Exception {
-        return post("/aa/authorize/user/delete", toJson(map("username", username)));
+    public static Response authorizeUserDelete(String token, String username) throws Exception {
+        return postAuth(token, "/aa/authorize/user/delete", toJson(map("username", username)));
     }
 
-    /** GET /aa/authorize/user/show — list user-permission entries. */
-    public Response authorizeUserShow() throws Exception {
-        return get("/aa/authorize/user/show");
+    public static Response authorizeUserShow(String token) throws Exception {
+        return getAuth(token, "/aa/authorize/user/show");
     }
 
     // ── Network Element ──────────────────────────────────────────────────────
 
-    /** GET /aa/authorize/ne/show — list 5GC NEs (basic fields). */
-    public Response neShow() throws Exception {
-        return get("/aa/authorize/ne/show");
+    public static Response neShow(String token) throws Exception {
+        return getAuth(token, "/aa/authorize/ne/show");
     }
 
     /**
@@ -203,120 +167,103 @@ public final class MgtServiceClient {
      * conf_port_master_tcp, conf_port_slave_ssh, conf_port_slave_tcp,
      * conf_username, conf_password.
      */
-    public Response neCreate(Map<String, Object> neFields) throws Exception {
-        return post("/aa/authorize/ne/create", toJson(neFields));
+    public static Response neCreate(String token, Map<String, Object> neFields) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/create", toJson(neFields));
     }
 
-    /** POST /aa/authorize/ne/update — id required, other fields optional (partial update). */
-    public Response neUpdate(Map<String, Object> neFields) throws Exception {
-        return post("/aa/authorize/ne/update", toJson(neFields));
+    public static Response neUpdate(String token, Map<String, Object> neFields) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/update", toJson(neFields));
     }
 
-    /** POST /aa/authorize/ne/remove — delete NE + cascade mappings/configs/backups. */
-    public Response neRemove(long id) throws Exception {
-        return post("/aa/authorize/ne/remove", toJson(map("id", id)));
+    public static Response neRemove(String token, long id) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/remove", toJson(map("id", id)));
     }
 
-    /** POST /aa/authorize/ne/set — assign NE to user. neid is the NE ID as a string. */
-    public Response neAssignToUser(String username, String neId) throws Exception {
-        return post("/aa/authorize/ne/set", toJson(map(
+    public static Response neAssignToUser(String token, String username, String neId) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/set", toJson(map(
                 "username", username,
                 "neid", neId)));
     }
 
-    /** POST /aa/authorize/ne/delete — remove NE from user. */
-    public Response neUnassignFromUser(String username, String neId) throws Exception {
-        return post("/aa/authorize/ne/delete", toJson(map(
+    public static Response neUnassignFromUser(String token, String username, String neId) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/delete", toJson(map(
                 "username", username,
                 "neid", neId)));
     }
 
-    // ── List endpoints (any authenticated user) ──────────────────────────────
+    // ── List endpoints ───────────────────────────────────────────────────────
 
-    /** GET /aa/list/ne — full NE fields the caller is authorized to access. */
-    public Response listNe() throws Exception {
-        return get("/aa/list/ne");
+    public static Response listNe(String token) throws Exception {
+        return getAuth(token, "/aa/list/ne");
     }
 
-    /** GET /aa/list/ne/monitor — NE name + monitor URL. */
-    public Response listNeMonitor() throws Exception {
-        return get("/aa/list/ne/monitor");
+    public static Response listNeMonitor(String token) throws Exception {
+        return getAuth(token, "/aa/list/ne/monitor");
     }
 
     // ── NE Config ────────────────────────────────────────────────────────────
 
-    /**
-     * POST /aa/authorize/ne/config/create.
-     * Required: ne_id, ip_address. Optional: port (default 22), username, password,
-     * conf_mode, description.
-     */
-    public Response neConfigCreate(Map<String, Object> fields) throws Exception {
-        return post("/aa/authorize/ne/config/create", toJson(fields));
+    public static Response neConfigCreate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/config/create", toJson(fields));
     }
 
-    /** GET /aa/authorize/ne/config/list — list NE configs (includes ne_name + password). */
-    public Response neConfigList() throws Exception {
-        return get("/aa/authorize/ne/config/list");
+    public static Response neConfigList(String token) throws Exception {
+        return getAuth(token, "/aa/authorize/ne/config/list");
     }
 
-    /** POST /aa/authorize/ne/config/update — id required, other fields optional. */
-    public Response neConfigUpdate(Map<String, Object> fields) throws Exception {
-        return post("/aa/authorize/ne/config/update", toJson(fields));
+    public static Response neConfigUpdate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/config/update", toJson(fields));
     }
 
-    /** POST /aa/authorize/ne/config/delete. */
-    public Response neConfigDelete(long id) throws Exception {
-        return post("/aa/authorize/ne/config/delete", toJson(map("id", id)));
+    public static Response neConfigDelete(String token, long id) throws Exception {
+        return postAuth(token, "/aa/authorize/ne/config/delete", toJson(map("id", id)));
     }
 
     // ── Config Backup ────────────────────────────────────────────────────────
 
-    /** POST /aa/config-backup/save — XML stored on disk, metadata in DB. */
-    public Response configBackupSave(String neName, String neIp, String configXml) throws Exception {
-        return post("/aa/config-backup/save", toJson(map(
+    public static Response configBackupSave(String token, String neName, String neIp, String configXml) throws Exception {
+        return postAuth(token, "/aa/config-backup/save", toJson(map(
                 "ne_name", neName,
                 "ne_ip", neIp,
                 "config_xml", configXml)));
     }
 
-    /** GET /aa/config-backup/list?ne_name=&lt;optional&gt; — pass null to list all. */
-    public Response configBackupList(String neNameFilter) throws Exception {
+    /** GET /aa/config-backup/list?ne_name=&lt;optional&gt; — pass null for no filter. */
+    public static Response configBackupList(String token, String neNameFilter) throws Exception {
         String q = (neNameFilter == null || neNameFilter.isEmpty())
                 ? "" : "?ne_name=" + urlEncode(neNameFilter);
-        return get("/aa/config-backup/list" + q);
+        return getAuth(token, "/aa/config-backup/list" + q);
     }
 
-    /** GET /aa/config-backup/{id} — returns metadata + full XML. */
-    public Response configBackupGet(long id) throws Exception {
-        return get("/aa/config-backup/" + id);
+    public static Response configBackupGet(String token, long id) throws Exception {
+        return getAuth(token, "/aa/config-backup/" + id);
     }
 
     // ── History ──────────────────────────────────────────────────────────────
 
     /**
-     * GET /aa/history/list — all params optional.
-     * @param limit    1..500 (default 100). 0 to omit.
-     * @param scope    "cli-config" | "ne-command" | "ne-config" or null.
-     * @param neName   filter by NE name, or null.
-     * @param account  filter by username, or null.
+     * GET /aa/history/list — all filter params optional.
+     * @param limit   1..500 (default 100). 0 to omit.
+     * @param scope   "cli-config" | "ne-command" | "ne-config" or null.
+     * @param neName  filter by NE name, or null.
+     * @param account filter by username, or null.
      */
-    public Response historyList(int limit, String scope, String neName, String account) throws Exception {
+    public static Response historyList(String token, int limit, String scope, String neName, String account) throws Exception {
         StringBuilder q = new StringBuilder();
         if (limit > 0)                                    appendQuery(q, "limit",   String.valueOf(limit));
         if (scope   != null && !scope.isEmpty())          appendQuery(q, "scope",   scope);
         if (neName  != null && !neName.isEmpty())         appendQuery(q, "ne_name", neName);
         if (account != null && !account.isEmpty())        appendQuery(q, "account", account);
-        return get("/aa/history/list" + q);
+        return getAuth(token, "/aa/history/list" + q);
     }
 
     /**
-     * POST /aa/history/save — used by SSH server / cli-netconf-svc to log a command.
-     * cmd_name + ne_name are required; ne_ip / scope / result optional.
+     * POST /aa/history/save — used by SSH / cli-netconf to log a CLI command.
      * account is taken from the JWT — do not send it.
      */
-    public Response historySave(String cmdName, String neName, String neIp,
-                                String scope, String result) throws Exception {
-        return post("/aa/history/save", toJson(map(
+    public static Response historySave(String token, String cmdName, String neName, String neIp,
+                                       String scope, String result) throws Exception {
+        return postAuth(token, "/aa/history/save", toJson(map(
                 "cmd_name", cmdName,
                 "ne_name",  neName,
                 "ne_ip",    neIp,
@@ -326,57 +273,49 @@ public final class MgtServiceClient {
 
     // ── Admin (frontend API) ─────────────────────────────────────────────────
 
-    /** GET /aa/admin/user/list — full user objects, no password. */
-    public Response adminUserList() throws Exception {
-        return get("/aa/admin/user/list");
+    public static Response adminUserList(String token) throws Exception {
+        return getAuth(token, "/aa/admin/user/list");
     }
 
-    /**
-     * POST /aa/admin/user/update — update metadata.
-     * Required: account_name. Optional: full_name, email, phone_number, address,
-     * description, account_type (1 or 2 — cannot set 0).
-     * Normal users may call this only for their own account_name; account_type
-     * is preserved server-side for non-admins.
-     */
-    public Response adminUserUpdate(Map<String, Object> fields) throws Exception {
-        return post("/aa/admin/user/update", toJson(fields));
+    public static Response adminUserUpdate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/admin/user/update", toJson(fields));
     }
 
-    /** GET /aa/admin/ne/list — full NE objects (includes credentials). */
-    public Response adminNeList() throws Exception {
-        return get("/aa/admin/ne/list");
+    public static Response adminNeList(String token) throws Exception {
+        return getAuth(token, "/aa/admin/ne/list");
     }
 
-    /**
-     * POST /aa/admin/ne/create — create with full CliNe schema.
-     * Required: ne_name. See CliNe schema for all fields.
-     */
-    public Response adminNeCreate(Map<String, Object> fields) throws Exception {
-        return post("/aa/admin/ne/create", toJson(fields));
+    public static Response adminNeCreate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/admin/ne/create", toJson(fields));
     }
 
-    /** POST /aa/admin/ne/update — id required, other fields optional. */
-    public Response adminNeUpdate(Map<String, Object> fields) throws Exception {
-        return post("/aa/admin/ne/update", toJson(fields));
+    public static Response adminNeUpdate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/admin/ne/update", toJson(fields));
     }
 
     // ── Import ───────────────────────────────────────────────────────────────
 
     /** POST /aa/import/ — body is plain text in section format ([users], [nes], ...). */
-    public Response importBulk(String plainTextBody) throws Exception {
-        return postRawText("/aa/import/", plainTextBody);
+    public static Response importBulk(String token, String plainTextBody) throws Exception {
+        requireBaseUrl();
+        HttpRequest req = HttpRequest.newBuilder()
+                .uri(URI.create(baseUrl + "/aa/import/"))
+                .timeout(Duration.ofSeconds(15))
+                .header("Content-Type", "text/plain; charset=utf-8")
+                .header("Authorization", token)
+                .POST(BodyPublishers.ofString(plainTextBody, StandardCharsets.UTF_8))
+                .build();
+        return send(req);
     }
 
-    // ── Subscribers (TCP-collected files) ────────────────────────────────────
+    // ── Subscribers ──────────────────────────────────────────────────────────
 
-    /** GET /aa/subscribers/files — list available subscriber result files. */
-    public Response subscribersFiles() throws Exception {
-        return get("/aa/subscribers/files");
+    public static Response subscribersFiles(String token) throws Exception {
+        return getAuth(token, "/aa/subscribers/files");
     }
 
-    /** GET /aa/subscribers/files/{index} — fetch file content by index. */
-    public Response subscribersFile(int index) throws Exception {
-        return get("/aa/subscribers/files/" + index);
+    public static Response subscribersFile(String token, int index) throws Exception {
+        return getAuth(token, "/aa/subscribers/files/" + index);
     }
 
     // ── Typed convenience wrappers ───────────────────────────────────────────
@@ -385,76 +324,75 @@ public final class MgtServiceClient {
     // record from MgtModels. They throw MgtApiException if status is not 2xx —
     // use the raw Response-returning variants if you want to inspect failures.
 
-    /** Like {@link #authenticate} but returns the parsed body. Token is also stored on this instance. */
-    public MgtModels.AuthResult authenticateTyped(String u, String p) throws Exception {
+    public static MgtModels.AuthResult authenticateTyped(String u, String p) throws Exception {
         return must(authenticate(u, p)).as(MgtModels.AuthResult::from);
     }
 
-    public MgtModels.ValidateTokenResult validateTokenTyped(String tokenWithBasicPrefix) throws Exception {
-        return must(validateToken(tokenWithBasicPrefix)).as(MgtModels.ValidateTokenResult::from);
+    public static MgtModels.ValidateTokenResult validateTokenTyped(String tokenToValidate) throws Exception {
+        return must(validateToken(tokenToValidate)).as(MgtModels.ValidateTokenResult::from);
     }
 
-    public List<MgtModels.UserShow> showUsersTyped() throws Exception {
-        return must(showUsers()).asList(MgtModels.UserShow::from);
+    public static List<MgtModels.UserShow> showUsersTyped(String token) throws Exception {
+        return must(showUsers(token)).asList(MgtModels.UserShow::from);
     }
 
-    public List<MgtModels.UserPermission> authorizeUserShowTyped() throws Exception {
-        return must(authorizeUserShow()).asList(MgtModels.UserPermission::from);
+    public static List<MgtModels.UserPermission> authorizeUserShowTyped(String token) throws Exception {
+        return must(authorizeUserShow(token)).asList(MgtModels.UserPermission::from);
     }
 
-    public List<MgtModels.NeShow> neShowTyped() throws Exception {
-        return must(neShow()).asList(MgtModels.NeShow::from);
+    public static List<MgtModels.NeShow> neShowTyped(String token) throws Exception {
+        return must(neShow(token)).asList(MgtModels.NeShow::from);
     }
 
-    public List<MgtModels.Ne> listNeTyped() throws Exception {
-        return must(listNe()).asList(MgtModels.Ne::from);
+    public static List<MgtModels.Ne> listNeTyped(String token) throws Exception {
+        return must(listNe(token)).asList(MgtModels.Ne::from);
     }
 
-    public List<MgtModels.NeMonitor> listNeMonitorTyped() throws Exception {
-        return must(listNeMonitor()).asList(MgtModels.NeMonitor::from);
+    public static List<MgtModels.NeMonitor> listNeMonitorTyped(String token) throws Exception {
+        return must(listNeMonitor(token)).asList(MgtModels.NeMonitor::from);
     }
 
-    public List<MgtModels.NeConfig> neConfigListTyped() throws Exception {
-        return must(neConfigList()).asList(MgtModels.NeConfig::from);
+    public static List<MgtModels.NeConfig> neConfigListTyped(String token) throws Exception {
+        return must(neConfigList(token)).asList(MgtModels.NeConfig::from);
     }
 
     /** Parsed {@link #configBackupList}. Returns only the {@code backups} array. */
-    public List<MgtModels.ConfigBackup> configBackupListTyped(String neNameFilter) throws Exception {
+    public static List<MgtModels.ConfigBackup> configBackupListTyped(String token, String neNameFilter) throws Exception {
         MgtModels.ConfigBackupListResult wrapped =
-                must(configBackupList(neNameFilter)).as(MgtModels.ConfigBackupListResult::from);
+                must(configBackupList(token, neNameFilter)).as(MgtModels.ConfigBackupListResult::from);
         return wrapped == null || wrapped.backups() == null ? List.of() : wrapped.backups();
     }
 
-    public MgtModels.ConfigBackupDetail configBackupGetTyped(long id) throws Exception {
-        return must(configBackupGet(id)).as(MgtModels.ConfigBackupDetail::from);
+    public static MgtModels.ConfigBackupDetail configBackupGetTyped(String token, long id) throws Exception {
+        return must(configBackupGet(token, id)).as(MgtModels.ConfigBackupDetail::from);
     }
 
-    public MgtModels.ConfigBackupSaveResult configBackupSaveTyped(String neName, String neIp, String xml) throws Exception {
-        return must(configBackupSave(neName, neIp, xml)).as(MgtModels.ConfigBackupSaveResult::from);
+    public static MgtModels.ConfigBackupSaveResult configBackupSaveTyped(String token, String neName, String neIp, String xml) throws Exception {
+        return must(configBackupSave(token, neName, neIp, xml)).as(MgtModels.ConfigBackupSaveResult::from);
     }
 
-    public List<MgtModels.History> historyListTyped(int limit, String scope, String neName, String account) throws Exception {
-        return must(historyList(limit, scope, neName, account)).asList(MgtModels.History::from);
+    public static List<MgtModels.History> historyListTyped(String token, int limit, String scope, String neName, String account) throws Exception {
+        return must(historyList(token, limit, scope, neName, account)).asList(MgtModels.History::from);
     }
 
-    public List<MgtModels.AdminUser> adminUserListTyped() throws Exception {
-        return must(adminUserList()).asList(MgtModels.AdminUser::from);
+    public static List<MgtModels.AdminUser> adminUserListTyped(String token) throws Exception {
+        return must(adminUserList(token)).asList(MgtModels.AdminUser::from);
     }
 
-    public List<MgtModels.CliNe> adminNeListTyped() throws Exception {
-        return must(adminNeList()).asList(MgtModels.CliNe::from);
+    public static List<MgtModels.CliNe> adminNeListTyped(String token) throws Exception {
+        return must(adminNeList(token)).asList(MgtModels.CliNe::from);
     }
 
-    public List<MgtModels.ImportResult> importBulkTyped(String body) throws Exception {
-        return must(importBulk(body)).asList(MgtModels.ImportResult::from);
+    public static List<MgtModels.ImportResult> importBulkTyped(String token, String body) throws Exception {
+        return must(importBulk(token, body)).asList(MgtModels.ImportResult::from);
     }
 
-    public List<MgtModels.SubscriberFile> subscribersFilesTyped() throws Exception {
-        return must(subscribersFiles()).asList(MgtModels.SubscriberFile::from);
+    public static List<MgtModels.SubscriberFile> subscribersFilesTyped(String token) throws Exception {
+        return must(subscribersFiles(token)).asList(MgtModels.SubscriberFile::from);
     }
 
-    public MgtModels.SubscriberFileContent subscribersFileTyped(int index) throws Exception {
-        return must(subscribersFile(index)).as(MgtModels.SubscriberFileContent::from);
+    public static MgtModels.SubscriberFileContent subscribersFileTyped(String token, int index) throws Exception {
+        return must(subscribersFile(token, index)).as(MgtModels.SubscriberFileContent::from);
     }
 
     /** Thrown by *Typed methods when the HTTP status is not 2xx. */
@@ -475,39 +413,39 @@ public final class MgtServiceClient {
 
     // ── Generic helpers (also exposed for ad-hoc calls) ──────────────────────
 
-    public Response get(String path) throws Exception {
-        return send(builder(path).GET().build());
+    /** GET {path} with Authorization header. */
+    public static Response getAuth(String token, String path) throws Exception {
+        return send(authed(token, path).GET().build());
     }
 
-    public Response post(String path, String jsonBody) throws Exception {
-        return postRaw(path, jsonBody, true);
-    }
-
-    private Response postRaw(String path, String jsonBody, boolean auth) throws Exception {
-        requireBaseUrl();
-        HttpRequest.Builder b = HttpRequest.newBuilder()
-                .uri(URI.create(baseUrl + path))
-                .timeout(Duration.ofSeconds(15))
-                .header("Content-Type", "application/json");
-        if (auth && token != null) b.header("Authorization", token);
-        return send(b.POST(BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8)).build());
-    }
-
-    private Response postRawText(String path, String body) throws Exception {
-        HttpRequest req = builder(path)
-                .header("Content-Type", "text/plain; charset=utf-8")
-                .POST(BodyPublishers.ofString(body, StandardCharsets.UTF_8))
+    /** POST {path} (JSON body) with Authorization header. */
+    public static Response postAuth(String token, String path, String jsonBody) throws Exception {
+        HttpRequest req = authed(token, path)
+                .header("Content-Type", "application/json")
+                .POST(BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
         return send(req);
     }
 
-    private HttpRequest.Builder builder(String path) {
+    /** POST {path} (JSON body) without Authorization header — for /aa/authenticate and /aa/validate-token. */
+    public static Response postUnauth(String path, String jsonBody) throws Exception {
+        HttpRequest req = unauth(path)
+                .header("Content-Type", "application/json")
+                .POST(BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
+                .build();
+        return send(req);
+    }
+
+    private static HttpRequest.Builder authed(String token, String path) {
+        if (token == null || token.isEmpty()) throw new IllegalArgumentException("token required");
+        return unauth(path).header("Authorization", token);
+    }
+
+    private static HttpRequest.Builder unauth(String path) {
         requireBaseUrl();
-        HttpRequest.Builder b = HttpRequest.newBuilder()
+        return HttpRequest.newBuilder()
                 .uri(URI.create(baseUrl + path))
                 .timeout(Duration.ofSeconds(15));
-        if (token != null) b.header("Authorization", token);
-        return b;
     }
 
     private static Response send(HttpRequest req) throws Exception {
