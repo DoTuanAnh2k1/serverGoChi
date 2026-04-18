@@ -8,9 +8,12 @@ import java.net.http.HttpRequest.BodyPublishers;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.function.Function;
 
 /**
  * Static Java client for cli-mgt-svc HTTP API.
@@ -55,9 +58,26 @@ public final class MgtServiceClient {
     /** Drop stored token (useful for tests / logout). */
     public static void clearToken() { token = null; }
 
-    /** Simple status + body container. */
+    /** Status + body container with typed parse helpers. */
     public record Response(int status, String body) {
         public boolean ok() { return status >= 200 && status < 300; }
+
+        /** Parse body and map through factory (e.g. {@code MgtModels.AuthResult::from}). */
+        public <T> T as(Function<Object, T> factory) {
+            return factory.apply(MgtModels.parse(body));
+        }
+
+        /** Parse body as a JSON array and map each item through factory. Returns empty list if body is not an array. */
+        public <T> List<T> asList(Function<Object, T> factory) {
+            Object v = MgtModels.parse(body);
+            if (!(v instanceof List)) return List.of();
+            List<T> out = new ArrayList<>();
+            for (Object item : (List<?>) v) {
+                T parsed = factory.apply(item);
+                if (parsed != null) out.add(parsed);
+            }
+            return out;
+        }
     }
 
     // ── Health / Docs ────────────────────────────────────────────────────────
@@ -76,8 +96,8 @@ public final class MgtServiceClient {
     public static Response authenticate(String username, String password) throws Exception {
         Response r = postRaw("/aa/authenticate", toJson(map("username", username, "password", password)), false);
         if (r.ok()) {
-            String tk = extractStringField(r.body(), "response_data");
-            if (tk != null && !tk.isEmpty()) token = tk;
+            MgtModels.AuthResult auth = r.as(MgtModels.AuthResult::from);
+            if (auth != null && auth.token() != null && !auth.token().isEmpty()) token = auth.token();
         }
         return r;
     }
@@ -332,6 +352,115 @@ public final class MgtServiceClient {
         return get("/aa/subscribers/files/" + index);
     }
 
+    // ── Typed convenience wrappers ───────────────────────────────────────────
+    //
+    // These call the matching raw endpoint above, then parse the body into a
+    // record from MgtModels. They throw MgtApiException if status is not 2xx —
+    // use the raw Response-returning variants if you want to inspect failures.
+
+    /** Like {@link #authenticate} but returns the parsed body. Token is stored internally as usual. */
+    public static MgtModels.AuthResult authenticateTyped(String u, String p) throws Exception {
+        return must(authenticate(u, p)).as(MgtModels.AuthResult::from);
+    }
+
+    /** Parsed {@link #validateToken}. */
+    public static MgtModels.ValidateTokenResult validateTokenTyped(String tokenWithBasicPrefix) throws Exception {
+        return must(validateToken(tokenWithBasicPrefix)).as(MgtModels.ValidateTokenResult::from);
+    }
+
+    /** Parsed {@link #showUsers}. */
+    public static List<MgtModels.UserShow> showUsersTyped() throws Exception {
+        return must(showUsers()).asList(MgtModels.UserShow::from);
+    }
+
+    /** Parsed {@link #authorizeUserShow}. */
+    public static List<MgtModels.UserPermission> authorizeUserShowTyped() throws Exception {
+        return must(authorizeUserShow()).asList(MgtModels.UserPermission::from);
+    }
+
+    /** Parsed {@link #neShow}. */
+    public static List<MgtModels.NeShow> neShowTyped() throws Exception {
+        return must(neShow()).asList(MgtModels.NeShow::from);
+    }
+
+    /** Parsed {@link #listNe}. */
+    public static List<MgtModels.Ne> listNeTyped() throws Exception {
+        return must(listNe()).asList(MgtModels.Ne::from);
+    }
+
+    /** Parsed {@link #listNeMonitor}. */
+    public static List<MgtModels.NeMonitor> listNeMonitorTyped() throws Exception {
+        return must(listNeMonitor()).asList(MgtModels.NeMonitor::from);
+    }
+
+    /** Parsed {@link #neConfigList}. */
+    public static List<MgtModels.NeConfig> neConfigListTyped() throws Exception {
+        return must(neConfigList()).asList(MgtModels.NeConfig::from);
+    }
+
+    /** Parsed {@link #configBackupList}. Returns only the {@code backups} array. */
+    public static List<MgtModels.ConfigBackup> configBackupListTyped(String neNameFilter) throws Exception {
+        MgtModels.ConfigBackupListResult wrapped =
+                must(configBackupList(neNameFilter)).as(MgtModels.ConfigBackupListResult::from);
+        return wrapped == null || wrapped.backups() == null ? List.of() : wrapped.backups();
+    }
+
+    /** Parsed {@link #configBackupGet}. */
+    public static MgtModels.ConfigBackupDetail configBackupGetTyped(long id) throws Exception {
+        return must(configBackupGet(id)).as(MgtModels.ConfigBackupDetail::from);
+    }
+
+    /** Parsed {@link #configBackupSave}. */
+    public static MgtModels.ConfigBackupSaveResult configBackupSaveTyped(String neName, String neIp, String xml) throws Exception {
+        return must(configBackupSave(neName, neIp, xml)).as(MgtModels.ConfigBackupSaveResult::from);
+    }
+
+    /** Parsed {@link #historyList}. */
+    public static List<MgtModels.History> historyListTyped(int limit, String scope, String neName, String account) throws Exception {
+        return must(historyList(limit, scope, neName, account)).asList(MgtModels.History::from);
+    }
+
+    /** Parsed {@link #adminUserList}. */
+    public static List<MgtModels.AdminUser> adminUserListTyped() throws Exception {
+        return must(adminUserList()).asList(MgtModels.AdminUser::from);
+    }
+
+    /** Parsed {@link #adminNeList}. */
+    public static List<MgtModels.CliNe> adminNeListTyped() throws Exception {
+        return must(adminNeList()).asList(MgtModels.CliNe::from);
+    }
+
+    /** Parsed {@link #importBulk}. */
+    public static List<MgtModels.ImportResult> importBulkTyped(String body) throws Exception {
+        return must(importBulk(body)).asList(MgtModels.ImportResult::from);
+    }
+
+    /** Parsed {@link #subscribersFiles}. */
+    public static List<MgtModels.SubscriberFile> subscribersFilesTyped() throws Exception {
+        return must(subscribersFiles()).asList(MgtModels.SubscriberFile::from);
+    }
+
+    /** Parsed {@link #subscribersFile}. */
+    public static MgtModels.SubscriberFileContent subscribersFileTyped(int index) throws Exception {
+        return must(subscribersFile(index)).as(MgtModels.SubscriberFileContent::from);
+    }
+
+    /** Thrown by *Typed methods when the HTTP status is not 2xx. */
+    public static final class MgtApiException extends RuntimeException {
+        public final int status;
+        public final String responseBody;
+        public MgtApiException(int status, String body) {
+            super("mgt-svc call failed: " + status + " " + body);
+            this.status = status;
+            this.responseBody = body;
+        }
+    }
+
+    private static Response must(Response r) {
+        if (!r.ok()) throw new MgtApiException(r.status(), r.body());
+        return r;
+    }
+
     // ── Generic helpers (also exposed for ad-hoc calls) ──────────────────────
 
     public static Response get(String path) throws Exception {
@@ -443,38 +572,6 @@ public final class MgtServiceClient {
             }
         }
         sb.append('"');
-    }
-
-    /** Naive extractor: find the first top-level "field":"value" pair. Good enough for token parsing. */
-    private static String extractStringField(String json, String field) {
-        if (json == null) return null;
-        String key = "\"" + field + "\"";
-        int i = json.indexOf(key);
-        if (i < 0) return null;
-        int colon = json.indexOf(':', i + key.length());
-        if (colon < 0) return null;
-        int q1 = json.indexOf('"', colon + 1);
-        if (q1 < 0) return null;
-        StringBuilder sb = new StringBuilder();
-        for (int k = q1 + 1; k < json.length(); k++) {
-            char c = json.charAt(k);
-            if (c == '\\' && k + 1 < json.length()) {
-                char n = json.charAt(++k);
-                switch (n) {
-                    case '"':  sb.append('"');  break;
-                    case '\\': sb.append('\\'); break;
-                    case 'n':  sb.append('\n'); break;
-                    case 'r':  sb.append('\r'); break;
-                    case 't':  sb.append('\t'); break;
-                    default:   sb.append(n);
-                }
-            } else if (c == '"') {
-                return sb.toString();
-            } else {
-                sb.append(c);
-            }
-        }
-        return null;
     }
 
     private static void appendQuery(StringBuilder q, String key, String value) {

@@ -1,26 +1,34 @@
 # Java client for cli-mgt-svc
 
-Single-file, zero-dependency Java 17+ client. Drop into any project, change the package, and use.
+Single-package, zero-dependency Java 17+ client. Drop the three files into any
+project, change the package name, and use.
 
 ## Files
 
-- `MgtServiceClient.java` — full client; one method per HTTP endpoint.
-- `MgtHistoryClient.java` — minimal example covering only `POST /aa/history/save`.
+- `MgtServiceClient.java` — full client; one method per HTTP endpoint plus typed wrappers.
+- `MgtModels.java` — record types for every response shape + a minimal JSON parser.
+- `MgtHistoryClient.java` — standalone example covering only `POST /aa/history/save`.
 
 ## Quick start
 
 ```java
-MgtServiceClient c = new MgtServiceClient("http://localhost:3000");
+MgtServiceClient.init("http://localhost:3000");
 
 // 1. Login — token is stored on the client, auto-attached on subsequent calls.
-c.authenticate("anhdt195", "123");
+MgtServiceClient.authenticate("anhdt195", "123");
 
-// 2. Read endpoints — return Response(status, body).
-MgtServiceClient.Response r = c.listNe();
+// 2a. Raw style — returns Response(status, body) with the JSON body as a String.
+MgtServiceClient.Response r = MgtServiceClient.listNe();
 System.out.println(r.status() + " " + r.body());
 
-// 3. Write endpoints with many fields — pass a Map.
-c.adminNeCreate(MgtServiceClient.map(
+// 2b. Typed style — returns parsed records, throws MgtApiException on non-2xx.
+List<MgtModels.Ne> nes = MgtServiceClient.listNeTyped();
+for (MgtModels.Ne ne : nes) {
+    System.out.println(ne.ne() + " → " + ne.confMasterIp() + ":" + ne.confPortMasterSsh());
+}
+
+// 3. Write endpoints with many fields — pass a Map to the raw method.
+MgtServiceClient.adminNeCreate(MgtServiceClient.map(
     "ne_name", "HTSMF03",
     "namespace", "hcm-5gc",
     "conf_master_ip", "10.10.1.1",
@@ -29,16 +37,68 @@ c.adminNeCreate(MgtServiceClient.map(
 ));
 
 // 4. Save command history (called from SSH server / cli-netconf).
-c.historySave("show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success");
+MgtServiceClient.historySave("show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success");
+
+// 5. Typed history query.
+List<MgtModels.History> recent =
+    MgtServiceClient.historyListTyped(50, "ne-command", null, "anhdt195");
+recent.forEach(h -> System.out.printf("%s  %-10s  %s%n",
+        h.createdDate(), h.account(), h.cmdName()));
 ```
 
-## What you get
+## Raw vs. typed methods
 
-`Response` is a record `(int status, String body)`. Body is the raw JSON string —
-parse it with Jackson / Gson on your side if you want typed objects.
+Every endpoint has a raw variant returning `Response(int status, String body)`.
+Endpoints that return JSON objects/arrays also have a `*Typed` variant that
+parses the body into a `MgtModels.*` record and throws `MgtApiException` if the
+status is not 2xx.
 
-The client uses only `java.net.http.HttpClient` and `java.util.Map`. No external
-dependencies, no annotations, no codegen.
+| Raw                        | Typed                          | Returns                                 |
+|----------------------------|--------------------------------|-----------------------------------------|
+| `authenticate`             | `authenticateTyped`            | `MgtModels.AuthResult`                  |
+| `validateToken`            | `validateTokenTyped`           | `MgtModels.ValidateTokenResult`         |
+| `showUsers`                | `showUsersTyped`               | `List<MgtModels.UserShow>`              |
+| `authorizeUserShow`        | `authorizeUserShowTyped`       | `List<MgtModels.UserPermission>`        |
+| `neShow`                   | `neShowTyped`                  | `List<MgtModels.NeShow>`                |
+| `listNe`                   | `listNeTyped`                  | `List<MgtModels.Ne>`                    |
+| `listNeMonitor`            | `listNeMonitorTyped`           | `List<MgtModels.NeMonitor>`             |
+| `neConfigList`             | `neConfigListTyped`            | `List<MgtModels.NeConfig>`              |
+| `configBackupSave`         | `configBackupSaveTyped`        | `MgtModels.ConfigBackupSaveResult`      |
+| `configBackupList`         | `configBackupListTyped`        | `List<MgtModels.ConfigBackup>`          |
+| `configBackupGet`          | `configBackupGetTyped`         | `MgtModels.ConfigBackupDetail`          |
+| `historyList`              | `historyListTyped`             | `List<MgtModels.History>`               |
+| `adminUserList`            | `adminUserListTyped`           | `List<MgtModels.AdminUser>`             |
+| `adminNeList`              | `adminNeListTyped`             | `List<MgtModels.CliNe>`                 |
+| `importBulk`               | `importBulkTyped`              | `List<MgtModels.ImportResult>`          |
+| `subscribersFiles`         | `subscribersFilesTyped`        | `List<MgtModels.SubscriberFile>`        |
+| `subscribersFile`          | `subscribersFileTyped`         | `MgtModels.SubscriberFileContent`       |
+
+Write/update endpoints (`*Create`, `*Update`, `*Delete`, `*Assign`, etc.) return
+the generic `Response` — inspect `status()` or `as(MgtModels.Envelope::from)`
+for `{status, code, message}` payloads.
+
+### Ad-hoc parsing
+
+If an endpoint isn't covered by a `*Typed` variant, parse on the fly:
+
+```java
+MgtServiceClient.Response r = MgtServiceClient.post("/aa/admin/user/update", ...);
+MgtModels.Envelope env = r.as(MgtModels.Envelope::from);
+if (Boolean.TRUE.equals(env.status())) ...
+```
+
+Or drop to the map/list level:
+
+```java
+Object parsed = MgtModels.parse(r.body());  // Map / List / String / Long / Double / Boolean / null
+```
+
+## Thread safety & state
+
+`MgtServiceClient` keeps **a single global `baseUrl` + `token`** per JVM. It is
+intended for service accounts (e.g. the SSH / cli-netconf side logging into
+mgt-service with one account). Don't use it to multiplex many user sessions —
+for that, drop the statics and reintroduce instance fields.
 
 ## Endpoint coverage
 
@@ -60,6 +120,6 @@ All 35 endpoints in `api.yaml`, grouped:
 Need an endpoint not listed here? Use the generic helpers:
 
 ```java
-c.get("/aa/something");
-c.post("/aa/something", MgtServiceClient.toJson(MgtServiceClient.map("k", "v")));
+MgtServiceClient.get("/aa/something");
+MgtServiceClient.post("/aa/something", MgtServiceClient.toJson(MgtServiceClient.map("k", "v")));
 ```
