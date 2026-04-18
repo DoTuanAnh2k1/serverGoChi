@@ -41,7 +41,7 @@ type MockStore struct {
 	DeleteCliNeConfigByIdFn          func(id int64) error
 	DeleteCliNeConfigByNeIdFn        func(neId int64) error
 	GetRecentHistoryFn               func(limit int) ([]db_models.CliOperationHistory, error)
-	GetRecentHistoryFilteredFn       func(limit int, scope, neName string) ([]db_models.CliOperationHistory, error)
+	GetRecentHistoryFilteredFn       func(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error)
 	GetDailyOperationHistoryFn       func(date time.Time) ([]db_models.CliOperationHistory, error)
 	DeleteHistoryBeforeFn            func(cutoff time.Time) (int64, error)
 	SaveConfigBackupFn               func(b *db_models.CliConfigBackup) error
@@ -252,9 +252,9 @@ func (m *MockStore) GetRecentHistory(limit int) ([]db_models.CliOperationHistory
 	return nil, nil
 }
 
-func (m *MockStore) GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error) {
+func (m *MockStore) GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error) {
 	if m.GetRecentHistoryFilteredFn != nil {
-		return m.GetRecentHistoryFilteredFn(limit, scope, neName)
+		return m.GetRecentHistoryFilteredFn(limit, scope, neName, account)
 	}
 	return nil, nil
 }

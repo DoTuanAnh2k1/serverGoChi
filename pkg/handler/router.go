@@ -56,12 +56,17 @@ func Init() {
 
 		router.Route("/authenticate/user", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
-			r.Use(middleware.CheckRole)
 
-			r.Post("/set", HandlerAuthenticateUserSet)
-			r.Post("/delete", HandlerAuthenticateUserDelete)
+			// Read — any authenticated user (Normal users need this to view directory)
 			r.Get("/show", HandlerAuthenticateUserShow)
-			r.Post("/reset-password", HandlerAdminResetPassword)
+
+			// Write — admin only
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/set", HandlerAuthenticateUserSet)
+				g.Post("/delete", HandlerAuthenticateUserDelete)
+				g.Post("/reset-password", HandlerAdminResetPassword)
+			})
 		})
 
 		router.Route("/authorize", func(r chi.Router) {
@@ -93,14 +98,20 @@ func Init() {
 
 		router.Route("/admin", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
-			r.Use(middleware.CheckRole)
 
+			// Read — any authenticated user
 			r.Get("/user/list", HandlerAdminUserList)
+			r.Get("/ne/list", HandlerAdminNeList)
+
+			// Self-or-admin: handler enforces actor==target unless caller is admin.
 			r.Post("/user/update", HandlerAdminUserUpdate)
 
-			r.Get("/ne/list", HandlerAdminNeList)
-			r.Post("/ne/create", HandlerAdminNeCreate)
-			r.Post("/ne/update", HandlerAdminNeUpdate)
+			// Admin-only writes
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/ne/create", HandlerAdminNeCreate)
+				g.Post("/ne/update", HandlerAdminNeUpdate)
+			})
 		})
 
 		router.Route("/import", func(r chi.Router) {

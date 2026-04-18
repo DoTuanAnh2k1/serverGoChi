@@ -64,13 +64,16 @@ func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, e
 	return results, cur.Err()
 }
 
-func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error) {
+func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error) {
 	filter := bson.M{}
 	if scope != "" {
 		filter["scope"] = scope
 	}
 	if neName != "" {
 		filter["ne_name"] = neName
+	}
+	if account != "" {
+		filter["account"] = account
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "created_date", Value: -1}}).SetLimit(int64(limit))
 	ctx := context.Background()

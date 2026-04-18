@@ -80,8 +80,8 @@ type DatabaseStore interface {
 	// GetRecentHistory returns the N most recent history records.
 	GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error)
 
-	// GetRecentHistoryFiltered returns N most recent records filtered by scope and/or NE name.
-	GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error)
+	// GetRecentHistoryFiltered returns N most recent records filtered by scope, NE name, and/or account.
+	GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error)
 
 	// Leader-only: get all history for a given day for CSV export
 	GetDailyOperationHistory(date time.Time) ([]db_models.CliOperationHistory, error)

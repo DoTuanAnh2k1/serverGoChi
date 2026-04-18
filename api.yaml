@@ -852,6 +852,11 @@ paths:
           schema:
             type: string
           description: Filter by NE name
+        - name: account
+          in: query
+          schema:
+            type: string
+          description: Filter by account username
       responses:
         "200":
           description: History list

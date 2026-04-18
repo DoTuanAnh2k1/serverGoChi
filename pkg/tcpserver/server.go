@@ -29,8 +29,17 @@ func New(addr, dataDir string) *Server {
 
 // Start begins listening in a separate goroutine.
 func (s *Server) Start() error {
-	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
-		return fmt.Errorf("tcp: create data dir %q: %w", s.dataDir, err)
+	if info, err := os.Stat(s.dataDir); err == nil {
+		if !info.IsDir() {
+			return fmt.Errorf("tcp: data dir %q exists but is not a directory", s.dataDir)
+		}
+		logger.Logger.WithField("data_dir", s.dataDir).Info("tcp: data dir already exists, reusing")
+	} else if os.IsNotExist(err) {
+		if err := os.MkdirAll(s.dataDir, 0755); err != nil {
+			return fmt.Errorf("tcp: create data dir %q: %w", s.dataDir, err)
+		}
+	} else {
+		return fmt.Errorf("tcp: stat data dir %q: %w", s.dataDir, err)
 	}
 
 	ln, err := net.Listen("tcp", s.addr)

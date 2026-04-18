@@ -146,7 +146,8 @@ func startTCPServer() {
 	dataDir := env("TCP_DATA_DIR", ".")
 	tcp := tcpserver.New(addr, dataDir)
 	if err := tcp.Start(); err != nil {
-		log.Fatalf("tcp server: %v", err)
+		logger.Logger.Errorf("tcp server: failed to start (continuing without it): %v", err)
+		return
 	}
 }
 

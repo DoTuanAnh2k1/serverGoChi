@@ -125,7 +125,8 @@ body.role-user .admin-only{display:none !important}
   <h1 id="pageTitle">Dashboard</h1>
   <div>
     <span style="color:#64748b;font-size:.85rem;margin-right:1rem" id="currentUser"></span>
-    <button class="btn btn-outline btn-sm" onclick="openChangePasswordModal()" data-i18n="change_my_password">Change Password</button>
+    <button class="btn btn-outline btn-sm" onclick="openMyProfileModal()" data-i18n="my_profile">My Profile</button>
+    <button class="btn btn-outline btn-sm" onclick="openChangePasswordModal()" data-i18n="change_my_password" style="margin-left:.4rem">Change Password</button>
     <button class="btn btn-outline btn-sm" onclick="doLogout()" data-i18n="logout" style="margin-left:.4rem">Logout</button>
   </div>
 </div>
@@ -237,20 +238,28 @@ body.role-user .admin-only{display:none !important}
 <!-- History -->
 <div class="section" id="sec-history">
   <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1rem;flex-wrap:wrap;gap:.5rem">
-      <h3 data-i18n="operation_history">Operation History</h3>
-      <div style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap">
-        <select id="historyScope" style="padding:.4rem .6rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.85rem">
-          <option value="">All Scopes</option>
-          <option value="cli-config">cli-config</option>
-          <option value="ne-command">ne-command</option>
-          <option value="ne-config">ne-config</option>
-        </select>
-        <input id="historyNeName" placeholder="NE name" style="width:120px;padding:.4rem .6rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.85rem">
-        <select id="historyLimit" style="padding:.4rem .6rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.85rem">
-          <option value="50">Last 50</option><option value="100" selected>Last 100</option><option value="200">Last 200</option><option value="500">Last 500</option>
-        </select>
-        <button class="btn btn-outline btn-sm" onclick="loadHistory()" data-i18n="refresh">Refresh</button>
+    <div style="margin-bottom:1rem">
+      <h3 data-i18n="operation_history" style="margin-bottom:.75rem">Operation History</h3>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:.5rem;align-items:end">
+        <div><label style="display:block;color:#94a3b8;font-size:.75rem;margin-bottom:.25rem" data-i18n="filter_user">User</label><div class="ac-wrap" id="acHistUser"></div></div>
+        <div><label style="display:block;color:#94a3b8;font-size:.75rem;margin-bottom:.25rem" data-i18n="filter_ne">NE</label><div class="ac-wrap" id="acHistNe"></div></div>
+        <div><label style="display:block;color:#94a3b8;font-size:.75rem;margin-bottom:.25rem" data-i18n="filter_scope">Scope</label>
+          <select id="historyScope" style="width:100%;padding:.4rem .6rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.85rem">
+            <option value="">All Scopes</option>
+            <option value="cli-config">cli-config</option>
+            <option value="ne-command">ne-command</option>
+            <option value="ne-config">ne-config</option>
+          </select>
+        </div>
+        <div><label style="display:block;color:#94a3b8;font-size:.75rem;margin-bottom:.25rem" data-i18n="filter_limit">Limit</label>
+          <select id="historyLimit" style="width:100%;padding:.4rem .6rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.85rem">
+            <option value="50">Last 50</option><option value="100" selected>Last 100</option><option value="200">Last 200</option><option value="500">Last 500</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:.4rem">
+          <button class="btn btn-primary btn-sm" onclick="loadHistory()" data-i18n="apply_filter">Apply</button>
+          <button class="btn btn-outline btn-sm" onclick="clearHistoryFilters()" data-i18n="clear_filter">Clear</button>
+        </div>
       </div>
     </div>
     <div id="historyTable"><div class="loading">Loading...</div></div>
@@ -340,6 +349,8 @@ const I18N = {
     create_ne:'Create Network Element', edit_ne:'Edit Network Element', all_nes:'All Network Elements',
     assign_ne:'Assign NE to User', user_ne_assignments:'User - NE Assignments',
     operation_history:'Operation History',
+    you:'you', self:'self', my_profile:'My Profile',
+    filter_user:'User', filter_ne:'NE', filter_scope:'Scope', filter_limit:'Limit', apply_filter:'Apply', clear_filter:'Clear',
     import_data:'Import Data', import_desc:'Upload a file or paste import data below.', upload_file:'Upload File', load_sample:'Load Sample', import:'Import', import_results:'Import Results', export_data:'Export data.txt',
     // guide
     guide_html: `
@@ -401,6 +412,8 @@ const I18N = {
     create_ne:'Tạo phần tử mạng', edit_ne:'Sửa phần tử mạng', all_nes:'Tất cả phần tử mạng',
     assign_ne:'Gán NE cho người dùng', user_ne_assignments:'Người dùng - NE',
     operation_history:'Lịch sử thao tác',
+    you:'bạn', self:'tôi', my_profile:'Hồ sơ của tôi',
+    filter_user:'Người dùng', filter_ne:'NE', filter_scope:'Phạm vi', filter_limit:'Giới hạn', apply_filter:'Áp dụng', clear_filter:'Xoá bộ lọc',
     import_data:'Nhập dữ liệu', import_desc:'Tải file lên hoặc dán nội dung vào ô bên dưới.', upload_file:'Tải file', load_sample:'Tải mẫu', import:'Nhập', import_results:'Kết quả nhập', export_data:'Xuất data.txt',
     guide_html: `
       <h3>Bắt đầu</h3>
@@ -665,7 +678,7 @@ async function refreshCaches() {
   cachedAdminUsers = Array.isArray(au.data) ? au.data : [];
 }
 
-let acNeMapUser, acNeMapNe;
+let acNeMapUser, acNeMapNe, acHistUser, acHistNe;
 function enterApp() {
   document.getElementById('loginPage').style.display = 'none';
   document.getElementById('app').style.display = 'block';
@@ -673,6 +686,8 @@ function enterApp() {
   document.getElementById('currentUser').textContent = USERNAME + (IS_ADMIN ? ' (admin)' : '');
   acNeMapUser = initAC('acNeMapUser', 'Search user...', () => cachedUsers.map(u => ({label: u.username, value: u.username, sub: u.role||''})));
   acNeMapNe = initMultiAC('acNeMapNe', 'neMapChips', 'Search NEs (add multiple)...', () => cachedNes.map(n => ({label: n.ne_name + ' (' + (n.namespace||'-') + ')', value: String(n.id), sub: 'ID:' + n.id + ' | ' + (n.site_name||'-') + ' | ' + (n.conf_master_ip||'')})));
+  acHistUser = initAC('acHistUser', 'Any user...', () => (cachedAdminUsers||[]).map(u => ({label: u.account_name, value: u.account_name, sub: u.email||''})));
+  acHistNe = initAC('acHistNe', 'Any NE...', () => (cachedNes||[]).map(n => ({label: n.ne_name, value: n.ne_name, sub: (n.site_name||'')})));
   refreshCaches().then(() => showSection('dashboard'));
   applyI18n();
 }
@@ -696,8 +711,9 @@ async function loadUsers() {
   data.forEach(u=>{
     const typ='<span class="user-type '+esc(typeClass[u.account_type]||'')+'">'+esc(typeLabel[u.account_type]||String(u.account_type))+'</span>';
     const enabled=u.is_enable?'<span class="badge badge-green">Yes</span>':'<span class="badge badge-red">No</span>';
+    const isSelf=u.account_name===USERNAME;
     html+='<tr><td>'+u.account_id+'</td>'
-      +'<td><b>'+esc(u.account_name)+'</b></td>'
+      +'<td><b>'+esc(u.account_name)+'</b>'+(isSelf?' <span class="badge badge-blue" style="margin-left:.3rem">'+t('you')+'</span>':'')+'</td>'
       +'<td>'+esc(u.email||'-')+'</td>'
       +'<td>'+esc(u.full_name||'-')+'</td>'
       +'<td>'+esc(u.phone_number||'-')+'</td>'
@@ -764,9 +780,23 @@ function openResetPasswordModal(username){
   }, t('save'));
 }
 
+function openMyProfileModal(){
+  if(!cachedAdminUsers.find(x=>x.account_name===USERNAME)){
+    refreshCaches().then(()=>openEditUserModal(USERNAME));
+    return;
+  }
+  openEditUserModal(USERNAME);
+}
 function openEditUserModal(username){
   const u=cachedAdminUsers.find(x=>x.account_name===username);
   if(!u){toast('User not found','error');return;}
+  const typeField = IS_ADMIN
+    ? '<div class="form-group"><label>Account Type</label>'+
+      '<select id="euType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">'+
+      '<option value="2"'+(u.account_type===2?' selected':'')+'>Normal (2)</option>'+
+      '<option value="1"'+(u.account_type===1?' selected':'')+'>Admin (1)</option>'+
+      '</select></div>'
+    : '';
   const body =
     '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem"><b>'+esc(u.account_name)+'</b></p>'+
     '<div class="form-row"><div class="form-group"><label>Full Name</label><input id="euFull" value="'+esc(u.full_name||'')+'"></div>'+
@@ -774,11 +804,7 @@ function openEditUserModal(username){
     '<div class="form-row"><div class="form-group"><label>Phone</label><input id="euPhone" value="'+esc(u.phone_number||'')+'"></div>'+
     '<div class="form-group"><label>Address</label><input id="euAddr" value="'+esc(u.address||'')+'"></div></div>'+
     '<div class="form-group"><label>Description</label><input id="euDesc" value="'+esc(u.description||'')+'"></div>'+
-    '<div class="form-group"><label>Account Type</label>'+
-    '<select id="euType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">'+
-    '<option value="2"'+(u.account_type===2?' selected':'')+'>Normal (2)</option>'+
-    '<option value="1"'+(u.account_type===1?' selected':'')+'>Admin (1)</option>'+
-    '</select></div>';
+    typeField;
   openModal(t('edit_user'), body, async () => {
     const payload={
       account_name:u.account_name,
@@ -787,7 +813,7 @@ function openEditUserModal(username){
       phone_number:document.getElementById('euPhone').value,
       address:document.getElementById('euAddr').value,
       description:document.getElementById('euDesc').value,
-      account_type:parseInt(document.getElementById('euType').value)||2,
+      account_type: IS_ADMIN ? (parseInt(document.getElementById('euType').value)||2) : u.account_type,
     };
     const res=await api('POST','/admin/user/update',payload);
     if(res.status===200){toast(t('user_updated'));closeModal();await refreshCaches();loadUsers();}
@@ -924,23 +950,63 @@ async function assignNe(){
 }
 
 // ── History ──
+const HIST_PAGE_SIZE=20;
+let histPage=1;
+let histData=[];
+function gotoHistPage(p){histPage=p;renderHistory();}
+function clearHistoryFilters(){
+  if(acHistUser)acHistUser.clear();
+  if(acHistNe)acHistNe.clear();
+  document.getElementById('historyScope').value='';
+  histPage=1;
+  loadHistory();
+}
 async function loadHistory(){
   const limit=document.getElementById('historyLimit').value;
   const scope=document.getElementById('historyScope').value;
-  const neName=document.getElementById('historyNeName').value.trim();
+  const neName=acHistNe?acHistNe.getValue().trim():'';
+  const account=acHistUser?acHistUser.getValue().trim():'';
   let url='/history/list?limit='+limit;
   if(scope) url+='&scope='+encodeURIComponent(scope);
   if(neName) url+='&ne_name='+encodeURIComponent(neName);
+  if(account) url+='&account='+encodeURIComponent(account);
   const{status,data}=await api('GET',url);
-  if(status!==200||!Array.isArray(data)||!data.length){document.getElementById('historyTable').innerHTML='<div class="empty">No history</div>';return;}
+  histData=(status===200&&Array.isArray(data))?data:[];
+  histPage=1;
+  renderHistory();
+}
+function renderHistory(){
+  const data=histData;
+  if(!data.length){document.getElementById('historyTable').innerHTML='<div class="empty">No history</div>';return;}
+  const totalPages=Math.max(1,Math.ceil(data.length/HIST_PAGE_SIZE));
+  if(histPage>totalPages)histPage=totalPages;
+  if(histPage<1)histPage=1;
+  const start=(histPage-1)*HIST_PAGE_SIZE;
+  const slice=data.slice(start,start+HIST_PAGE_SIZE);
   let html='<table><thead><tr><th>Time</th><th>User</th><th>Command</th><th>NE</th><th>Result</th><th>Scope</th></tr></thead><tbody>';
-  data.forEach(h=>{
+  slice.forEach(h=>{
     const time=h.executed_time?new Date(h.executed_time).toLocaleString():'-';
     const scopeBadge=h.scope==='cli-config'?'<span class="badge badge-blue">cli-config</span>':h.scope==='ne-command'?'<span class="badge badge-green">ne-command</span>':h.scope==='ne-config'?'<span class="badge" style="background:#4a1d7f;color:#c4b5fd">ne-config</span>':'<span class="badge badge-blue">'+esc(h.scope||'-')+'</span>';
     const resultBadge=h.result==='success'?'<span class="badge badge-green">success</span>':h.result==='failure'?'<span class="badge badge-red">failure</span>':'<span class="badge badge-blue">'+esc(h.result||'-')+'</span>';
     html+='<tr><td style="white-space:nowrap;font-size:.8rem">'+time+'</td><td>'+esc(h.account||'-')+'</td><td style="font-family:monospace;font-size:.8rem">'+esc(h.cmd_name||'-')+'</td><td>'+esc(h.ne_name||'-')+'</td><td>'+resultBadge+'</td><td>'+scopeBadge+'</td></tr>';
   });
   html+='</tbody></table>';
+  if(totalPages>1){
+    const pageBtns=[];
+    const windowSize=7;
+    let from=Math.max(1,histPage-Math.floor(windowSize/2));
+    let to=Math.min(totalPages,from+windowSize-1);
+    from=Math.max(1,to-windowSize+1);
+    for(let i=from;i<=to;i++){
+      pageBtns.push('<button class="btn btn-sm '+(i===histPage?'btn-primary':'btn-outline')+'" onclick="gotoHistPage('+i+')">'+i+'</button>');
+    }
+    html+='<div style="display:flex;gap:.3rem;justify-content:flex-end;align-items:center;margin-top:.75rem;flex-wrap:wrap">'
+      +'<span style="color:#94a3b8;font-size:.8rem;margin-right:.5rem">'+(start+1)+'–'+Math.min(start+HIST_PAGE_SIZE,data.length)+' / '+data.length+'</span>'
+      +'<button class="btn btn-outline btn-sm" '+(histPage===1?'disabled':'')+' onclick="gotoHistPage('+(histPage-1)+')">&laquo;</button>'
+      +pageBtns.join('')
+      +'<button class="btn btn-outline btn-sm" '+(histPage===totalPages?'disabled':'')+' onclick="gotoHistPage('+(histPage+1)+')">&raquo;</button>'
+      +'</div>';
+  }
   document.getElementById('historyTable').innerHTML=html;
 }
 

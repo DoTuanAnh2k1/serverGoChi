@@ -29,8 +29,8 @@ func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, e
 	return records, nil
 }
 
-// GetRecentHistoryFiltered returns N most recent records filtered by scope and/or NE name.
-func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName string) ([]db_models.CliOperationHistory, error) {
+// GetRecentHistoryFiltered returns N most recent records filtered by scope, NE name, and/or account.
+func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error) {
 	var records []db_models.CliOperationHistory
 	q := c.Db.Order("created_date DESC").Limit(limit)
 	if scope != "" {
@@ -38,6 +38,9 @@ func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName string) ([]db
 	}
 	if neName != "" {
 		q = q.Where("ne_name = ?", neName)
+	}
+	if account != "" {
+		q = q.Where("account = ?", account)
 	}
 	tx := q.Find(&records)
 	if tx.Error != nil {

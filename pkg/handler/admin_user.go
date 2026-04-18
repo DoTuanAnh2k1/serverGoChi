@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler/response"
@@ -58,6 +59,10 @@ func HandlerAdminUserList(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandlerAdminUserUpdate updates a user's metadata fields (no password change via this endpoint).
+//
+// Authorization:
+//   - Admins (account_type 0/1, Permission "admin") may edit any non-SuperAdmin user.
+//   - Normal users may edit ONLY their own account, and cannot change account_type.
 func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		AccountName string `json:"account_name"`
@@ -70,6 +75,12 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.AccountName == "" {
 		response.Write(w, http.StatusBadRequest, "account_name is required")
+		return
+	}
+	actor := mustUser(r)
+	isAdmin := strings.EqualFold(actor.Permission, "admin")
+	if !isAdmin && actor.Username != req.AccountName {
+		response.Write(w, http.StatusForbidden, "cannot modify another user")
 		return
 	}
 	u, err := service.GetUserByUserName(req.AccountName)
@@ -86,6 +97,10 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 	if u.AccountType == 0 {
 		response.Write(w, http.StatusForbidden, "cannot modify SuperAdmin account")
 		return
+	}
+	// Non-admin self-edit: preserve account_type (don't let users promote/demote themselves).
+	if !isAdmin {
+		req.AccountType = u.AccountType
 	}
 	// Guard: cannot elevate a user to SuperAdmin via this endpoint.
 	if req.AccountType == 0 {
@@ -104,7 +119,6 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, "failed to update user")
 		return
 	}
-	actor := mustUser(r)
 	saveHistory(opHistory("admin user update", req.AccountName, actor.Username), "success")
 	response.Success(w, "user updated")
 }

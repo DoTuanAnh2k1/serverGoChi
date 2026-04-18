@@ -29,9 +29,10 @@ type saveHistoryReq struct {
 //         ?limit=<int>   — số bản ghi tối đa (1–500, mặc định 100)
 //         ?scope=<string> — lọc theo scope (tuỳ chọn)
 //         ?ne_name=<string> — lọc theo tên NE (tuỳ chọn)
+//         ?account=<string> — lọc theo username (tuỳ chọn)
 // Output: 200 [ ...CliOperationHistory ] (mảng rỗng nếu không có bản ghi)
 //         500 nếu lỗi DB
-// Flow  : parse limit từ query → nếu có scope/ne_name dùng GetRecentHistoryFiltered,
+// Flow  : parse limit từ query → nếu có scope/ne_name/account dùng GetRecentHistoryFiltered,
 //         ngược lại dùng GetRecentHistory → trả danh sách
 func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 	limit := 100
@@ -43,11 +44,12 @@ func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 
 	scope := r.URL.Query().Get("scope")
 	neName := r.URL.Query().Get("ne_name")
+	account := r.URL.Query().Get("account")
 
 	var records []db_models.CliOperationHistory
 	var err error
-	if scope != "" || neName != "" {
-		records, err = service.GetRecentHistoryFiltered(limit, scope, neName)
+	if scope != "" || neName != "" || account != "" {
+		records, err = service.GetRecentHistoryFiltered(limit, scope, neName, account)
 	} else {
 		records, err = service.GetRecentHistory(limit)
 	}
