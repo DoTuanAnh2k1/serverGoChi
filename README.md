@@ -143,7 +143,8 @@ Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / Eng
 | Dashboard | Tổng quan users, NEs |
 | Users | Tạo (có password + confirm password) / sửa thông tin / admin reset password / đổi mật khẩu của chính mình / vô hiệu hóa |
 | Network Elements | Tạo / sửa (inline edit) / xóa NE |
-| NE Mapping | Gán nhiều NE cho 1 user (multi-select chips) / xóa mapping |
+| NE Mapping | Gán quyền cho user — trực tiếp bằng NE hoặc qua Group (radio Target: NE / Group). Bảng tách cột **Direct** (badge xanh dương) và **Via group** (badge xanh lá); Remove chỉ áp dụng cho direct |
+| Groups | Tạo group → gán tập NE + tập user. User thuộc group thấy toàn bộ NE của group (hiển thị ở tab NE Mapping với badge xanh lá) |
 | History | Lịch sử thao tác, filter theo scope (cli-config/ne-command/ne-config) và NE |
 | Import | Upload file hoặc paste data để import hàng loạt |
 | Guide | Hướng dẫn sử dụng (song ngữ) |

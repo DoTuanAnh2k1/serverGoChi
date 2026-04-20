@@ -346,18 +346,36 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 
 	var result []userShowAuthenticateResp
 	for _, u := range userList {
-		mappings, err := service.GetAllCliNeOfUserByUserId(u.AccountID)
+		directMappings, err := service.GetAllCliNeOfUserByUserId(u.AccountID)
 		if err != nil {
 			logger.Logger.WithField("user_id", u.AccountID).Errorf("authenticate/user/show: get ne mappings: %v", err)
 		}
+		directSet := make(map[int64]struct{}, len(directMappings))
 		var nes []tblNe
-		for _, m := range mappings {
+		for _, m := range directMappings {
+			directSet[m.TblNeID] = struct{}{}
 			ne, err := service.GetNeByNeId(m.TblNeID)
 			if err != nil || ne == nil {
 				continue
 			}
-			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName, ID: ne.ID, Namespace: ne.Namespace})
+			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName, ID: ne.ID, Namespace: ne.Namespace, ViaGroup: false})
 		}
+
+		reachable, err := service.GetAllNeIdsOfUser(u.AccountID)
+		if err != nil {
+			logger.Logger.WithField("user_id", u.AccountID).Errorf("authenticate/user/show: get union ne ids: %v", err)
+		}
+		for _, neId := range reachable {
+			if _, ok := directSet[neId]; ok {
+				continue
+			}
+			ne, err := service.GetNeByNeId(neId)
+			if err != nil || ne == nil {
+				continue
+			}
+			nes = append(nes, tblNe{Ne: ne.NeName, Site: ne.SiteName, ID: ne.ID, Namespace: ne.Namespace, ViaGroup: true})
+		}
+
 		result = append(result, userShowAuthenticateResp{
 			Username: u.AccountName,
 			TblNes:   nes,
@@ -403,4 +421,5 @@ type tblNe struct {
 	Site      string `json:"site"`
 	ID        int64  `json:"id"`
 	Namespace string `json:"namespace"`
+	ViaGroup  bool   `json:"via_group"`
 }

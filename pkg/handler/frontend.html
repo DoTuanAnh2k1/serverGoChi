@@ -370,6 +370,7 @@ const I18N = {
     nes_multi:'Network Elements (select multiple)', select_user_and_nes:'Select a user and at least one NE',
     groups_multi:'Groups (select multiple)', select_user_and_group:'Select a user and at least one group',
     map_target:'Target', target_ne:'NE', target_group:'Group',
+    ne_direct:'Direct NEs', ne_via_group:'NEs via group', remove_direct:'Remove (direct)', via_group_tooltip:'Access via group membership — remove by editing the group',
     assigned:'Assigned', failed:'Failed', login_failed:'Login failed', network_error:'Network error — please check your connection',
     change_my_password:'Change Password', old_password:'Old Password', new_password:'New Password',
     password_changed:'Password changed', wrong_old_password:'Wrong old password', all_fields_required:'All fields are required',
@@ -403,7 +404,20 @@ const I18N = {
       </ul>
 
       <h3>NE Mapping</h3>
-      <p>Assign NEs to users. Users can only access NEs assigned to them. Use the search dropdown to find users and NEs by name.</p>
+      <p>Assign access either directly or through a group. Pick a user, then toggle <b>Target: NE / Group</b>:</p>
+      <ul>
+        <li><b>NE</b> — assign one or more NEs directly to the user (shown as blue badges).</li>
+        <li><b>Group</b> — add the user to one or more groups; they inherit every NE attached to those groups (shown as green badges with a "via group" tooltip).</li>
+      </ul>
+      <p>The <code>/aa/list/ne</code> endpoint returns the union — deduplicated — of direct NEs and NEs reachable through group membership. The Remove button only unbinds direct mappings; to remove access that came through a group, edit the group in the Groups tab.</p>
+
+      <h3>Groups</h3>
+      <p>Groups bundle a set of NEs and a set of users so access is managed by role, not per-user. Workflow:</p>
+      <ol>
+        <li>Create a group (name + description) in the <b>Groups</b> tab.</li>
+        <li>Click <b>Manage</b> on that group to attach NEs — or use <b>Add all NEs</b> to bind every NE in one click.</li>
+        <li>Add users either from the same Manage modal, or from the <b>NE Mapping</b> tab using Target = Group.</li>
+      </ol>
 
       <h3>Import / Export</h3>
       <p>Bulk import data using a text file format. Click <b>Export data.txt</b> to generate a snapshot in the same format — you can edit it and import it back.</p>
@@ -441,6 +455,7 @@ const I18N = {
     nes_multi:'Phần tử mạng (chọn nhiều)', select_user_and_nes:'Hãy chọn user và ít nhất một NE',
     groups_multi:'Nhóm (chọn nhiều)', select_user_and_group:'Hãy chọn user và ít nhất một nhóm',
     map_target:'Đối tượng', target_ne:'NE', target_group:'Nhóm',
+    ne_direct:'NE gán trực tiếp', ne_via_group:'NE qua nhóm', remove_direct:'Xóa (trực tiếp)', via_group_tooltip:'Truy cập qua nhóm — muốn bỏ thì sửa nhóm',
     assigned:'Đã gán', failed:'Lỗi', login_failed:'Đăng nhập thất bại', network_error:'Lỗi kết nối — vui lòng kiểm tra mạng',
     change_my_password:'Đổi mật khẩu', old_password:'Mật khẩu cũ', new_password:'Mật khẩu mới',
     password_changed:'Đã đổi mật khẩu', wrong_old_password:'Mật khẩu cũ không đúng', all_fields_required:'Vui lòng điền đủ các trường',
@@ -472,7 +487,20 @@ const I18N = {
       </ul>
 
       <h3>Gán NE</h3>
-      <p>Gán NE cho người dùng. Người dùng chỉ truy cập được NE đã được gán. Tìm kiếm theo tên trong ô autocomplete.</p>
+      <p>Cấp quyền cho user theo 2 cách — trực tiếp hoặc qua nhóm. Chọn user, rồi chuyển nút <b>Đối tượng: NE / Nhóm</b>:</p>
+      <ul>
+        <li><b>NE</b> — gán một hay nhiều NE trực tiếp cho user (badge xanh dương).</li>
+        <li><b>Nhóm</b> — thêm user vào một hay nhiều nhóm; user tự động thấy mọi NE gắn với nhóm (badge xanh lá, hover để xem tooltip).</li>
+      </ul>
+      <p>API <code>/aa/list/ne</code> trả về hợp (dedup) của NE trực tiếp và NE đi qua nhóm. Nút Remove chỉ xoá mapping trực tiếp; muốn bỏ NE đến từ nhóm, hãy vào tab <b>Nhóm</b> và sửa nhóm đó.</p>
+
+      <h3>Nhóm</h3>
+      <p>Nhóm gom một tập NE và một tập user lại để quản lý quyền theo vai trò thay vì từng user. Quy trình:</p>
+      <ol>
+        <li>Tạo nhóm (tên + mô tả) trong tab <b>Nhóm</b>.</li>
+        <li>Bấm <b>Manage</b> để gán NE — hoặc dùng <b>Add all NEs</b> để gắn toàn bộ NE trong một lần.</li>
+        <li>Thêm user vào nhóm trực tiếp trong modal Manage, hoặc ở tab <b>Gán NE</b> với Đối tượng = Nhóm.</li>
+      </ol>
 
       <h3>Nhập liệu / Xuất liệu</h3>
       <p>Nhập dữ liệu hàng loạt từ file text. Bấm <b>Xuất data.txt</b> để tải snapshot cùng định dạng — có thể chỉnh sửa rồi nhập lại.</p>
@@ -997,7 +1025,22 @@ async function submitNe(){
 }
 
 // ── NE Mapping ──
-async function loadNeMapping(){const data=cachedUsers;if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}let html='<table><thead><tr><th>'+t('username')+'</th><th>NEs</th><th class="admin-only">Actions</th></tr></thead><tbody>';data.forEach(u=>{const nes=(u.tblNes||[]);const nesBadges=nes.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' <span class="ac-sub">('+esc(n.namespace||'-')+')</span></span>').join(' ')||'<span style="color:#64748b">None</span>';const removeButtons=nes.map(n=>'<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+n.id+')">'+esc(n.ne)+' ('+esc(n.namespace||'-')+') &times;</button>').join(' ');html+='<tr><td>'+esc(u.username)+'</td><td>'+nesBadges+'</td><td class="actions admin-only">'+(removeButtons||'-')+'</td></tr>';});html+='</tbody></table>';document.getElementById('neMappingTable').innerHTML=html;}
+async function loadNeMapping(){
+  const data=cachedUsers;
+  if(!data.length){document.getElementById('neMappingTable').innerHTML='<div class="empty">No data</div>';return;}
+  let html='<table><thead><tr><th>'+t('username')+'</th><th>'+t('ne_direct')+'</th><th>'+t('ne_via_group')+'</th><th class="admin-only">'+t('remove_direct')+'</th></tr></thead><tbody>';
+  data.forEach(u=>{
+    const nes=(u.tblNes||[]);
+    const direct=nes.filter(n=>!n.via_group);
+    const viaGrp=nes.filter(n=>n.via_group);
+    const directBadges=direct.length?direct.map(n=>'<span class="badge badge-blue">'+esc(n.ne)+' <span class="ac-sub">('+esc(n.namespace||'-')+')</span></span>').join(' '):'<span style="color:#64748b">-</span>';
+    const grpBadges=viaGrp.length?viaGrp.map(n=>'<span class="badge badge-green" title="'+t('via_group_tooltip')+'">'+esc(n.ne)+' <span class="ac-sub">('+esc(n.namespace||'-')+')</span></span>').join(' '):'<span style="color:#64748b">-</span>';
+    const removeButtons=direct.length?direct.map(n=>'<button class="btn btn-danger btn-sm" onclick="removeNe(\''+esc(u.username)+'\','+n.id+')">'+esc(n.ne)+' &times;</button>').join(' '):'-';
+    html+='<tr><td>'+esc(u.username)+'</td><td>'+directBadges+'</td><td>'+grpBadges+'</td><td class="actions admin-only">'+removeButtons+'</td></tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('neMappingTable').innerHTML=html;
+}
 async function removeNe(username,neid){if(!confirm('Remove NE '+neid+' from '+username+'?'))return;const res=await api('POST','/authorize/ne/delete',{username,neid:String(neid)});if(res.status===200){toast('Removed');await refreshCaches();loadNeMapping();}else toast(failMsg(res),'error');}
 async function assignNe(){
   const username=acNeMapUser.getValue();
