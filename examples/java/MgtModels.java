@@ -129,6 +129,39 @@ public final class MgtModels {
         }
     }
 
+    /** One NE in {@link AdminUserFull#nes()}. */
+    public record UserNeRef(Long id, String neName, String siteName, String namespace) {
+        public static UserNeRef from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new UserNeRef(F.l(m, "id"), F.s(m, "ne_name"),
+                    F.s(m, "site_name"), F.s(m, "namespace"));
+        }
+    }
+
+    /**
+     * Item from {@code GET /aa/admin/user/full} — AdminUser plus the caller's
+     * derived role and the deduplicated union of NEs reachable directly and via
+     * group membership.
+     */
+    public record AdminUserFull(
+            Long accountId, String accountName, String fullName, String email,
+            String address, String phoneNumber, Integer accountType, String description,
+            Boolean isEnable, Boolean status, String createdBy, Integer loginFailureCount,
+            String role, List<UserNeRef> nes) {
+        public static AdminUserFull from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new AdminUserFull(
+                    F.l(m, "account_id"), F.s(m, "account_name"), F.s(m, "full_name"),
+                    F.s(m, "email"), F.s(m, "address"), F.s(m, "phone_number"),
+                    F.i(m, "account_type"), F.s(m, "description"),
+                    F.bool(m, "is_enable"), F.bool(m, "status"),
+                    F.s(m, "created_by"), F.i(m, "login_failure_count"),
+                    F.s(m, "role"), F.listOf(m, "nes", UserNeRef::from));
+        }
+    }
+
     // ═══════════════════════════════════════════════════════════════════════
     //  Group
     // ═══════════════════════════════════════════════════════════════════════
@@ -171,7 +204,7 @@ public final class MgtModels {
         }
     }
 
-    /** Item from {@code GET /aa/list/ne} — NE the caller is authorized for, full fields. */
+    /** Item from {@code GET /aa/list/ne} — every NE the caller can reach (direct assignments ∪ group-reachable), full fields. */
     public record Ne(
             String site, String ne, String ip, String description, String namespace,
             Integer port, String commandUrl, String confMode,

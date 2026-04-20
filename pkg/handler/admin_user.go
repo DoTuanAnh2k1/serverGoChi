@@ -59,6 +59,67 @@ func HandlerAdminUserList(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusOK, result)
 }
 
+// adminUserFullResp extends adminUserResp with the caller-facing role and the
+// effective list of NEs the user may connect to (direct + via groups, deduped).
+type adminUserFullResp struct {
+	adminUserResp
+	Role string      `json:"role"`
+	Nes  []userNeRef `json:"nes"`
+}
+
+type userNeRef struct {
+	ID        int64  `json:"id"`
+	NeName    string `json:"ne_name"`
+	SiteName  string `json:"site_name"`
+	Namespace string `json:"namespace"`
+}
+
+// HandlerAdminUserFullList returns every non-SuperAdmin user together with
+// their role and the union of NEs reachable directly or via group membership.
+func HandlerAdminUserFullList(w http.ResponseWriter, r *http.Request) {
+	users, err := service.GetAllUser()
+	if err != nil {
+		logger.Logger.Error("admin/user/full: ", err)
+		response.InternalError(w, "failed to list users")
+		return
+	}
+	users = service.FilterOutSuperAdmins(users)
+	result := make([]adminUserFullResp, 0, len(users))
+	for _, u := range users {
+		neIds, err := service.GetAllNeIdsOfUser(u.AccountID)
+		if err != nil {
+			logger.Logger.Errorf("admin/user/full: ne ids for %s: %v", u.AccountName, err)
+		}
+		nes := make([]userNeRef, 0, len(neIds))
+		for _, id := range neIds {
+			ne, err := service.GetNeByNeId(id)
+			if err != nil || ne == nil {
+				continue
+			}
+			nes = append(nes, userNeRef{ID: ne.ID, NeName: ne.NeName, SiteName: ne.SiteName, Namespace: ne.Namespace})
+		}
+		result = append(result, adminUserFullResp{
+			adminUserResp: adminUserResp{
+				AccountID:         u.AccountID,
+				AccountName:       u.AccountName,
+				FullName:          u.FullName,
+				Email:             u.Email,
+				Address:           u.Address,
+				PhoneNumber:       u.PhoneNumber,
+				AccountType:       u.AccountType,
+				Description:       u.Description,
+				IsEnable:          u.IsEnable,
+				Status:            u.Status,
+				CreatedBy:         u.CreatedBy,
+				LoginFailureCount: u.LoginFailureCount,
+			},
+			Role: service.GetPermissionByUser(u),
+			Nes:  nes,
+		})
+	}
+	response.Write(w, http.StatusOK, result)
+}
+
 // HandlerAdminUserUpdate updates a user's metadata fields (no password change via this endpoint).
 //
 // Authorization:

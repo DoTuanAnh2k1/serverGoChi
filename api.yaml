@@ -584,6 +584,11 @@ paths:
     get:
       tags: [Network Element]
       summary: NEs accessible to the logged-in user
+      description: |
+        Returns every NE the user can reach, deduplicated — the union of:
+          1. direct assignments via `cli_user_ne_mapping` (authorize/ne/set), and
+          2. indirect assignments through any group the user belongs to
+             (group/user/assign + group/ne/assign).
       operationId: listNe
       security:
         - bearerAuth: []
@@ -970,6 +975,31 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/AdminUserItem"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /aa/admin/user/full:
+    get:
+      tags: [Admin]
+      summary: List all users with role and the NEs they can connect to (union of direct and group paths)
+      description: |
+        Same base fields as `/aa/admin/user/list` plus `role` ("admin" or "user") and `nes` — the
+        deduplicated union of NEs reachable directly and via group membership.
+        SuperAdmin accounts are excluded server-side.
+      operationId: adminUserFullList
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Users with role and effective NEs
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/AdminUserFullItem"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "500":
@@ -2139,6 +2169,33 @@ components:
         login_failure_count:
           type: integer
           format: int32
+
+    AdminUserFullItem:
+      description: |
+        AdminUserItem plus `role` and the deduplicated union of NEs the user
+        can reach — directly via cli_user_ne_mapping and indirectly via group
+        membership. Returned by GET /aa/admin/user/full.
+      allOf:
+        - $ref: "#/components/schemas/AdminUserItem"
+        - type: object
+          properties:
+            role:
+              type: string
+              enum: [admin, user]
+            nes:
+              type: array
+              items:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    format: int64
+                  ne_name:
+                    type: string
+                  site_name:
+                    type: string
+                  namespace:
+                    type: string
 
     CliNe:
       description: |

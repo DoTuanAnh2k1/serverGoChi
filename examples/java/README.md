@@ -64,6 +64,7 @@ status is not 2xx.
 | `configBackupGet(tok,id)`| `configBackupGetTyped`      | `MgtModels.ConfigBackupDetail`          |
 | `historyList(tok,…)`     | `historyListTyped`          | `List<MgtModels.History>`               |
 | `adminUserList(tok)`     | `adminUserListTyped`        | `List<MgtModels.AdminUser>`             |
+| `adminUserFull(tok)`     | `adminUserFullTyped`        | `List<MgtModels.AdminUserFull>`         |
 | `adminNeList(tok)`       | `adminNeListTyped`          | `List<MgtModels.CliNe>`                 |
 | `groupList(tok)`         | `groupListTyped`            | `List<MgtModels.Group>`                 |
 | `groupShow(tok, id)`     | `groupShowTyped`            | `MgtModels.GroupDetail`                 |
@@ -115,7 +116,7 @@ All endpoints in `api.yaml`, grouped:
 - NE Config: `neConfigCreate`, `neConfigList`, `neConfigUpdate`, `neConfigDelete`
 - Config Backup: `configBackupSave`, `configBackupList`, `configBackupGet`
 - History: `historyList`, `historySave`
-- Admin (frontend API): `adminUserList`, `adminUserUpdate`, `adminNeList`, `adminNeCreate`, `adminNeUpdate`
+- Admin (frontend API): `adminUserList`, `adminUserFull`, `adminUserUpdate`, `adminNeList`, `adminNeCreate`, `adminNeUpdate`
 - Groups: `groupList`, `groupShow`, `groupCreate`, `groupUpdate`, `groupDelete`,
   `userGroupList`, `userGroupAssign`, `userGroupUnassign`,
   `groupNeList`, `groupNeAssign`, `groupNeUnassign`

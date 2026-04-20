@@ -224,11 +224,17 @@ body.role-user .admin-only{display:none !important}
 <!-- NE Mapping -->
 <div class="section" id="sec-ne-mapping">
   <div class="card admin-only">
-    <h3 style="margin-bottom:1rem" data-i18n="assign_ne">Assign NE to User</h3>
+    <h3 style="margin-bottom:1rem" data-i18n="assign_ne">Assign NE or Group to User</h3>
+    <div style="display:flex;gap:1rem;margin-bottom:.75rem;align-items:center;color:#94a3b8;font-size:.9rem">
+      <span data-i18n="map_target">Target</span>:
+      <label style="display:flex;align-items:center;gap:.35rem"><input type="radio" name="neMapTarget" value="ne" checked onchange="toggleNeMapTarget()"> <span data-i18n="target_ne">NE</span></label>
+      <label style="display:flex;align-items:center;gap:.35rem"><input type="radio" name="neMapTarget" value="group" onchange="toggleNeMapTarget()"> <span data-i18n="target_group">Group</span></label>
+    </div>
     <div class="form-row">
       <div class="form-group"><label data-i18n="username">Username</label><div class="ac-wrap" id="acNeMapUser"></div></div>
-      <div class="form-group" style="flex:2"><label data-i18n="nes_multi">Network Elements (select multiple)</label><div class="chips" id="neMapChips"></div><div class="ac-wrap" id="acNeMapNe"></div></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="assignNe()" data-i18n="assign">Assign</button></div>
+      <div class="form-group" id="neMapNeTarget" style="flex:2"><label data-i18n="nes_multi">Network Elements (select multiple)</label><div class="chips" id="neMapChips"></div><div class="ac-wrap" id="acNeMapNe"></div></div>
+      <div class="form-group" id="neMapGroupTarget" style="flex:2;display:none"><label data-i18n="groups_multi">Groups (select multiple)</label><select id="neMapGroups" multiple size="5" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem"></select></div>
+      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="assignTarget()" data-i18n="assign">Assign</button></div>
     </div>
   </div>
   <div class="card">
@@ -244,8 +250,8 @@ body.role-user .admin-only{display:none !important}
     <div class="form-row">
       <div class="form-group"><label data-i18n="group_name">Group Name</label> *<input id="newGroupName" placeholder="ops-team"></div>
       <div class="form-group"><label data-i18n="description">Description</label><input id="newGroupDesc" placeholder="Operations team"></div>
-      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createGroup()" data-i18n="create">Create</button></div>
     </div>
+    <button class="btn btn-primary" onclick="createGroup()" data-i18n="create" style="margin-top:.5rem">Create</button>
   </div>
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="all_groups">All Groups</h3>
@@ -354,7 +360,7 @@ const I18N = {
     create_group:'Create Group', all_groups:'All Groups', group_name:'Group Name',
     edit_group:'Edit Group', group_members:'Members', group_nes:'Network Elements',
     manage_group:'Manage Group', group_created:'Group created', group_updated:'Group updated', group_deleted:'Group deleted',
-    groups:'Groups', select_groups:'Select groups', no_groups:'No groups',
+    groups:'Groups', select_groups:'Select groups', no_groups:'No groups', select_all_nes:'Select all NEs', add_all_nes:'Add all NEs',
     user_type_admin_hint:'Admins require full name, phone and at least one group.',
     // common
     username:'Username', password:'Password', confirm_password:'Confirm Password *', password_mismatch:'Passwords do not match',
@@ -362,6 +368,8 @@ const I18N = {
     login:'Login', logout:'Logout', create:'Create', edit:'Edit', update:'Update', cancel:'Cancel', save:'Save', assign:'Assign',
     refresh:'Refresh', delete_btn:'Delete', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
     nes_multi:'Network Elements (select multiple)', select_user_and_nes:'Select a user and at least one NE',
+    groups_multi:'Groups (select multiple)', select_user_and_group:'Select a user and at least one group',
+    map_target:'Target', target_ne:'NE', target_group:'Group',
     assigned:'Assigned', failed:'Failed', login_failed:'Login failed', network_error:'Network error — please check your connection',
     change_my_password:'Change Password', old_password:'Old Password', new_password:'New Password',
     password_changed:'Password changed', wrong_old_password:'Wrong old password', all_fields_required:'All fields are required',
@@ -424,13 +432,15 @@ const I18N = {
     create_group:'Tạo nhóm', all_groups:'Tất cả nhóm', group_name:'Tên nhóm',
     edit_group:'Sửa nhóm', group_members:'Thành viên', group_nes:'Phần tử mạng',
     manage_group:'Quản lý nhóm', group_created:'Đã tạo nhóm', group_updated:'Đã cập nhật nhóm', group_deleted:'Đã xoá nhóm',
-    groups:'Nhóm', select_groups:'Chọn nhóm', no_groups:'Chưa có nhóm',
+    groups:'Nhóm', select_groups:'Chọn nhóm', no_groups:'Chưa có nhóm', select_all_nes:'Chọn tất cả NE', add_all_nes:'Thêm tất cả NE',
     user_type_admin_hint:'Tài khoản admin bắt buộc có họ tên, số điện thoại và ít nhất một nhóm.',
     username:'Tên đăng nhập', password:'Mật khẩu', confirm_password:'Nhập lại mật khẩu *', password_mismatch:'Mật khẩu nhập lại không khớp',
     user_required_fields:'Tên đăng nhập, email, mật khẩu và nhập lại mật khẩu là bắt buộc',
     login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', edit:'Sửa', update:'Cập nhật', cancel:'Hủy', save:'Lưu', assign:'Gán',
     refresh:'Làm mới', delete_btn:'Xóa', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
     nes_multi:'Phần tử mạng (chọn nhiều)', select_user_and_nes:'Hãy chọn user và ít nhất một NE',
+    groups_multi:'Nhóm (chọn nhiều)', select_user_and_group:'Hãy chọn user và ít nhất một nhóm',
+    map_target:'Đối tượng', target_ne:'NE', target_group:'Nhóm',
     assigned:'Đã gán', failed:'Lỗi', login_failed:'Đăng nhập thất bại', network_error:'Lỗi kết nối — vui lòng kiểm tra mạng',
     change_my_password:'Đổi mật khẩu', old_password:'Mật khẩu cũ', new_password:'Mật khẩu mới',
     password_changed:'Đã đổi mật khẩu', wrong_old_password:'Mật khẩu cũ không đúng', all_fields_required:'Vui lòng điền đủ các trường',
@@ -707,6 +717,8 @@ async function refreshCaches() {
   cachedNes = Array.isArray(n.data) ? n.data : [];
   cachedAdminUsers = Array.isArray(au.data) ? au.data : [];
   cachedGroups = Array.isArray(g.data) ? g.data : [];
+  populateNewGroupSelect();
+  populateNeMapGroups();
 }
 
 let acNeMapUser, acNeMapNe, acHistUser, acHistNe;
@@ -999,6 +1011,34 @@ async function assignNe(){
   acNeMapUser.clear();acNeMapNe.clear();
   await refreshCaches();loadNeMapping();
 }
+function toggleNeMapTarget(){
+  const v=(document.querySelector('input[name="neMapTarget"]:checked')||{}).value||'ne';
+  const neBox=document.getElementById('neMapNeTarget');
+  const gBox=document.getElementById('neMapGroupTarget');
+  if(neBox) neBox.style.display = v==='ne' ? '' : 'none';
+  if(gBox)  gBox.style.display  = v==='group' ? '' : 'none';
+  if(v==='group') populateNeMapGroups();
+}
+function populateNeMapGroups(){
+  const sel=document.getElementById('neMapGroups');
+  if(!sel)return;
+  sel.innerHTML=(cachedGroups||[]).map(g=>'<option value="'+g.id+'">'+esc(g.name)+(g.description?(' — '+esc(g.description)):'')+'</option>').join('');
+}
+async function assignTarget(){
+  const v=(document.querySelector('input[name="neMapTarget"]:checked')||{}).value||'ne';
+  if(v==='ne'){ await assignNe(); return; }
+  const username=acNeMapUser.getValue();
+  const gids=Array.from(document.getElementById('neMapGroups').selectedOptions).map(o=>parseInt(o.value,10)).filter(n=>!isNaN(n));
+  if(!username||!gids.length){toast(t('select_user_and_group'),'error');return;}
+  const results=await Promise.all(gids.map(gid=>api('POST','/group/user/assign',{username,group_id:gid})));
+  const ok=results.filter(r=>r.status===200||r.status===201).length;
+  const fails=results.filter(r=>r.status!==200&&r.status!==201);
+  if(ok)toast(t('assigned')+': '+ok+(fails.length?(', '+t('failed')+': '+fails.length):''));
+  if(fails.length)toast(failMsg(fails[0]),'error');
+  acNeMapUser.clear();
+  const gSel=document.getElementById('neMapGroups');if(gSel)gSel.selectedIndex=-1;
+  await refreshCaches();loadNeMapping();
+}
 
 // ── Groups ──
 async function loadGroups(){
@@ -1023,8 +1063,12 @@ async function createGroup(){
   const description=document.getElementById('newGroupDesc').value;
   if(!name){toast(t('group_name')+' *','error');return;}
   const res=await api('POST','/group/create',{name,description});
-  if(res.status===201||res.status===200){toast(t('group_created'));document.getElementById('newGroupName').value='';document.getElementById('newGroupDesc').value='';await refreshCaches();loadGroups();}
-  else toast(failMsg(res),'error');
+  if(res.status!==201&&res.status!==200){toast(failMsg(res),'error');return;}
+  toast(t('group_created'));
+  document.getElementById('newGroupName').value='';
+  document.getElementById('newGroupDesc').value='';
+  await refreshCaches();
+  loadGroups();
 }
 async function deleteGroup(id,name){
   if(!confirm(t('delete_btn')+' '+name+'?'))return;
@@ -1062,7 +1106,8 @@ async function openManageGroupModal(id){
     '<button class="btn btn-outline btn-sm" onclick="assignUserToGroupUI('+g.id+')">'+t('assign')+'</button></div></div>'+
     '<div class="form-group"><label>'+t('group_nes')+'</label><div class="chips" id="mgNeChips">'+neChips+'</div>'+
     '<div style="display:flex;gap:.4rem"><select id="mgAddNe" style="flex:1;padding:.4rem;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0"><option value="">-- '+t('ne')+' --</option>'+neOpts+'</select>'+
-    '<button class="btn btn-outline btn-sm" onclick="assignNeToGroupUI('+g.id+')">'+t('assign')+'</button></div></div>';
+    '<button class="btn btn-outline btn-sm" onclick="assignNeToGroupUI('+g.id+')">'+t('assign')+'</button>'+
+    '<button class="btn btn-outline btn-sm" onclick="assignAllNesToGroupUI('+g.id+')">'+t('add_all_nes')+'</button></div></div>';
   openModal(t('manage_group'), body, () => closeModal(), t('close')||'Close');
   // Wire chip removal handlers
   document.getElementById('mgUserChips').addEventListener('click', async e => {
@@ -1091,6 +1136,16 @@ async function assignNeToGroupUI(gid){
   const res=await api('POST','/group/ne/assign',{group_id:gid,ne_id:neId});
   if(res.status===200||res.status===201){await refreshCaches();openManageGroupModal(gid);}
   else toast(failMsg(res),'error');
+}
+async function assignAllNesToGroupUI(gid){
+  const sel=document.getElementById('mgAddNe');
+  const ids=Array.from(sel.options).map(o=>parseInt(o.value,10)).filter(n=>!isNaN(n));
+  if(!ids.length){toast(t('ne'),'error');return;}
+  for(const neId of ids){
+    const r=await api('POST','/group/ne/assign',{group_id:gid,ne_id:neId});
+    if(r.status!==200&&r.status!==201&&r.status!==304)toast('NE#'+neId+': '+failMsg(r),'error');
+  }
+  await refreshCaches();openManageGroupModal(gid);
 }
 
 // ── History ──

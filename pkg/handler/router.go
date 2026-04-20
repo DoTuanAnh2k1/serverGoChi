@@ -101,6 +101,7 @@ func Init() {
 
 			// Read — any authenticated user
 			r.Get("/user/list", HandlerAdminUserList)
+			r.Get("/user/full", HandlerAdminUserFullList)
 			r.Get("/ne/list", HandlerAdminNeList)
 
 			// Self-or-admin: handler enforces actor==target unless caller is admin.

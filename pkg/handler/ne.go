@@ -548,7 +548,7 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cliUserNeMappingList, err := service.GetAllCliNeOfUserByUserId(tblAccount.AccountID)
+	neIds, err := service.GetAllNeIdsOfUser(tblAccount.AccountID)
 	if err != nil {
 		logger.Logger.Error("Cannot list cli user ne mapping from db: ", err)
 		response.InternalError(w, "Cannot list cli user ne mapping from db")
@@ -557,8 +557,8 @@ func HandlerListNe(w http.ResponseWriter, r *http.Request) {
 
 	var neResp neResponse
 	var neDataList []neData
-	for _, cliUserNeMapping := range cliUserNeMappingList {
-		cliNe, err := service.GetNeByNeId(cliUserNeMapping.TblNeID)
+	for _, neId := range neIds {
+		cliNe, err := service.GetNeByNeId(neId)
 		if err != nil {
 			logger.Logger.Error("Cannot list cli ne from db: ", err)
 			response.InternalError(w, "Cannot list cli ne from db")

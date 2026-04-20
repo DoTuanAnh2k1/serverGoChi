@@ -333,7 +333,11 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, "failed to retrieve users")
 		return
 	}
-	userList = service.FilterOutSuperAdmins(userList)
+	// Note: SuperAdmin is intentionally NOT filtered here. This endpoint drives
+	// the cli-netconf bootstrap (entrypoint-netconf.sh) which creates Linux
+	// accounts for every returned user — hiding SuperAdmin would break SSH
+	// logins for the seed account. Frontend listings use /admin/user/list which
+	// does filter.
 	if len(userList) == 0 {
 		saveHistory(opHistory, "failure")
 		response.NotFound(w, "no users found")

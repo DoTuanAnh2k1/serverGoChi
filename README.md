@@ -186,7 +186,7 @@ Header: `Authorization: Basic <jwt_token>` (token từ `/aa/authenticate` đã c
 | `POST` | `/aa/authorize/ne/set` | Gán NE cho user |
 | `POST` | `/aa/authorize/ne/delete` | Xóa NE khỏi user |
 | `GET`  | `/aa/authorize/ne/show` | Danh sách NE (5GC) |
-| `GET`  | `/aa/list/ne` | NE user được truy cập (full fields) |
+| `GET`  | `/aa/list/ne` | NE user được truy cập (hợp của assign trực tiếp + qua group) |
 | `GET`  | `/aa/list/ne/monitor` | NE monitor URL |
 
 ### Admin (Frontend API)

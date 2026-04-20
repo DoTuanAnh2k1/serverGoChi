@@ -207,6 +207,7 @@ public final class MgtServiceClient {
 
     // ── List endpoints ───────────────────────────────────────────────────────
 
+    /** GET /aa/list/ne — NEs reachable by the caller (direct ∪ via group membership). */
     public static Response listNe(String token) throws Exception {
         return getAuth(token, "/aa/list/ne");
     }
@@ -289,6 +290,11 @@ public final class MgtServiceClient {
 
     public static Response adminUserList(String token) throws Exception {
         return getAuth(token, "/aa/admin/user/list");
+    }
+
+    /** GET /aa/admin/user/full — every user with role and union of reachable NEs. */
+    public static Response adminUserFull(String token) throws Exception {
+        return getAuth(token, "/aa/admin/user/full");
     }
 
     public static Response adminUserUpdate(String token, Map<String, Object> fields) throws Exception {
@@ -437,6 +443,10 @@ public final class MgtServiceClient {
 
     public static List<MgtModels.AdminUser> adminUserListTyped(String token) throws Exception {
         return must(adminUserList(token)).asList(MgtModels.AdminUser::from);
+    }
+
+    public static List<MgtModels.AdminUserFull> adminUserFullTyped(String token) throws Exception {
+        return must(adminUserFull(token)).asList(MgtModels.AdminUserFull::from);
     }
 
     public static List<MgtModels.Group> groupListTyped(String token) throws Exception {
