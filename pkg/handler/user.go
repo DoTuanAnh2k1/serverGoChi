@@ -275,6 +275,7 @@ func HandlerAuthorizeUserShow(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, "failed to retrieve users")
 		return
 	}
+	accounts = service.FilterOutSuperAdmins(accounts)
 
 	var result []userShowResp
 	for _, a := range accounts {

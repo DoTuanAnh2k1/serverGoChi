@@ -49,6 +49,7 @@ func DeleteNeById(id int64) error {
 		fn   func() error
 	}{
 		{"user-ne mappings", func() error { return s.DeleteAllUserNeMappingByNeId(id) }},
+		{"group-ne mappings", func() error { return s.DeleteAllGroupNeMappingByNeId(id) }},
 		{"ne monitor", func() error { return s.DeleteNeMonitorByNeId(id) }},
 		{"ne config", func() error { return s.DeleteCliNeConfigByNeId(id) }},
 		{"ne slave", func() error { return s.DeleteCliNeSlaveByNeId(id) }},

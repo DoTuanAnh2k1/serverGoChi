@@ -65,6 +65,10 @@ status is not 2xx.
 | `historyList(tok,…)`     | `historyListTyped`          | `List<MgtModels.History>`               |
 | `adminUserList(tok)`     | `adminUserListTyped`        | `List<MgtModels.AdminUser>`             |
 | `adminNeList(tok)`       | `adminNeListTyped`          | `List<MgtModels.CliNe>`                 |
+| `groupList(tok)`         | `groupListTyped`            | `List<MgtModels.Group>`                 |
+| `groupShow(tok, id)`     | `groupShowTyped`            | `MgtModels.GroupDetail`                 |
+| `userGroupList(tok, u)`  | `userGroupListTyped`        | `List<MgtModels.Group>`                 |
+| `groupNeList(tok, gid)`  | `groupNeListTyped`          | `List<Long>` — NE ids in the group      |
 | `importBulk(tok, body)`  | `importBulkTyped`           | `List<MgtModels.ImportResult>`          |
 | `subscribersFiles(tok)`  | `subscribersFilesTyped`     | `List<MgtModels.SubscriberFile>`        |
 | `subscribersFile(tok,i)` | `subscribersFileTyped`      | `MgtModels.SubscriberFileContent`       |
@@ -100,7 +104,7 @@ Object parsed = MgtModels.parse(response.body());  // Map / List / String / Long
 
 ## Endpoint coverage
 
-All 35 endpoints in `api.yaml`, grouped:
+All endpoints in `api.yaml`, grouped:
 
 - Auth: `authenticate`, `validateToken`, `changePassword`
 - Health: `health`, `healthDb`
@@ -112,5 +116,8 @@ All 35 endpoints in `api.yaml`, grouped:
 - Config Backup: `configBackupSave`, `configBackupList`, `configBackupGet`
 - History: `historyList`, `historySave`
 - Admin (frontend API): `adminUserList`, `adminUserUpdate`, `adminNeList`, `adminNeCreate`, `adminNeUpdate`
+- Groups: `groupList`, `groupShow`, `groupCreate`, `groupUpdate`, `groupDelete`,
+  `userGroupList`, `userGroupAssign`, `userGroupUnassign`,
+  `groupNeList`, `groupNeAssign`, `groupNeUnassign`
 - Import: `importBulk`
 - Subscribers: `subscribersFiles`, `subscribersFile`

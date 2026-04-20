@@ -3,6 +3,7 @@ package handler
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"strings"
 	"time"
@@ -100,12 +101,22 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Decode body that carries an optional group_ids list alongside the TblAccount fields.
+	raw, err := io.ReadAll(r.Body)
+	if err != nil {
+		response.Write(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
 	var userInfo db_models.TblAccount
-	if err := json.NewDecoder(r.Body).Decode(&userInfo); err != nil {
+	if err := json.Unmarshal(raw, &userInfo); err != nil {
 		logger.Logger.Errorf("authenticate/user/set: decode request body: %v", err)
 		response.Write(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
+	var extra struct {
+		GroupIDs []int64 `json:"group_ids"`
+	}
+	_ = json.Unmarshal(raw, &extra)
 
 	if strings.TrimSpace(userInfo.AccountName) == "" {
 		response.Write(w, http.StatusBadRequest, "username is required")
@@ -113,6 +124,21 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(userInfo.Password) == "" {
 		response.Write(w, http.StatusBadRequest, "password is required")
+		return
+	}
+	// Apply common validation (email format + unique, phone format).
+	if err := service.ValidateUserCommon(&userInfo, userInfo.AccountName); err != nil {
+		response.Write(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// Prevent elevation to SuperAdmin via this endpoint.
+	if userInfo.AccountType == 0 {
+		response.Write(w, http.StatusForbidden, "cannot create SuperAdmin account")
+		return
+	}
+	// For admin users enforce required fields + ≥1 group.
+	if err := service.ValidateAdminUserFields(&userInfo, extra.GroupIDs); err != nil {
+		response.Write(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -146,7 +172,10 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		now := time.Now()
 		userInfo.CreatedDate, userInfo.UpdatedDate = now, now
 		userInfo.LastLoginTime, userInfo.LastChangePass, userInfo.LockedTime = now, now, now
-		userInfo.AccountType = 2
+		// Default to normal user if caller did not specify a valid non-super type.
+		if userInfo.AccountType != 1 && userInfo.AccountType != 2 {
+			userInfo.AccountType = 2
+		}
 		userInfo.Status = true
 
 		if err := service.AddUser(&userInfo); err != nil {
@@ -154,6 +183,17 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 			saveHistory(opHistory, "failure")
 			response.InternalError(w, "failed to create user")
 			return
+		}
+		// Persist group assignments (required for admin, optional for normal users).
+		if len(extra.GroupIDs) > 0 {
+			created, _ := service.GetUserByUserName(userInfo.AccountName)
+			if created != nil {
+				for _, gid := range extra.GroupIDs {
+					if err := service.AssignUserToGroup(created.AccountID, gid); err != nil {
+						log.Errorf("authenticate/user/set: assign group %d: %v", gid, err)
+					}
+				}
+			}
 		}
 		log.Info("authenticate/user/set: user created")
 		saveHistory(opHistory, "success")
@@ -293,6 +333,7 @@ func HandlerAuthenticateUserShow(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, "failed to retrieve users")
 		return
 	}
+	userList = service.FilterOutSuperAdmins(userList)
 	if len(userList) == 0 {
 		saveHistory(opHistory, "failure")
 		response.NotFound(w, "no users found")

@@ -109,6 +109,7 @@ body.role-user .admin-only{display:none !important}
   <a onclick="showSection('users')" data-section="users" data-i18n="nav_users">Users</a>
   <a onclick="showSection('nes')" data-section="nes" data-i18n="nav_nes">Network Elements</a>
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
+  <a onclick="showSection('groups')" data-section="groups" data-i18n="nav_groups">Groups</a>
   <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
   <a onclick="showSection('import')" data-section="import" data-i18n="nav_import" class="admin-only">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
@@ -161,10 +162,11 @@ body.role-user .admin-only{display:none !important}
           <select id="newAccountType" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">
             <option value="2">Normal (2)</option>
             <option value="1">Admin (1)</option>
-            <option value="0">SuperAdmin (0)</option>
           </select>
         </div>
       </div>
+      <div class="form-group"><label data-i18n="groups">Groups</label><select id="newGroupIds" multiple size="4" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem"></select></div>
+      <p style="color:#94a3b8;font-size:.8rem" data-i18n="user_type_admin_hint">Admins require full name, phone and at least one group.</p>
     </div>
     <button class="btn btn-primary" onclick="createUser()" data-i18n="create" style="margin-top:.5rem">Create</button>
   </div>
@@ -232,6 +234,22 @@ body.role-user .admin-only{display:none !important}
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="user_ne_assignments">User - NE Assignments</h3>
     <div id="neMappingTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Groups -->
+<div class="section" id="sec-groups">
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="create_group">Create Group</h3>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="group_name">Group Name</label> *<input id="newGroupName" placeholder="ops-team"></div>
+      <div class="form-group"><label data-i18n="description">Description</label><input id="newGroupDesc" placeholder="Operations team"></div>
+      <div class="form-group" style="flex:0;display:flex;align-items:flex-end"><button class="btn btn-primary" onclick="createGroup()" data-i18n="create">Create</button></div>
+    </div>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:1rem" data-i18n="all_groups">All Groups</h3>
+    <div id="groupsTable"><div class="loading">Loading...</div></div>
   </div>
 </div>
 
@@ -314,7 +332,7 @@ body.role-user .admin-only{display:none !important}
 const API = '{{API_BASE}}';
 let TOKEN = localStorage.getItem('mgt_token') || '';
 let USERNAME = localStorage.getItem('mgt_user') || '';
-let cachedUsers = [], cachedNes = [], cachedAdminUsers = [];
+let cachedUsers = [], cachedNes = [], cachedAdminUsers = [], cachedGroups = [];
 let LANG = localStorage.getItem('mgt_lang') || 'en';
 let IS_ADMIN = false;
 
@@ -332,7 +350,12 @@ const I18N = {
   en: {
     // nav
     nav_dashboard:'Dashboard', nav_users:'Users', nav_nes:'Network Elements',
-    nav_ne_mapping:'NE Mapping', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
+    nav_ne_mapping:'NE Mapping', nav_groups:'Groups', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
+    create_group:'Create Group', all_groups:'All Groups', group_name:'Group Name',
+    edit_group:'Edit Group', group_members:'Members', group_nes:'Network Elements',
+    manage_group:'Manage Group', group_created:'Group created', group_updated:'Group updated', group_deleted:'Group deleted',
+    groups:'Groups', select_groups:'Select groups', no_groups:'No groups',
+    user_type_admin_hint:'Admins require full name, phone and at least one group.',
     // common
     username:'Username', password:'Password', confirm_password:'Confirm Password *', password_mismatch:'Passwords do not match',
     user_required_fields:'Username, email, password and confirm password are required',
@@ -397,7 +420,12 @@ const I18N = {
   },
   vi: {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_nes:'Phần tử mạng',
-    nav_ne_mapping:'Gán NE', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
+    nav_ne_mapping:'Gán NE', nav_groups:'Nhóm', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
+    create_group:'Tạo nhóm', all_groups:'Tất cả nhóm', group_name:'Tên nhóm',
+    edit_group:'Sửa nhóm', group_members:'Thành viên', group_nes:'Phần tử mạng',
+    manage_group:'Quản lý nhóm', group_created:'Đã tạo nhóm', group_updated:'Đã cập nhật nhóm', group_deleted:'Đã xoá nhóm',
+    groups:'Nhóm', select_groups:'Chọn nhóm', no_groups:'Chưa có nhóm',
+    user_type_admin_hint:'Tài khoản admin bắt buộc có họ tên, số điện thoại và ít nhất một nhóm.',
     username:'Tên đăng nhập', password:'Mật khẩu', confirm_password:'Nhập lại mật khẩu *', password_mismatch:'Mật khẩu nhập lại không khớp',
     user_required_fields:'Tên đăng nhập, email, mật khẩu và nhập lại mật khẩu là bắt buộc',
     login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', edit:'Sửa', update:'Cập nhật', cancel:'Hủy', save:'Lưu', assign:'Gán',
@@ -647,6 +675,7 @@ function showSection(name) {
   if (name === 'users') loadUsers();
   if (name === 'nes') loadNes();
   if (name === 'ne-mapping') loadNeMapping();
+  if (name === 'groups') loadGroups();
   if (name === 'history') loadHistory();
 }
 
@@ -668,14 +697,16 @@ function doLogout() {
   document.getElementById('loginPage').style.display = 'flex';
 }
 async function refreshCaches() {
-  const [u, n, au] = await Promise.all([
+  const [u, n, au, g] = await Promise.all([
     api('GET', '/authenticate/user/show'),
     api('GET', '/admin/ne/list'),
-    api('GET', '/admin/user/list')
+    api('GET', '/admin/user/list'),
+    api('GET', '/group/list')
   ]);
   cachedUsers = Array.isArray(u.data) ? u.data : [];
   cachedNes = Array.isArray(n.data) ? n.data : [];
   cachedAdminUsers = Array.isArray(au.data) ? au.data : [];
+  cachedGroups = Array.isArray(g.data) ? g.data : [];
 }
 
 let acNeMapUser, acNeMapNe, acHistUser, acHistNe;
@@ -703,6 +734,7 @@ async function loadDashboard() {
 
 // ── Users ──
 async function loadUsers() {
+  populateNewGroupSelect();
   const data = cachedAdminUsers;
   if(!data.length){document.getElementById('usersTable').innerHTML='<div class="empty">No users found</div>';return;}
   const typeLabel = {0:'SuperAdmin',1:'Admin',2:'Normal'};
@@ -728,6 +760,11 @@ async function loadUsers() {
   html+='</tbody></table>';
   document.getElementById('usersTable').innerHTML=html;
 }
+function populateNewGroupSelect(){
+  const sel=document.getElementById('newGroupIds');
+  if(!sel)return;
+  sel.innerHTML=(cachedGroups||[]).map(g=>'<option value="'+g.id+'">'+esc(g.name)+'</option>').join('');
+}
 async function createUser(){
   const account_name=document.getElementById('newUsername').value;
   const email=document.getElementById('newEmail').value;
@@ -740,8 +777,9 @@ async function createUser(){
   const address=document.getElementById('newAddress').value;
   const description=document.getElementById('newDescription').value;
   const account_type=parseInt(document.getElementById('newAccountType').value)||2;
-  const res=await api('POST','/authenticate/user/set',{account_name,password,email,full_name,phone_number,address,description,account_type});
-  if(res.status===201){toast('User created');['newUsername','newEmail','newPassword','newPassword2','newFullName','newPhone','newAddress','newDescription'].forEach(id=>document.getElementById(id).value='');document.getElementById('newAccountType').value='2';await refreshCaches();loadUsers();}
+  const group_ids=Array.from(document.getElementById('newGroupIds').selectedOptions).map(o=>parseInt(o.value,10)).filter(n=>!isNaN(n));
+  const res=await api('POST','/authenticate/user/set',{account_name,password,email,full_name,phone_number,address,description,account_type,group_ids});
+  if(res.status===201){toast('User created');['newUsername','newEmail','newPassword','newPassword2','newFullName','newPhone','newAddress','newDescription'].forEach(id=>document.getElementById(id).value='');document.getElementById('newAccountType').value='2';document.getElementById('newGroupIds').selectedIndex=-1;await refreshCaches();populateNewGroupSelect();loadUsers();}
   else toast(failMsg(res),'error');
 }
 async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const res=await api('POST','/authenticate/user/delete',{account_name:username});if(res.status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast(failMsg(res),'error');}
@@ -787,7 +825,7 @@ function openMyProfileModal(){
   }
   openEditUserModal(USERNAME);
 }
-function openEditUserModal(username){
+async function openEditUserModal(username){
   const u=cachedAdminUsers.find(x=>x.account_name===username);
   if(!u){toast('User not found','error');return;}
   const typeField = IS_ADMIN
@@ -797,6 +835,15 @@ function openEditUserModal(username){
       '<option value="1"'+(u.account_type===1?' selected':'')+'>Admin (1)</option>'+
       '</select></div>'
     : '';
+  let currentGroupIds=[];
+  if(IS_ADMIN){
+    const gr=await api('GET','/group/user?username='+encodeURIComponent(u.account_name));
+    if(gr.status===200&&Array.isArray(gr.data))currentGroupIds=gr.data.map(x=>x.id);
+  }
+  const groupOptions=(cachedGroups||[]).map(g=>'<option value="'+g.id+'"'+(currentGroupIds.includes(g.id)?' selected':'')+'>'+esc(g.name)+'</option>').join('');
+  const groupField = IS_ADMIN
+    ? '<div class="form-group"><label>'+t('groups')+'</label><select id="euGroups" multiple size="4" style="width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem">'+groupOptions+'</select></div>'
+    : '';
   const body =
     '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem"><b>'+esc(u.account_name)+'</b></p>'+
     '<div class="form-row"><div class="form-group"><label>Full Name</label><input id="euFull" value="'+esc(u.full_name||'')+'"></div>'+
@@ -804,7 +851,8 @@ function openEditUserModal(username){
     '<div class="form-row"><div class="form-group"><label>Phone</label><input id="euPhone" value="'+esc(u.phone_number||'')+'"></div>'+
     '<div class="form-group"><label>Address</label><input id="euAddr" value="'+esc(u.address||'')+'"></div></div>'+
     '<div class="form-group"><label>Description</label><input id="euDesc" value="'+esc(u.description||'')+'"></div>'+
-    typeField;
+    typeField + groupField +
+    (IS_ADMIN?'<p style="color:#94a3b8;font-size:.8rem">'+t('user_type_admin_hint')+'</p>':'');
   openModal(t('edit_user'), body, async () => {
     const payload={
       account_name:u.account_name,
@@ -815,6 +863,9 @@ function openEditUserModal(username){
       description:document.getElementById('euDesc').value,
       account_type: IS_ADMIN ? (parseInt(document.getElementById('euType').value)||2) : u.account_type,
     };
+    if(IS_ADMIN){
+      payload.group_ids=Array.from(document.getElementById('euGroups').selectedOptions).map(o=>parseInt(o.value,10)).filter(n=>!isNaN(n));
+    }
     const res=await api('POST','/admin/user/update',payload);
     if(res.status===200){toast(t('user_updated'));closeModal();await refreshCaches();loadUsers();}
     else toast(failMsg(res),'error');
@@ -947,6 +998,99 @@ async function assignNe(){
   if(fails.length)toast(failMsg(fails[0]),'error');
   acNeMapUser.clear();acNeMapNe.clear();
   await refreshCaches();loadNeMapping();
+}
+
+// ── Groups ──
+async function loadGroups(){
+  const data=cachedGroups;
+  if(!data.length){document.getElementById('groupsTable').innerHTML='<div class="empty">'+t('no_groups')+'</div>';return;}
+  let html='<table><thead><tr><th>ID</th><th>'+t('group_name')+'</th><th>'+t('description')+'</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(g=>{
+    html+='<tr><td>'+g.id+'</td>'
+      +'<td><b>'+esc(g.name)+'</b></td>'
+      +'<td>'+esc(g.description||'-')+'</td>'
+      +'<td class="actions admin-only">'
+      +'<button class="btn btn-outline btn-sm" onclick="openManageGroupModal('+g.id+')">'+t('manage_group')+'</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="openEditGroupModal('+g.id+')">'+t('edit')+'</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteGroup('+g.id+',\''+esc(g.name)+'\')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
+  });
+  html+='</tbody></table>';
+  document.getElementById('groupsTable').innerHTML=html;
+}
+async function createGroup(){
+  const name=document.getElementById('newGroupName').value.trim();
+  const description=document.getElementById('newGroupDesc').value;
+  if(!name){toast(t('group_name')+' *','error');return;}
+  const res=await api('POST','/group/create',{name,description});
+  if(res.status===201||res.status===200){toast(t('group_created'));document.getElementById('newGroupName').value='';document.getElementById('newGroupDesc').value='';await refreshCaches();loadGroups();}
+  else toast(failMsg(res),'error');
+}
+async function deleteGroup(id,name){
+  if(!confirm(t('delete_btn')+' '+name+'?'))return;
+  const res=await api('POST','/group/delete',{id});
+  if(res.status===200){toast(t('group_deleted'));await refreshCaches();loadGroups();}
+  else toast(failMsg(res),'error');
+}
+function openEditGroupModal(id){
+  const g=cachedGroups.find(x=>x.id===id);
+  if(!g){toast('Group not found','error');return;}
+  const body=
+    '<div class="form-group"><label>'+t('group_name')+'</label><input id="egName" value="'+esc(g.name)+'"></div>'+
+    '<div class="form-group"><label>'+t('description')+'</label><input id="egDesc" value="'+esc(g.description||'')+'"></div>';
+  openModal(t('edit_group'), body, async () => {
+    const res=await api('POST','/group/update',{id:g.id,name:document.getElementById('egName').value,description:document.getElementById('egDesc').value});
+    if(res.status===200){toast(t('group_updated'));closeModal();await refreshCaches();loadGroups();}
+    else toast(failMsg(res),'error');
+  }, t('save'));
+}
+async function openManageGroupModal(id){
+  const g=cachedGroups.find(x=>x.id===id);
+  if(!g){toast('Group not found','error');return;}
+  const detail=await api('POST','/group/show',{id:g.id});
+  const users=(detail.status===200&&detail.data&&Array.isArray(detail.data.users))?detail.data.users:[];
+  const neIds=(detail.status===200&&detail.data&&Array.isArray(detail.data.ne_ids))?detail.data.ne_ids:[];
+  const userChips=users.length?users.map(u=>'<span class="chip">'+esc(u)+' <span class="chip-x" data-uname="'+esc(u)+'" data-act="user-unassign">&times;</span></span>').join(''):'<span style="color:#64748b">-</span>';
+  const neNameMap={};(cachedNes||[]).forEach(n=>{neNameMap[n.id]=n.ne_name;});
+  const neChips=neIds.length?neIds.map(nid=>'<span class="chip">'+esc(neNameMap[nid]||('NE#'+nid))+' <span class="chip-x" data-neid="'+nid+'" data-act="ne-unassign">&times;</span></span>').join(''):'<span style="color:#64748b">-</span>';
+  const userOpts=(cachedAdminUsers||[]).filter(u=>!users.includes(u.account_name)).map(u=>'<option value="'+esc(u.account_name)+'">'+esc(u.account_name)+'</option>').join('');
+  const neOpts=(cachedNes||[]).filter(n=>!neIds.includes(n.id)).map(n=>'<option value="'+n.id+'">'+esc(n.ne_name)+'</option>').join('');
+  const body=
+    '<p style="color:#94a3b8;font-size:.85rem;margin-bottom:1rem"><b>'+esc(g.name)+'</b> &mdash; '+esc(g.description||'')+'</p>'+
+    '<div class="form-group"><label>'+t('group_members')+'</label><div class="chips" id="mgUserChips">'+userChips+'</div>'+
+    '<div style="display:flex;gap:.4rem"><select id="mgAddUser" style="flex:1;padding:.4rem;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0"><option value="">-- '+t('username')+' --</option>'+userOpts+'</select>'+
+    '<button class="btn btn-outline btn-sm" onclick="assignUserToGroupUI('+g.id+')">'+t('assign')+'</button></div></div>'+
+    '<div class="form-group"><label>'+t('group_nes')+'</label><div class="chips" id="mgNeChips">'+neChips+'</div>'+
+    '<div style="display:flex;gap:.4rem"><select id="mgAddNe" style="flex:1;padding:.4rem;background:#0f172a;border:1px solid #475569;border-radius:6px;color:#e2e8f0"><option value="">-- '+t('ne')+' --</option>'+neOpts+'</select>'+
+    '<button class="btn btn-outline btn-sm" onclick="assignNeToGroupUI('+g.id+')">'+t('assign')+'</button></div></div>';
+  openModal(t('manage_group'), body, () => closeModal(), t('close')||'Close');
+  // Wire chip removal handlers
+  document.getElementById('mgUserChips').addEventListener('click', async e => {
+    const x=e.target.closest('.chip-x'); if(!x||x.dataset.act!=='user-unassign')return;
+    const res=await api('POST','/group/user/unassign',{username:x.dataset.uname,group_id:g.id});
+    if(res.status===200){await refreshCaches();openManageGroupModal(g.id);}
+    else toast(failMsg(res),'error');
+  });
+  document.getElementById('mgNeChips').addEventListener('click', async e => {
+    const x=e.target.closest('.chip-x'); if(!x||x.dataset.act!=='ne-unassign')return;
+    const res=await api('POST','/group/ne/unassign',{group_id:g.id,ne_id:parseInt(x.dataset.neid,10)});
+    if(res.status===200){await refreshCaches();openManageGroupModal(g.id);}
+    else toast(failMsg(res),'error');
+  });
+}
+async function assignUserToGroupUI(gid){
+  const username=document.getElementById('mgAddUser').value;
+  if(!username){toast(t('username'),'error');return;}
+  const res=await api('POST','/group/user/assign',{username,group_id:gid});
+  if(res.status===200||res.status===201){await refreshCaches();openManageGroupModal(gid);}
+  else toast(failMsg(res),'error');
+}
+async function assignNeToGroupUI(gid){
+  const neId=parseInt(document.getElementById('mgAddNe').value,10);
+  if(!neId){toast(t('ne'),'error');return;}
+  const res=await api('POST','/group/ne/assign',{group_id:gid,ne_id:neId});
+  if(res.status===200||res.status===201){await refreshCaches();openManageGroupModal(gid);}
+  else toast(failMsg(res),'error');
 }
 
 // ── History ──

@@ -93,4 +93,28 @@ type DatabaseStore interface {
 	SaveConfigBackup(b *db_models.CliConfigBackup) error
 	ListConfigBackups(neName string) ([]*db_models.CliConfigBackup, error)
 	GetConfigBackupById(id int64) (*db_models.CliConfigBackup, error)
+
+	// cli_group — CRUD
+	CreateGroup(g *db_models.CliGroup) error
+	GetGroupById(id int64) (*db_models.CliGroup, error)
+	GetGroupByName(name string) (*db_models.CliGroup, error)
+	GetAllGroups() ([]*db_models.CliGroup, error)
+	UpdateGroup(g *db_models.CliGroup) error
+	DeleteGroupById(id int64) error
+
+	// cli_user_group_mapping
+	CreateUserGroupMapping(m *db_models.CliUserGroupMapping) error
+	DeleteUserGroupMapping(m *db_models.CliUserGroupMapping) error
+	GetAllGroupsOfUser(userId int64) ([]*db_models.CliUserGroupMapping, error)
+	GetAllUsersOfGroup(groupId int64) ([]*db_models.CliUserGroupMapping, error)
+	DeleteAllUserGroupMappingByUserId(userId int64) error
+	DeleteAllUserGroupMappingByGroupId(groupId int64) error
+
+	// cli_group_ne_mapping
+	CreateGroupNeMapping(m *db_models.CliGroupNeMapping) error
+	DeleteGroupNeMapping(m *db_models.CliGroupNeMapping) error
+	GetAllNesOfGroup(groupId int64) ([]*db_models.CliGroupNeMapping, error)
+	GetAllGroupsOfNe(neId int64) ([]*db_models.CliGroupNeMapping, error)
+	DeleteAllGroupNeMappingByGroupId(groupId int64) error
+	DeleteAllGroupNeMappingByNeId(neId int64) error
 }

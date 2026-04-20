@@ -22,6 +22,17 @@ func TestHandlerAdminUserUpdate_Success(t *testing.T) {
 		GetUserByUserNameFn: func(name string) (*db_models.TblAccount, error) {
 			return &db_models.TblAccount{AccountID: 5, AccountName: name, AccountType: 2, Email: "old@x.com"}, nil
 		},
+		GetAllUserFn: func() ([]*db_models.TblAccount, error) {
+			return []*db_models.TblAccount{
+				{AccountID: 5, AccountName: "bob", Email: "old@x.com"},
+			}, nil
+		},
+		GetGroupByIdFn: func(id int64) (*db_models.CliGroup, error) {
+			return &db_models.CliGroup{ID: id, Name: "ops"}, nil
+		},
+		GetAllGroupsOfUserFn: func(userId int64) ([]*db_models.CliUserGroupMapping, error) {
+			return []*db_models.CliUserGroupMapping{{UserID: userId, GroupID: 1}}, nil
+		},
 		UpdateUserFn: func(u *db_models.TblAccount) error {
 			saved = u
 			return nil
@@ -33,10 +44,11 @@ func TestHandlerAdminUserUpdate_Success(t *testing.T) {
 		"account_name": "bob",
 		"full_name":    "Bob Doe",
 		"email":        "bob@example.com",
-		"phone_number": "0900",
+		"phone_number": "0900000000",
 		"address":      "HCM",
 		"description":  "ops",
 		"account_type": 1,
+		"group_ids":    []int64{1},
 	})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	req = injectUser(req, "alice")
@@ -50,7 +62,7 @@ func TestHandlerAdminUserUpdate_Success(t *testing.T) {
 	if saved == nil {
 		t.Fatal("UpdateUser was not called")
 	}
-	if saved.FullName != "Bob Doe" || saved.Email != "bob@example.com" || saved.PhoneNumber != "0900" ||
+	if saved.FullName != "Bob Doe" || saved.Email != "bob@example.com" || saved.PhoneNumber != "0900000000" ||
 		saved.Address != "HCM" || saved.Description != "ops" || saved.AccountType != 1 {
 		t.Errorf("updated fields wrong: %+v", saved)
 	}
@@ -135,7 +147,7 @@ func TestHandlerAdminUserUpdate_DBError(t *testing.T) {
 		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },
 	})
 
-	body, _ := json.Marshal(map[string]any{"account_name": "bob", "account_type": 1})
+	body, _ := json.Marshal(map[string]any{"account_name": "bob", "account_type": 2})
 	req := httptest.NewRequest(http.MethodPost, "/", bytes.NewReader(body))
 	req = injectUser(req, "alice")
 	w := httptest.NewRecorder()

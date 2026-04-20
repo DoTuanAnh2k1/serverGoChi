@@ -130,6 +130,32 @@ public final class MgtModels {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    //  Group
+    // ═══════════════════════════════════════════════════════════════════════
+
+    /** Item from {@code GET /aa/group/list} and {@code GET /aa/group/user}. */
+    public record Group(Long id, String name, String description) {
+        public static Group from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new Group(F.l(m, "id"), F.s(m, "name"), F.s(m, "description"));
+        }
+    }
+
+    /** Response body for {@code POST /aa/group/show} — group with members and NEs. */
+    public record GroupDetail(Long id, String name, String description,
+                              List<String> users, List<Long> neIds) {
+        public static GroupDetail from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new GroupDetail(
+                    F.l(m, "id"), F.s(m, "name"), F.s(m, "description"),
+                    F.stringList(m, "users"),
+                    F.longList(m, "ne_ids"));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     //  Network Element
     // ═══════════════════════════════════════════════════════════════════════
 
@@ -388,6 +414,18 @@ public final class MgtModels {
             List<String> out = new ArrayList<>();
             for (Object item : (List<?>) v) {
                 out.add(item == null ? null : String.valueOf(item));
+            }
+            return out;
+        }
+
+        static List<Long> longList(Map<?, ?> m, String k) {
+            Object v = m.get(k);
+            if (!(v instanceof List)) return Collections.emptyList();
+            List<Long> out = new ArrayList<>();
+            for (Object item : (List<?>) v) {
+                if (item == null) continue;
+                if (item instanceof Number) { out.add(((Number) item).longValue()); continue; }
+                try { out.add(Long.parseLong(String.valueOf(item))); } catch (NumberFormatException ignored) {}
             }
             return out;
         }

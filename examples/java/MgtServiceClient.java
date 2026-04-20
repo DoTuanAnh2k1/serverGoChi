@@ -83,6 +83,20 @@ public final class MgtServiceClient {
             }
             return out;
         }
+
+        /** Parse body as a JSON array of numbers. Returns empty list if body is not an array. */
+        public List<Long> asLongList() {
+            Object v = MgtModels.parse(body);
+            if (!(v instanceof List)) return List.of();
+            List<Long> out = new ArrayList<>();
+            for (Object item : (List<?>) v) {
+                if (item instanceof Number) out.add(((Number) item).longValue());
+                else if (item != null) {
+                    try { out.add(Long.parseLong(String.valueOf(item))); } catch (NumberFormatException ignored) {}
+                }
+            }
+            return out;
+        }
     }
 
     // ── Health / Docs (no auth) ──────────────────────────────────────────────
@@ -293,6 +307,52 @@ public final class MgtServiceClient {
         return postAuth(token, "/aa/admin/ne/update", toJson(fields));
     }
 
+    // ── Groups ───────────────────────────────────────────────────────────────
+
+    public static Response groupList(String token) throws Exception {
+        return getAuth(token, "/aa/group/list");
+    }
+
+    public static Response groupShow(String token, long id) throws Exception {
+        return postAuth(token, "/aa/group/show", toJson(Map.of("id", id)));
+    }
+
+    public static Response groupCreate(String token, String name, String description) throws Exception {
+        return postAuth(token, "/aa/group/create", toJson(Map.of("name", name, "description", description == null ? "" : description)));
+    }
+
+    public static Response groupUpdate(String token, long id, String name, String description) throws Exception {
+        return postAuth(token, "/aa/group/update", toJson(Map.of("id", id, "name", name == null ? "" : name, "description", description == null ? "" : description)));
+    }
+
+    public static Response groupDelete(String token, long id) throws Exception {
+        return postAuth(token, "/aa/group/delete", toJson(Map.of("id", id)));
+    }
+
+    public static Response userGroupList(String token, String username) throws Exception {
+        return getAuth(token, "/aa/group/user?username=" + URLEncoder.encode(username, StandardCharsets.UTF_8));
+    }
+
+    public static Response userGroupAssign(String token, String username, long groupId) throws Exception {
+        return postAuth(token, "/aa/group/user/assign", toJson(Map.of("username", username, "group_id", groupId)));
+    }
+
+    public static Response userGroupUnassign(String token, String username, long groupId) throws Exception {
+        return postAuth(token, "/aa/group/user/unassign", toJson(Map.of("username", username, "group_id", groupId)));
+    }
+
+    public static Response groupNeList(String token, long groupId) throws Exception {
+        return getAuth(token, "/aa/group/ne?group_id=" + groupId);
+    }
+
+    public static Response groupNeAssign(String token, long groupId, long neId) throws Exception {
+        return postAuth(token, "/aa/group/ne/assign", toJson(Map.of("group_id", groupId, "ne_id", neId)));
+    }
+
+    public static Response groupNeUnassign(String token, long groupId, long neId) throws Exception {
+        return postAuth(token, "/aa/group/ne/unassign", toJson(Map.of("group_id", groupId, "ne_id", neId)));
+    }
+
     // ── Import ───────────────────────────────────────────────────────────────
 
     /** POST /aa/import/ — body is plain text in section format ([users], [nes], ...). */
@@ -377,6 +437,22 @@ public final class MgtServiceClient {
 
     public static List<MgtModels.AdminUser> adminUserListTyped(String token) throws Exception {
         return must(adminUserList(token)).asList(MgtModels.AdminUser::from);
+    }
+
+    public static List<MgtModels.Group> groupListTyped(String token) throws Exception {
+        return must(groupList(token)).asList(MgtModels.Group::from);
+    }
+
+    public static MgtModels.GroupDetail groupShowTyped(String token, long id) throws Exception {
+        return must(groupShow(token, id)).as(MgtModels.GroupDetail::from);
+    }
+
+    public static List<MgtModels.Group> userGroupListTyped(String token, String username) throws Exception {
+        return must(userGroupList(token, username)).asList(MgtModels.Group::from);
+    }
+
+    public static List<Long> groupNeListTyped(String token, long groupId) throws Exception {
+        return must(groupNeList(token, groupId)).asLongList();
     }
 
     public static List<MgtModels.CliNe> adminNeListTyped(String token) throws Exception {

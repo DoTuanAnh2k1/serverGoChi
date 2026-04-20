@@ -40,6 +40,8 @@ tags:
     description: Bulk data import
   - name: Subscribers
     description: TCP subscriber file viewer
+  - name: Group
+    description: Groups of users; a group maps to multiple NEs, a user may belong to multiple groups
 
 # ─────────────────────────────────────────────────────────────────────────────
 paths:
@@ -1159,6 +1161,252 @@ paths:
         "500":
           $ref: "#/components/responses/InternalError"
 
+  # ── Groups ─────────────────────────────────────────────────────────────────
+  /aa/group/list:
+    get:
+      tags: [Group]
+      summary: List all groups
+      operationId: groupList
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Group list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "500":
+          $ref: "#/components/responses/InternalError"
+
+  /aa/group/show:
+    post:
+      tags: [Group]
+      summary: Show a single group with its users and NE ids
+      operationId: groupShow
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Group details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GroupDetail"
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /aa/group/create:
+    post:
+      tags: [Group]
+      summary: Create a new group (admin only)
+      operationId: groupCreate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:        { type: string }
+                description: { type: string }
+      responses:
+        "201":
+          description: Created
+        "400":
+          $ref: "#/components/responses/BadRequest"
+        "409":
+          description: Group name already exists
+
+  /aa/group/update:
+    post:
+      tags: [Group]
+      summary: Update group name/description (admin only)
+      operationId: groupUpdate
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id:          { type: integer, format: int64 }
+                name:        { type: string }
+                description: { type: string }
+      responses:
+        "200":
+          description: Updated
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /aa/group/delete:
+    post:
+      tags: [Group]
+      summary: Delete a group (admin only; cascades mappings)
+      operationId: groupDelete
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [id]
+              properties:
+                id: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Deleted
+
+  /aa/group/user:
+    get:
+      tags: [Group]
+      summary: List the groups a user belongs to
+      operationId: userGroupList
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: username
+          in: query
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Group list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Group"
+
+  /aa/group/user/assign:
+    post:
+      tags: [Group]
+      summary: Assign a user to a group (admin only)
+      operationId: userGroupAssign
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, group_id]
+              properties:
+                username: { type: string }
+                group_id: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Assigned
+
+  /aa/group/user/unassign:
+    post:
+      tags: [Group]
+      summary: Unassign a user from a group (admin only)
+      operationId: userGroupUnassign
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, group_id]
+              properties:
+                username: { type: string }
+                group_id: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Unassigned
+
+  /aa/group/ne:
+    get:
+      tags: [Group]
+      summary: List the NE ids belonging to a group
+      operationId: groupNeList
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: group_id
+          in: query
+          required: true
+          schema: { type: integer, format: int64 }
+      responses:
+        "200":
+          description: NE id list
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: integer, format: int64 }
+
+  /aa/group/ne/assign:
+    post:
+      tags: [Group]
+      summary: Assign an NE to a group (admin only)
+      operationId: groupNeAssign
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id, ne_id]
+              properties:
+                group_id: { type: integer, format: int64 }
+                ne_id:    { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Assigned
+
+  /aa/group/ne/unassign:
+    post:
+      tags: [Group]
+      summary: Unassign an NE from a group (admin only)
+      operationId: groupNeUnassign
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [group_id, ne_id]
+              properties:
+                group_id: { type: integer, format: int64 }
+                ne_id:    { type: integer, format: int64 }
+      responses:
+        "200":
+          description: Unassigned
+
 # ─────────────────────────────────────────────────────────────────────────────
 components:
 
@@ -1992,3 +2240,23 @@ components:
           type: integer
           description: Total line count
           example: 42
+
+    Group:
+      type: object
+      properties:
+        id:          { type: integer, format: int64, example: 1 }
+        name:        { type: string,  example: ops }
+        description: { type: string,  example: Operations team }
+
+    GroupDetail:
+      type: object
+      properties:
+        id:          { type: integer, format: int64, example: 1 }
+        name:        { type: string,  example: ops }
+        description: { type: string,  example: Operations team }
+        users:
+          type: array
+          items: { type: string, example: alice }
+        ne_ids:
+          type: array
+          items: { type: integer, format: int64, example: 42 }

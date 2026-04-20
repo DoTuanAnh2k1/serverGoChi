@@ -216,11 +216,13 @@ func TestHandlerAuthorizeUserDelete_RejectsSuperAdmin(t *testing.T) {
 // ── HandlerAuthorizeUserShow ──────────────────────────────────────────────────
 
 func TestHandlerAuthorizeUserShow_ReturnsPermissions(t *testing.T) {
+	// SuperAdmin (account_type=0) must be hidden from the listing.
 	store.SetSingleton(&testutil.MockStore{
 		GetAllUserFn: func() ([]*db_models.TblAccount, error) {
 			return []*db_models.TblAccount{
-				{AccountID: 1, AccountName: "alice", AccountType: 0},
+				{AccountID: 1, AccountName: "alice", AccountType: 1},
 				{AccountID: 2, AccountName: "bob", AccountType: 2},
+				{AccountID: 3, AccountName: "root", AccountType: 0},
 			}, nil
 		},
 		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error { return nil },

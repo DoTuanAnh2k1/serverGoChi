@@ -35,6 +35,7 @@ func HandlerAdminUserList(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, "failed to list users")
 		return
 	}
+	users = service.FilterOutSuperAdmins(users)
 	var result []adminUserResp
 	for _, u := range users {
 		result = append(result, adminUserResp{
@@ -65,13 +66,14 @@ func HandlerAdminUserList(w http.ResponseWriter, r *http.Request) {
 //   - Normal users may edit ONLY their own account, and cannot change account_type.
 func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		AccountName string `json:"account_name"`
-		FullName    string `json:"full_name"`
-		Email       string `json:"email"`
-		PhoneNumber string `json:"phone_number"`
-		Address     string `json:"address"`
-		Description string `json:"description"`
-		AccountType int32  `json:"account_type"`
+		AccountName string  `json:"account_name"`
+		FullName    string  `json:"full_name"`
+		Email       string  `json:"email"`
+		PhoneNumber string  `json:"phone_number"`
+		Address     string  `json:"address"`
+		Description string  `json:"description"`
+		AccountType int32   `json:"account_type"`
+		GroupIDs    []int64 `json:"group_ids"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil || req.AccountName == "" {
 		response.Write(w, http.StatusBadRequest, "account_name is required")
@@ -107,6 +109,32 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 		response.Write(w, http.StatusForbidden, "cannot set account_type to 0 (SuperAdmin)")
 		return
 	}
+	// Build a shadow account for validation so we check the POST-UPDATE state.
+	candidate := *u
+	candidate.FullName = req.FullName
+	candidate.Email = req.Email
+	candidate.PhoneNumber = req.PhoneNumber
+	candidate.Address = req.Address
+	candidate.Description = req.Description
+	candidate.AccountType = req.AccountType
+	if err := service.ValidateUserCommon(&candidate, u.AccountName); err != nil {
+		response.Write(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	// For admin targets enforce full_name + phone + ≥1 group.
+	// Determine the groups the user will end up with: provided list, or current list if none provided.
+	effectiveGroupIds := req.GroupIDs
+	if effectiveGroupIds == nil {
+		existingGroups, _ := service.GetGroupsOfUser(u.AccountID)
+		for _, m := range existingGroups {
+			effectiveGroupIds = append(effectiveGroupIds, m.GroupID)
+		}
+	}
+	if err := service.ValidateAdminUserFields(&candidate, effectiveGroupIds); err != nil {
+		response.Write(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
 	u.FullName = req.FullName
 	u.Email = req.Email
 	u.PhoneNumber = req.PhoneNumber
@@ -119,6 +147,45 @@ func HandlerAdminUserUpdate(w http.ResponseWriter, r *http.Request) {
 		response.InternalError(w, "failed to update user")
 		return
 	}
+	// If caller sent group_ids, replace the user's group membership with that set.
+	if req.GroupIDs != nil {
+		if err := replaceUserGroups(u.AccountID, req.GroupIDs); err != nil {
+			logger.Logger.Errorf("admin/user/update: replace groups: %v", err)
+			response.InternalError(w, "failed to update user groups")
+			return
+		}
+	}
 	saveHistory(opHistory("admin user update", req.AccountName, actor.Username), "success")
 	response.Success(w, "user updated")
+}
+
+// replaceUserGroups sets the user's group membership to exactly the given ids.
+func replaceUserGroups(userID int64, groupIDs []int64) error {
+	current, err := service.GetGroupsOfUser(userID)
+	if err != nil {
+		return err
+	}
+	wanted := make(map[int64]struct{}, len(groupIDs))
+	for _, id := range groupIDs {
+		wanted[id] = struct{}{}
+	}
+	have := make(map[int64]struct{}, len(current))
+	for _, m := range current {
+		have[m.GroupID] = struct{}{}
+	}
+	for gid := range have {
+		if _, ok := wanted[gid]; !ok {
+			if err := service.UnassignUserFromGroup(userID, gid); err != nil {
+				return err
+			}
+		}
+	}
+	for gid := range wanted {
+		if _, ok := have[gid]; !ok {
+			if err := service.AssignUserToGroup(userID, gid); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }

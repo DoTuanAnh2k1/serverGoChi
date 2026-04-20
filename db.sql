@@ -58,6 +58,24 @@ CREATE TABLE `cli_user_ne_mapping` (
   PRIMARY KEY (`user_id`, `tbl_ne_id`)
 );
 
+CREATE TABLE `cli_group` (
+  `id` bigint PRIMARY KEY AUTO_INCREMENT,
+  `name` varchar(255) NOT NULL UNIQUE,
+  `description` varchar(255)
+);
+
+CREATE TABLE `cli_user_group_mapping` (
+  `user_id` bigint,
+  `group_id` bigint,
+  PRIMARY KEY (`user_id`, `group_id`)
+);
+
+CREATE TABLE `cli_group_ne_mapping` (
+  `group_id` bigint,
+  `tbl_ne_id` bigint,
+  PRIMARY KEY (`group_id`, `tbl_ne_id`)
+);
+
 CREATE TABLE `cli_operation_history` (
   `id` int PRIMARY KEY AUTO_INCREMENT,
   `account` varchar(255) NOT NULL,
@@ -82,3 +100,9 @@ CREATE TABLE `cli_config_backup` (
 
 ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `user_ne` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
 ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `mapping_ne` FOREIGN KEY (`tbl_ne_id`) REFERENCES `cli_ne` (`id`);
+ALTER TABLE `cli_user_group_mapping` ADD CONSTRAINT `user_group_user` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
+ALTER TABLE `cli_user_group_mapping` ADD CONSTRAINT `user_group_group` FOREIGN KEY (`group_id`) REFERENCES `cli_group` (`id`);
+ALTER TABLE `cli_group_ne_mapping` ADD CONSTRAINT `group_ne_group` FOREIGN KEY (`group_id`) REFERENCES `cli_group` (`id`);
+ALTER TABLE `cli_group_ne_mapping` ADD CONSTRAINT `group_ne_ne` FOREIGN KEY (`tbl_ne_id`) REFERENCES `cli_ne` (`id`);
+-- Email must be unique when present; empty string must be stored as NULL (MySQL allows multiple NULLs per UNIQUE).
+ALTER TABLE `tbl_account` ADD CONSTRAINT `uq_tbl_account_email` UNIQUE (`email`);

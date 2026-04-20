@@ -114,6 +114,28 @@ func Init() {
 			})
 		})
 
+		router.Route("/group", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+
+			// Read — any authenticated user
+			r.Get("/list", HandlerGroupList)
+			r.Post("/show", HandlerGroupShow)
+			r.Get("/user", HandlerUserGroupList)
+			r.Get("/ne", HandlerGroupNeList)
+
+			// Admin-only writes
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/create", HandlerGroupCreate)
+				g.Post("/update", HandlerGroupUpdate)
+				g.Post("/delete", HandlerGroupDelete)
+				g.Post("/user/assign", HandlerUserGroupAssign)
+				g.Post("/user/unassign", HandlerUserGroupUnassign)
+				g.Post("/ne/assign", HandlerGroupNeAssign)
+				g.Post("/ne/unassign", HandlerGroupNeUnassign)
+			})
+		})
+
 		router.Route("/import", func(r chi.Router) {
 			r.Use(middleware.Authenticate)
 			r.Use(middleware.CheckRole)

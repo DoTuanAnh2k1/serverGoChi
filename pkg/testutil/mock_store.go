@@ -47,6 +47,24 @@ type MockStore struct {
 	SaveConfigBackupFn               func(b *db_models.CliConfigBackup) error
 	ListConfigBackupsFn              func(neName string) ([]*db_models.CliConfigBackup, error)
 	GetConfigBackupByIdFn            func(id int64) (*db_models.CliConfigBackup, error)
+	CreateGroupFn                       func(g *db_models.CliGroup) error
+	GetGroupByIdFn                      func(id int64) (*db_models.CliGroup, error)
+	GetGroupByNameFn                    func(name string) (*db_models.CliGroup, error)
+	GetAllGroupsFn                      func() ([]*db_models.CliGroup, error)
+	UpdateGroupFn                       func(g *db_models.CliGroup) error
+	DeleteGroupByIdFn                   func(id int64) error
+	CreateUserGroupMappingFn            func(m *db_models.CliUserGroupMapping) error
+	DeleteUserGroupMappingFn            func(m *db_models.CliUserGroupMapping) error
+	GetAllGroupsOfUserFn                func(userId int64) ([]*db_models.CliUserGroupMapping, error)
+	GetAllUsersOfGroupFn                func(groupId int64) ([]*db_models.CliUserGroupMapping, error)
+	DeleteAllUserGroupMappingByUserIdFn func(userId int64) error
+	DeleteAllUserGroupMappingByGroupIdFn func(groupId int64) error
+	CreateGroupNeMappingFn              func(m *db_models.CliGroupNeMapping) error
+	DeleteGroupNeMappingFn              func(m *db_models.CliGroupNeMapping) error
+	GetAllNesOfGroupFn                  func(groupId int64) ([]*db_models.CliGroupNeMapping, error)
+	GetAllGroupsOfNeFn                  func(neId int64) ([]*db_models.CliGroupNeMapping, error)
+	DeleteAllGroupNeMappingByGroupIdFn  func(groupId int64) error
+	DeleteAllGroupNeMappingByNeIdFn     func(neId int64) error
 }
 
 func (m *MockStore) Init(cfg config_models.DatabaseConfig) error {
@@ -292,4 +310,130 @@ func (m *MockStore) GetConfigBackupById(id int64) (*db_models.CliConfigBackup, e
 		return m.GetConfigBackupByIdFn(id)
 	}
 	return nil, nil
+}
+
+func (m *MockStore) CreateGroup(g *db_models.CliGroup) error {
+	if m.CreateGroupFn != nil {
+		return m.CreateGroupFn(g)
+	}
+	return nil
+}
+
+func (m *MockStore) GetGroupById(id int64) (*db_models.CliGroup, error) {
+	if m.GetGroupByIdFn != nil {
+		return m.GetGroupByIdFn(id)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetGroupByName(name string) (*db_models.CliGroup, error) {
+	if m.GetGroupByNameFn != nil {
+		return m.GetGroupByNameFn(name)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetAllGroups() ([]*db_models.CliGroup, error) {
+	if m.GetAllGroupsFn != nil {
+		return m.GetAllGroupsFn()
+	}
+	return nil, nil
+}
+
+func (m *MockStore) UpdateGroup(g *db_models.CliGroup) error {
+	if m.UpdateGroupFn != nil {
+		return m.UpdateGroupFn(g)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteGroupById(id int64) error {
+	if m.DeleteGroupByIdFn != nil {
+		return m.DeleteGroupByIdFn(id)
+	}
+	return nil
+}
+
+func (m *MockStore) CreateUserGroupMapping(mapping *db_models.CliUserGroupMapping) error {
+	if m.CreateUserGroupMappingFn != nil {
+		return m.CreateUserGroupMappingFn(mapping)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteUserGroupMapping(mapping *db_models.CliUserGroupMapping) error {
+	if m.DeleteUserGroupMappingFn != nil {
+		return m.DeleteUserGroupMappingFn(mapping)
+	}
+	return nil
+}
+
+func (m *MockStore) GetAllGroupsOfUser(userId int64) ([]*db_models.CliUserGroupMapping, error) {
+	if m.GetAllGroupsOfUserFn != nil {
+		return m.GetAllGroupsOfUserFn(userId)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetAllUsersOfGroup(groupId int64) ([]*db_models.CliUserGroupMapping, error) {
+	if m.GetAllUsersOfGroupFn != nil {
+		return m.GetAllUsersOfGroupFn(groupId)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) DeleteAllUserGroupMappingByUserId(userId int64) error {
+	if m.DeleteAllUserGroupMappingByUserIdFn != nil {
+		return m.DeleteAllUserGroupMappingByUserIdFn(userId)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteAllUserGroupMappingByGroupId(groupId int64) error {
+	if m.DeleteAllUserGroupMappingByGroupIdFn != nil {
+		return m.DeleteAllUserGroupMappingByGroupIdFn(groupId)
+	}
+	return nil
+}
+
+func (m *MockStore) CreateGroupNeMapping(mapping *db_models.CliGroupNeMapping) error {
+	if m.CreateGroupNeMappingFn != nil {
+		return m.CreateGroupNeMappingFn(mapping)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteGroupNeMapping(mapping *db_models.CliGroupNeMapping) error {
+	if m.DeleteGroupNeMappingFn != nil {
+		return m.DeleteGroupNeMappingFn(mapping)
+	}
+	return nil
+}
+
+func (m *MockStore) GetAllNesOfGroup(groupId int64) ([]*db_models.CliGroupNeMapping, error) {
+	if m.GetAllNesOfGroupFn != nil {
+		return m.GetAllNesOfGroupFn(groupId)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) GetAllGroupsOfNe(neId int64) ([]*db_models.CliGroupNeMapping, error) {
+	if m.GetAllGroupsOfNeFn != nil {
+		return m.GetAllGroupsOfNeFn(neId)
+	}
+	return nil, nil
+}
+
+func (m *MockStore) DeleteAllGroupNeMappingByGroupId(groupId int64) error {
+	if m.DeleteAllGroupNeMappingByGroupIdFn != nil {
+		return m.DeleteAllGroupNeMappingByGroupIdFn(groupId)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteAllGroupNeMappingByNeId(neId int64) error {
+	if m.DeleteAllGroupNeMappingByNeIdFn != nil {
+		return m.DeleteAllGroupNeMappingByNeIdFn(neId)
+	}
+	return nil
 }
