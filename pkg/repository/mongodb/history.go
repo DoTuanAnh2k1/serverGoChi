@@ -1,7 +1,6 @@
 package mongodb
 
 import (
-	"context"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
@@ -10,11 +9,22 @@ import (
 )
 
 func (c *Client) SaveHistoryCommand(history db_models.CliOperationHistory) error {
-	_, err := c.col(colOperationHistory).InsertOne(context.Background(), toMOperationHistory(history))
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	if history.ID == 0 {
+		id, err := c.nextID(ctx, colOperationHistory)
+		if err != nil {
+			return err
+		}
+		history.ID = int32(id)
+	}
+	_, err := c.col(colOperationHistory).InsertOne(ctx, toMOperationHistory(history))
 	return err
 }
 
 func (c *Client) GetDailyOperationHistory(date time.Time) ([]db_models.CliOperationHistory, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	end := start.Add(24 * time.Hour)
 
@@ -26,7 +36,6 @@ func (c *Client) GetDailyOperationHistory(date time.Time) ([]db_models.CliOperat
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "ne_name", Value: 1}, {Key: "created_date", Value: 1}})
 
-	ctx := context.Background()
 	cur, err := c.col(colOperationHistory).Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
@@ -45,8 +54,9 @@ func (c *Client) GetDailyOperationHistory(date time.Time) ([]db_models.CliOperat
 }
 
 func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	opts := options.Find().SetSort(bson.D{{Key: "created_date", Value: -1}}).SetLimit(int64(limit))
-	ctx := context.Background()
 	cur, err := c.col(colOperationHistory).Find(ctx, bson.M{}, opts)
 	if err != nil {
 		return nil, err
@@ -65,6 +75,8 @@ func (c *Client) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, e
 }
 
 func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	filter := bson.M{}
 	if scope != "" {
 		filter["scope"] = scope
@@ -76,7 +88,6 @@ func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName, account stri
 		filter["account"] = account
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "created_date", Value: -1}}).SetLimit(int64(limit))
-	ctx := context.Background()
 	cur, err := c.col(colOperationHistory).Find(ctx, filter, opts)
 	if err != nil {
 		return nil, err
@@ -94,8 +105,10 @@ func (c *Client) GetRecentHistoryFiltered(limit int, scope, neName, account stri
 }
 
 func (c *Client) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	filter := bson.M{"created_date": bson.M{"$lt": cutoff}}
-	result, err := c.col(colOperationHistory).DeleteMany(context.Background(), filter)
+	result, err := c.col(colOperationHistory).DeleteMany(ctx, filter)
 	if err != nil {
 		return 0, err
 	}

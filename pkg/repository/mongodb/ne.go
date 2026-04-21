@@ -1,15 +1,14 @@
 package mongodb
 
 import (
-	"context"
-
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 func (c *Client) GetNeListById(id int64) ([]*db_models.CliNe, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colNe).Find(ctx, bson.M{"id": id})
 	if err != nil {
 		return nil, err
@@ -28,7 +27,8 @@ func (c *Client) GetNeListById(id int64) ([]*db_models.CliNe, error) {
 }
 
 func (c *Client) GetCliNeListBySystemType(systemType string) ([]*db_models.CliNe, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colNe).Find(ctx, bson.M{"system_type": systemType})
 	if err != nil {
 		return nil, err
@@ -47,8 +47,10 @@ func (c *Client) GetCliNeListBySystemType(systemType string) ([]*db_models.CliNe
 }
 
 func (c *Client) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	var m mNe
-	err := c.col(colNe).FindOne(context.Background(), bson.M{"id": id}).Decode(&m)
+	err := c.col(colNe).FindOne(ctx, bson.M{"id": id}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -60,8 +62,10 @@ func (c *Client) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
 
 // GetNeMonitorById derives monitor info from CliNe — CommandURL is used as the monitor URL.
 func (c *Client) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	var m mNe
-	err := c.col(colNe).FindOne(context.Background(), bson.M{"id": id}).Decode(&m)
+	err := c.col(colNe).FindOne(ctx, bson.M{"id": id}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -78,8 +82,10 @@ func (c *Client) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
 }
 
 func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNeMapping, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	var m mUserNeMapping
-	err := c.col(colUserNeMapping).FindOne(context.Background(), bson.M{"user_id": userId}).Decode(&m)
+	err := c.col(colUserNeMapping).FindOne(ctx, bson.M{"user_id": userId}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -90,36 +96,54 @@ func (c *Client) GetCLIUserNeMappingByUserId(userId int64) (*db_models.CliUserNe
 }
 
 func (c *Client) DeleteCliNeById(id int64) error {
-	_, err := c.col(colNe).DeleteOne(context.Background(), bson.M{"id": id})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colNe).DeleteOne(ctx, bson.M{"id": id})
 	return err
 }
 
 func (c *Client) CreateCliNe(ne *db_models.CliNe) error {
-	_, err := c.col(colNe).InsertOne(context.Background(), toMNe(ne))
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	if ne.ID == 0 {
+		id, err := c.nextID(ctx, colNe)
+		if err != nil {
+			return err
+		}
+		ne.ID = id
+	}
+	_, err := c.col(colNe).InsertOne(ctx, toMNe(ne))
 	return err
 }
 
 func (c *Client) UpdateCliNe(ne *db_models.CliNe) error {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	filter := bson.M{"id": ne.ID}
 	update := bson.M{"$set": toMNe(ne)}
-	_, err := c.col(colNe).UpdateOne(context.Background(), filter, update)
+	_, err := c.col(colNe).UpdateOne(ctx, filter, update)
 	return err
 }
 
 func (c *Client) CreateUserNeMapping(mapping *db_models.CliUserNeMapping) error {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	doc := bson.M{"user_id": mapping.UserID, "tbl_ne_id": mapping.TblNeID}
-	_, err := c.col(colUserNeMapping).InsertOne(context.Background(), doc)
+	_, err := c.col(colUserNeMapping).InsertOne(ctx, doc)
 	return err
 }
 
 func (c *Client) DeleteUserNeMapping(mapping *db_models.CliUserNeMapping) error {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	filter := bson.M{"user_id": mapping.UserID, "tbl_ne_id": mapping.TblNeID}
-	_, err := c.col(colUserNeMapping).DeleteOne(context.Background(), filter)
+	_, err := c.col(colUserNeMapping).DeleteOne(ctx, filter)
 	return err
 }
 
 func (c *Client) GetAllNeOfUserByUserId(userId int64) ([]*db_models.CliUserNeMapping, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colUserNeMapping).Find(ctx, bson.M{"user_id": userId})
 	if err != nil {
 		return nil, err

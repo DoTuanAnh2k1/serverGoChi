@@ -1,7 +1,6 @@
 package mongodb
 
 import (
-	"context"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
@@ -13,19 +12,25 @@ import (
 const colConfigBackup = "cli_config_backup"
 
 func (c *Client) SaveConfigBackup(b *db_models.CliConfigBackup) error {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	if b.CreatedAt.IsZero() {
 		b.CreatedAt = time.Now().UTC()
 	}
-	// MongoDB has no auto-increment — use nanosecond timestamp as unique int64 ID.
 	if b.ID == 0 {
-		b.ID = b.CreatedAt.UnixNano()
+		id, err := c.nextID(ctx, colConfigBackup)
+		if err != nil {
+			return err
+		}
+		b.ID = id
 	}
-	_, err := c.col(colConfigBackup).InsertOne(context.Background(), toMConfigBackup(b))
+	_, err := c.col(colConfigBackup).InsertOne(ctx, toMConfigBackup(b))
 	return err
 }
 
 func (c *Client) ListConfigBackups(neName string) ([]*db_models.CliConfigBackup, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	filter := bson.M{}
 	if neName != "" {
 		filter["ne_name"] = neName
@@ -49,8 +54,10 @@ func (c *Client) ListConfigBackups(neName string) ([]*db_models.CliConfigBackup,
 }
 
 func (c *Client) GetConfigBackupById(id int64) (*db_models.CliConfigBackup, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	var m mConfigBackup
-	err := c.col(colConfigBackup).FindOne(context.Background(), bson.M{"id": id}).Decode(&m)
+	err := c.col(colConfigBackup).FindOne(ctx, bson.M{"id": id}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}

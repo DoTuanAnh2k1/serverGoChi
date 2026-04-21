@@ -1,17 +1,15 @@
 package mongodb
 
 import (
-	"context"
-
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
 const (
-	colGroup             = "cli_group"
-	colUserGroupMapping  = "cli_user_group_mapping"
-	colGroupNeMapping    = "cli_group_ne_mapping"
+	colGroup            = "cli_group"
+	colUserGroupMapping = "cli_user_group_mapping"
+	colGroupNeMapping   = "cli_group_ne_mapping"
 )
 
 // ── cli_group CRUD ───────────────────────────────────────────────────────────
@@ -31,13 +29,24 @@ func fromMGroup(m *mGroup) *db_models.CliGroup {
 }
 
 func (c *Client) CreateGroup(g *db_models.CliGroup) error {
-	_, err := c.col(colGroup).InsertOne(context.Background(), toMGroup(g))
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	if g.ID == 0 {
+		id, err := c.nextID(ctx, colGroup)
+		if err != nil {
+			return err
+		}
+		g.ID = id
+	}
+	_, err := c.col(colGroup).InsertOne(ctx, toMGroup(g))
 	return err
 }
 
 func (c *Client) GetGroupById(id int64) (*db_models.CliGroup, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	var m mGroup
-	err := c.col(colGroup).FindOne(context.Background(), bson.M{"id": id}).Decode(&m)
+	err := c.col(colGroup).FindOne(ctx, bson.M{"id": id}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -48,8 +57,10 @@ func (c *Client) GetGroupById(id int64) (*db_models.CliGroup, error) {
 }
 
 func (c *Client) GetGroupByName(name string) (*db_models.CliGroup, error) {
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	var m mGroup
-	err := c.col(colGroup).FindOne(context.Background(), bson.M{"name": name}).Decode(&m)
+	err := c.col(colGroup).FindOne(ctx, bson.M{"name": name}).Decode(&m)
 	if err == mongo.ErrNoDocuments {
 		return nil, nil
 	}
@@ -60,7 +71,8 @@ func (c *Client) GetGroupByName(name string) (*db_models.CliGroup, error) {
 }
 
 func (c *Client) GetAllGroups() ([]*db_models.CliGroup, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colGroup).Find(ctx, bson.D{})
 	if err != nil {
 		return nil, err
@@ -78,12 +90,16 @@ func (c *Client) GetAllGroups() ([]*db_models.CliGroup, error) {
 }
 
 func (c *Client) UpdateGroup(g *db_models.CliGroup) error {
-	_, err := c.col(colGroup).UpdateOne(context.Background(), bson.M{"id": g.ID}, bson.M{"$set": toMGroup(g)})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colGroup).UpdateOne(ctx, bson.M{"id": g.ID}, bson.M{"$set": toMGroup(g)})
 	return err
 }
 
 func (c *Client) DeleteGroupById(id int64) error {
-	_, err := c.col(colGroup).DeleteOne(context.Background(), bson.M{"id": id})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colGroup).DeleteOne(ctx, bson.M{"id": id})
 	return err
 }
 
@@ -99,17 +115,22 @@ func fromMUserGroupMapping(m *mUserGroupMapping) *db_models.CliUserGroupMapping 
 }
 
 func (c *Client) CreateUserGroupMapping(m *db_models.CliUserGroupMapping) error {
-	_, err := c.col(colUserGroupMapping).InsertOne(context.Background(), bson.M{"user_id": m.UserID, "group_id": m.GroupID})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colUserGroupMapping).InsertOne(ctx, bson.M{"user_id": m.UserID, "group_id": m.GroupID})
 	return err
 }
 
 func (c *Client) DeleteUserGroupMapping(m *db_models.CliUserGroupMapping) error {
-	_, err := c.col(colUserGroupMapping).DeleteOne(context.Background(), bson.M{"user_id": m.UserID, "group_id": m.GroupID})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colUserGroupMapping).DeleteOne(ctx, bson.M{"user_id": m.UserID, "group_id": m.GroupID})
 	return err
 }
 
 func (c *Client) GetAllGroupsOfUser(userId int64) ([]*db_models.CliUserGroupMapping, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colUserGroupMapping).Find(ctx, bson.M{"user_id": userId})
 	if err != nil {
 		return nil, err
@@ -127,7 +148,8 @@ func (c *Client) GetAllGroupsOfUser(userId int64) ([]*db_models.CliUserGroupMapp
 }
 
 func (c *Client) GetAllUsersOfGroup(groupId int64) ([]*db_models.CliUserGroupMapping, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colUserGroupMapping).Find(ctx, bson.M{"group_id": groupId})
 	if err != nil {
 		return nil, err
@@ -145,12 +167,16 @@ func (c *Client) GetAllUsersOfGroup(groupId int64) ([]*db_models.CliUserGroupMap
 }
 
 func (c *Client) DeleteAllUserGroupMappingByUserId(userId int64) error {
-	_, err := c.col(colUserGroupMapping).DeleteMany(context.Background(), bson.M{"user_id": userId})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colUserGroupMapping).DeleteMany(ctx, bson.M{"user_id": userId})
 	return err
 }
 
 func (c *Client) DeleteAllUserGroupMappingByGroupId(groupId int64) error {
-	_, err := c.col(colUserGroupMapping).DeleteMany(context.Background(), bson.M{"group_id": groupId})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colUserGroupMapping).DeleteMany(ctx, bson.M{"group_id": groupId})
 	return err
 }
 
@@ -166,17 +192,22 @@ func fromMGroupNeMapping(m *mGroupNeMapping) *db_models.CliGroupNeMapping {
 }
 
 func (c *Client) CreateGroupNeMapping(m *db_models.CliGroupNeMapping) error {
-	_, err := c.col(colGroupNeMapping).InsertOne(context.Background(), bson.M{"group_id": m.GroupID, "tbl_ne_id": m.TblNeID})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colGroupNeMapping).InsertOne(ctx, bson.M{"group_id": m.GroupID, "tbl_ne_id": m.TblNeID})
 	return err
 }
 
 func (c *Client) DeleteGroupNeMapping(m *db_models.CliGroupNeMapping) error {
-	_, err := c.col(colGroupNeMapping).DeleteOne(context.Background(), bson.M{"group_id": m.GroupID, "tbl_ne_id": m.TblNeID})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colGroupNeMapping).DeleteOne(ctx, bson.M{"group_id": m.GroupID, "tbl_ne_id": m.TblNeID})
 	return err
 }
 
 func (c *Client) GetAllNesOfGroup(groupId int64) ([]*db_models.CliGroupNeMapping, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colGroupNeMapping).Find(ctx, bson.M{"group_id": groupId})
 	if err != nil {
 		return nil, err
@@ -194,7 +225,8 @@ func (c *Client) GetAllNesOfGroup(groupId int64) ([]*db_models.CliGroupNeMapping
 }
 
 func (c *Client) GetAllGroupsOfNe(neId int64) ([]*db_models.CliGroupNeMapping, error) {
-	ctx := context.Background()
+	ctx, cancel := c.opCtx()
+	defer cancel()
 	cur, err := c.col(colGroupNeMapping).Find(ctx, bson.M{"tbl_ne_id": neId})
 	if err != nil {
 		return nil, err
@@ -212,11 +244,15 @@ func (c *Client) GetAllGroupsOfNe(neId int64) ([]*db_models.CliGroupNeMapping, e
 }
 
 func (c *Client) DeleteAllGroupNeMappingByGroupId(groupId int64) error {
-	_, err := c.col(colGroupNeMapping).DeleteMany(context.Background(), bson.M{"group_id": groupId})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colGroupNeMapping).DeleteMany(ctx, bson.M{"group_id": groupId})
 	return err
 }
 
 func (c *Client) DeleteAllGroupNeMappingByNeId(neId int64) error {
-	_, err := c.col(colGroupNeMapping).DeleteMany(context.Background(), bson.M{"tbl_ne_id": neId})
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colGroupNeMapping).DeleteMany(ctx, bson.M{"tbl_ne_id": neId})
 	return err
 }
