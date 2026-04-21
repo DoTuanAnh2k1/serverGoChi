@@ -10,6 +10,7 @@ Phục vụ quản lý người dùng, phân quyền, Network Element (NE), lị
 | Service | Repo | Mô tả |
 |---|---|---|
 | **cli-mgt-svc** | repo này | Management API + Admin frontend (embedded) |
+| **cli-ssh-svc** | repo này (`cmd/ssh`) | SSH CLI bastion — 3 mode: `cli-config` (quản trị user/NE/group qua REST), `ne-config` & `ne-command` (SSH proxy) |
 | **cli-netconf-svc** | [cli-netconf](https://github.com/DoTuanAnh2k1/cli-netconf) | SSH server cho mode ne-config (NETCONF) |
 | **SSH_SERVER** | *(repo riêng)* | SSH server cho mode ne-command |
 
@@ -19,11 +20,12 @@ Phục vụ quản lý người dùng, phân quyền, Network Element (NE), lị
 
 | Nhóm | Mô tả |
 |---|---|
-| **Authentication** | Đăng nhập, sinh JWT, lịch sử đăng nhập |
+| **Authentication** | Đăng nhập, sinh JWT, lịch sử đăng nhập. Role lấy từ JWT `aud` claim — không cần gọi lại listing để xác thực role |
 | **User Management** | Tạo / cập nhật / vô hiệu hóa tài khoản |
-| **Permission** | Phân quyền dựa trên `account_type` (SuperAdmin/Admin/Normal) |
+| **Permission** | Phân quyền dựa trên `account_type` (SuperAdmin/Admin/Normal). SuperAdmin ẩn khỏi mọi listing (`/aa/admin/user/list`, `/aa/authenticate/user/show`) nhưng vẫn đăng nhập & thao tác được bình thường |
 | **Network Element** | Tạo / sửa / xóa NE (site, IP, port, namespace, conf_mode) |
-| **User-NE Authorization** | Phân quyền user truy cập NE |
+| **User-NE Authorization** | Phân quyền user truy cập NE — trực tiếp hoặc qua Group |
+| **Groups** | Gom user ↔ group ↔ NE; `/aa/list/ne` trả về hợp (union) của direct + via-group |
 | **Config Backup** | Lưu backup config XML từ NETCONF commit |
 | **History / Audit** | Lưu lịch sử lệnh, filter theo scope/NE, export CSV, tự dọn dữ liệu cũ |
 | **Admin Frontend** | Giao diện quản trị tại `/admin` (embedded, song ngữ EN/VI) |
@@ -151,6 +153,59 @@ Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / Eng
 
 ---
 
+## SSH CLI (`cmd/ssh`)
+
+Một bastion SSH chạy song song với mgt-svc, cho phép Admin/SuperAdmin thao tác
+user/NE/group qua dòng lệnh và SSH proxy sang các NE CLI phía sau.
+
+```bash
+# Local (cần mgt-svc đã chạy)
+MGT_SVC_BASE=http://localhost:3000 make run-ssh
+
+# Hoặc trong docker-compose.local.yml: service cli-ssh-svc, expose :2223
+docker compose -f docker-compose.local.yml up -d --build cli-ssh-svc
+ssh anhdt195@localhost -p 2223
+```
+
+### Env
+
+| Var | Mặc định | Mô tả |
+|---|---|---|
+| `SSH_CLI_LISTEN_ADDR` | `:2223` | Địa chỉ bind SSH |
+| `SSH_CLI_HOST_KEY_PATH` | `/data/ssh_cli_host_key` | Ed25519 host key (tự sinh nếu chưa có) |
+| `MGT_SVC_BASE` | *required* | Base URL của cli-mgt-svc, vd `http://cli-mgt-svc:3000` |
+| `NE_CONFIG_SSH_ADDR` | — | Địa chỉ upstream cho mode `ne-config` (vd `cli-netconf-svc:22`) |
+| `NE_COMMAND_SSH_ADDR` | — | Địa chỉ upstream cho mode `ne-command` |
+| `LOG_LEVEL` | `info` | trace/debug/info/warn/error |
+
+### Flow
+
+1. SSH bằng username/password → forward `/aa/authenticate` để lấy JWT; reject nếu `account_type=2` (Normal).
+2. Menu 3 mode (Tab cycle / autocomplete): `cli-config / ne-config / ne-command`. Tab lần đầu hiện gợi ý ngay **dưới prompt** (prompt được giữ nguyên); các lần Tab tiếp theo rotate qua từng candidate; phím bất kỳ khác Tab sẽ xoá dòng gợi ý.
+3. **cli-config**: REPL với tab completion (verb → entity → field → enum value); mọi lệnh đều gọi HTTP sang mgt-svc kèm JWT.
+4. **ne-config / ne-command**: mở SSH outbound với cùng username/password sang địa chỉ cấu hình, pipe stdin/stdout/stderr, forward window-change.
+
+### Command grammar (cli-config)
+
+Pairs là `field value` (space-separated, không `=`). Quote cho value có khoảng trắng.
+
+```
+show user|ne|group [<name|id>]
+set user name <u> password <p> [email <e>] [full_name <f>] [account_type 1|2] [...]
+set ne ne_name <n> namespace <ns> conf_master_ip <ip> conf_port_master_tcp <port> command_url <url> [...]
+set group name <n> [description <d>]
+update <entity> <name|id> <field> <value> [<field> <value> ...]
+delete <entity> <name|id>
+map user <u> ne <ne|id>           map user <u> group <g|id>         map group <g|id> ne <ne|id>
+unmap ...                         (cùng shape)
+help [command]
+exit
+```
+
+Alias: `name` → `account_name` (user) hoặc `ne_name` (ne). `port` → `conf_port_master_tcp`. `ip` → `conf_master_ip`. `type` → `account_type`.
+
+---
+
 ## Metrics & Profiling
 
 ```bash
@@ -230,6 +285,20 @@ docker compose -f deploy/docker/docker-compose.yml up -d
 docker compose -f deploy/docker/docker-compose-private.yaml up -d
 ```
 
+### Published images
+
+| Image | Dockerfile | Vai trò |
+|---|---|---|
+| `hsdfat/cli-mgt:<tag>` | `deploy/docker/Dockerfile` | Management API + Admin frontend |
+| `hsdfat/cli-gate:<tag>` | `deploy/docker/Dockerfile_ssh` | SSH CLI bastion (port 2223) |
+
+Tag là số 5 chữ số tăng dần mỗi lần build (không reuse). Build ví dụ:
+
+```bash
+docker build -f deploy/docker/Dockerfile_ssh -t hsdfat/cli-gate:21040 .
+docker push hsdfat/cli-gate:21040
+```
+
 ### Kubernetes
 
 ```bash
@@ -274,6 +343,32 @@ cli-mgt-svc/
 ├── api.yaml                    # OpenAPI 3.0 spec
 └── Makefile
 ```
+
+---
+
+## Tests
+
+```bash
+make test                                      # chạy toàn bộ
+go test -cover ./...                           # kèm coverage
+go test -coverprofile=cover.out ./pkg/sshcli && go tool cover -func=cover.out | tail -5
+```
+
+Coverage hiện tại (snapshot):
+
+| Package | Coverage |
+|---|---|
+| `pkg/handler/response` | 97.4% |
+| `pkg/bcrypt` | 83.3% |
+| `pkg/tcpserver` | 76.3% |
+| `pkg/token` | 74.1% |
+| `pkg/sshcli` | 74.0% |
+| `pkg/handler/middleware` | 65.4% |
+| `pkg/leader` | 45.0% |
+| `pkg/service` | 40.5% |
+| `pkg/handler` | 33.6% |
+
+`pkg/repository/*` (mongo/mysql/postgres) và `pkg/{config,logger,store,server}` hiện chưa có unit test.
 
 ---
 
