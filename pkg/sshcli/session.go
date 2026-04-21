@@ -1,0 +1,175 @@
+package sshcli
+
+import (
+	"errors"
+	"fmt"
+	"io"
+	"strings"
+
+	"golang.org/x/crypto/ssh"
+	"golang.org/x/term"
+)
+
+// Mode represents the three top-level destinations available from the CLI menu.
+type Mode string
+
+const (
+	ModeCliConfig  Mode = "cli-config"
+	ModeNeConfig   Mode = "ne-config"
+	ModeNeCommand  Mode = "ne-command"
+)
+
+var menuModes = []string{string(ModeCliConfig), string(ModeNeConfig), string(ModeNeCommand)}
+
+// SessionRunner glues together the three modes for one SSH login.
+type SessionRunner struct {
+	Client           *MgtClient
+	Username         string
+	Password         string
+	NeConfigAddr     string
+	NeCommandAddr    string
+	PTYTerm          string
+	PTYWidth         uint32
+	PTYHeight        uint32
+	PTYModes         map[uint8]uint32
+	WindowChanges    <-chan WindowSize
+}
+
+// Run loops through the menu until the user exits. It writes a banner and
+// prompts for a mode; on return from a mode, it re-prompts.
+func (s *SessionRunner) Run(sess io.ReadWriter) error {
+	t := term.NewTerminal(sess, "")
+	t.SetPrompt("mode> ")
+	t.AutoCompleteCallback = makeMenuAutoComplete(sess)
+
+	banner := fmt.Sprintf("\r\nWelcome %s — management CLI.\r\n", s.Username)
+	banner += "Available modes: cli-config, ne-config, ne-command (Tab to cycle / autocomplete, 'exit' to quit).\r\n\r\n"
+	fmt.Fprint(sess, banner)
+
+	for {
+		line, err := t.ReadLine()
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				return nil
+			}
+			return err
+		}
+		choice := strings.TrimSpace(strings.ToLower(line))
+		switch choice {
+		case "":
+			continue
+		case "exit", "quit":
+			fmt.Fprint(sess, "bye.\r\n")
+			return nil
+		case string(ModeCliConfig):
+			if err := RunConfigMode(sess, s.Client); err != nil {
+				fmt.Fprintf(sess, "cli-config ended with error: %s\r\n", err)
+			}
+		case string(ModeNeConfig):
+			if s.NeConfigAddr == "" {
+				fmt.Fprint(sess, "ne-config address not configured on this server.\r\n")
+				continue
+			}
+			s.runProxy(sess, s.NeConfigAddr)
+		case string(ModeNeCommand):
+			if s.NeCommandAddr == "" {
+				fmt.Fprint(sess, "ne-command address not configured on this server.\r\n")
+				continue
+			}
+			s.runProxy(sess, s.NeCommandAddr)
+		default:
+			fmt.Fprintf(sess, "unknown mode %q — choose one of: %s\r\n", choice, strings.Join(menuModes, ", "))
+		}
+	}
+}
+
+func (s *SessionRunner) runProxy(sess io.ReadWriter, addr string) {
+	p := &ProxySession{
+		UpstreamAddr:  addr,
+		Username:      s.Username,
+		Password:      s.Password,
+		Term:          s.PTYTerm,
+		Width:         s.PTYWidth,
+		Height:        s.PTYHeight,
+		Modes:         sshTerminalModes(s.PTYModes),
+		WindowChanges: s.WindowChanges,
+	}
+	fmt.Fprintf(sess, "Connecting to %s ...\r\n", addr)
+	if err := p.Run(sess); err != nil {
+		fmt.Fprintf(sess, "proxy error: %s\r\n", err)
+	}
+	fmt.Fprint(sess, "\r\n-- session ended, back to mode menu --\r\n")
+}
+
+// makeMenuAutoComplete rotates through the menu modes on repeated Tab presses.
+// It detects a "same Tab again" by remembering the (line, pos) it returned
+// last: if the terminal fires Tab again with an unchanged line, we advance;
+// otherwise we start a fresh cycle using the current line as prefix. On the
+// first Tab of a new cycle with multiple candidates, it prints the list *below*
+// the prompt (save/restore cursor) so the prompt itself stays intact. The
+// hint is erased as soon as any non-Tab key is pressed.
+func makeMenuAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (string, int, bool) {
+	var st struct {
+		list      []string
+		idx       int
+		lastLine  string
+		lastPos   int
+		active    bool
+		hintShown bool
+	}
+	eraseHint := func() {
+		if !st.hintShown || hintW == nil {
+			return
+		}
+		fmt.Fprint(hintW, "\x1b7\r\n\x1b[2K\x1b8")
+		st.hintShown = false
+	}
+	showHint := func(opts []string) {
+		if hintW == nil || len(opts) <= 1 {
+			return
+		}
+		fmt.Fprintf(hintW, "\x1b7\r\n\x1b[2K%s\x1b8", strings.Join(opts, "  "))
+		st.hintShown = true
+	}
+	return func(line string, pos int, key rune) (string, int, bool) {
+		if key != '\t' {
+			eraseHint()
+			st.active = false
+			return "", 0, false
+		}
+		if st.active && line == st.lastLine && pos == st.lastPos && len(st.list) > 0 {
+			st.idx = (st.idx + 1) % len(st.list)
+		} else {
+			prefix := strings.ToLower(strings.TrimLeft(line[:pos], " "))
+			list := st.list[:0]
+			for _, mode := range menuModes {
+				if strings.HasPrefix(mode, prefix) {
+					list = append(list, mode)
+				}
+			}
+			if len(list) == 0 {
+				eraseHint()
+				st.active = false
+				return "", 0, false
+			}
+			eraseHint()
+			st.list = list
+			st.idx = 0
+			st.active = true
+			showHint(list)
+		}
+		cand := st.list[st.idx]
+		st.lastLine = cand
+		st.lastPos = len(cand)
+		return cand, len(cand), true
+	}
+}
+
+// sshTerminalModes converts a map of raw mode codes to the typed ssh.TerminalModes.
+func sshTerminalModes(raw map[uint8]uint32) ssh.TerminalModes {
+	out := ssh.TerminalModes{}
+	for k, v := range raw {
+		out[k] = v
+	}
+	return out
+}

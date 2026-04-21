@@ -88,9 +88,32 @@ services:
       SEED_PASSWORD: "123"
       LOG_LEVEL: debug
 
+  cli-ssh-svc:
+    build:
+      context: .
+      dockerfile: deploy/docker/Dockerfile_ssh
+    image: servergochi-cli-ssh
+    container_name: cli-ssh-svc
+    restart: unless-stopped
+    depends_on:
+      cli-mgt-svc:
+        condition: service_healthy
+    ports:
+      - "2223:2223"
+    environment:
+      SSH_CLI_LISTEN_ADDR: ":2223"
+      SSH_CLI_HOST_KEY_PATH: /data/ssh_cli_host_key
+      MGT_SVC_BASE: http://cli-mgt-svc:3000
+      NE_CONFIG_SSH_ADDR: cli-netconf-svc:22
+      NE_COMMAND_SSH_ADDR: cli-netconf-svc:22
+      LOG_LEVEL: debug
+    volumes:
+      - ssh_data:/data
+
 volumes:
   mysql_data:
   app_data:
+  ssh_data:
 
 networks:
   default:

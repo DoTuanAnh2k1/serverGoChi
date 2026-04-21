@@ -123,6 +123,21 @@ build-docker: ## Build Docker image (public registry)
 build-docker-private: ## Build Docker image (private registry)
 	docker build -f deploy/docker/Dockerfile_private -t $(APP_NAME):latest .
 
+build-ssh: ## Build the ssh-cli binary -> bin/ssh-cli
+	@mkdir -p $(BUILD_DIR)
+	CGO_ENABLED=0 go build -ldflags="-s -w" -trimpath -o $(BUILD_DIR)/ssh-cli ./cmd/ssh
+	@echo "Built: $(BUILD_DIR)/ssh-cli"
+
+build-ssh-docker: ## Build ssh-cli Docker image
+	docker build -f deploy/docker/Dockerfile_ssh -t cli-ssh-svc:latest .
+
+run-ssh: ## Run ssh-cli locally (needs MGT_SVC_BASE + optional NE_*_SSH_ADDR in env)
+	SSH_CLI_LISTEN_ADDR=$${SSH_CLI_LISTEN_ADDR:-:2223} \
+	SSH_CLI_HOST_KEY_PATH=$${SSH_CLI_HOST_KEY_PATH:-/tmp/ssh_cli_host_key} \
+	MGT_SVC_BASE=$${MGT_SVC_BASE:-http://localhost:3000} \
+	LOG_LEVEL=$${LOG_LEVEL:-debug} \
+	go run ./cmd/ssh
+
 ## ── Data ───────────────────────────────────────────────────────────
 
 import: ## Import data from file: make import FILE=data.txt
