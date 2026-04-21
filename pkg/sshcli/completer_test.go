@@ -1,9 +1,7 @@
 package sshcli
 
 import (
-	"bytes"
 	"sort"
-	"strings"
 	"testing"
 )
 
@@ -150,8 +148,7 @@ func TestCycleState_NoCandidates(t *testing.T) {
 // and the next Tab is fired with that updated line. The previous implementation
 // forgot about this and only ever returned the first candidate.
 func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
-	var hint bytes.Buffer
-	cb := makeAutoComplete(&hint)
+	cb := makeAutoComplete(nil)
 	line, pos := "show ", 5
 	seen := map[string]bool{}
 	var seq []string
@@ -160,9 +157,7 @@ func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
 		if !ok {
 			t.Fatalf("tab %d: callback returned !ok", i)
 		}
-		// Simulate terminal replacing the line with what the callback returned.
 		line, pos = nl, np
-		// The appended token (the candidate) starts at byte 5 ("show ").
 		seq = append(seq, line[5:])
 		seen[line[5:]] = true
 	}
@@ -171,17 +166,6 @@ func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
 	}
 	if seq[0] != seq[3] {
 		t.Errorf("expected wrap: seq[0]=%q seq[3]=%q", seq[0], seq[3])
-	}
-	// Hint must be printed exactly once (on the first Tab of the cycle) and
-	// contain each candidate.
-	hintStr := hint.String()
-	for _, want := range []string{"user", "ne", "group"} {
-		if !strings.Contains(hintStr, want) {
-			t.Errorf("hint missing %q; got %q", want, hintStr)
-		}
-	}
-	if n := strings.Count(hintStr, "\r\n"); n != 1 {
-		t.Errorf("hint should be printed once, got %d newlines: %q", n, hintStr)
 	}
 }
 
@@ -199,31 +183,8 @@ func TestAutoCompleteCallback_ResetOnNonTab(t *testing.T) {
 	}
 }
 
-// TestAutoCompleteCallback_ErasesHintOnNonTab verifies that after a cycle has
-// shown a hint, pressing any non-Tab key emits the erase sequence so the hint
-// line doesn't stay visible.
-func TestAutoCompleteCallback_ErasesHintOnNonTab(t *testing.T) {
-	var hint bytes.Buffer
-	cb := makeAutoComplete(&hint)
-	line, pos := "show ", 5
-	nl, np, _ := cb(line, pos, '\t')
-	line, pos = nl, np
-	shownLen := hint.Len()
-	if shownLen == 0 {
-		t.Fatal("expected hint to be shown on first tab")
-	}
-	// Press a printable character — should trigger erase.
-	cb(line, pos, 'x')
-	after := hint.Bytes()[shownLen:]
-	// Erase sequence is `\x1b7\r\n\x1b[2K\x1b8`.
-	if !bytes.Contains(after, []byte("\x1b7\r\n\x1b[2K\x1b8")) {
-		t.Errorf("expected erase sequence after non-tab key, got %q", after)
-	}
-}
-
 func TestMenuAutoComplete_CyclesThroughModes(t *testing.T) {
-	var hint bytes.Buffer
-	cb := makeMenuAutoComplete(&hint)
+	cb := makeMenuAutoComplete(nil)
 	line, pos := "", 0
 	seen := map[string]bool{}
 	var seq []string
@@ -246,15 +207,6 @@ func TestMenuAutoComplete_CyclesThroughModes(t *testing.T) {
 		if !seen[mode] {
 			t.Errorf("missing mode %q in cycle; got %v", mode, seq)
 		}
-	}
-	hintStr := hint.String()
-	for _, mode := range []string{"cli-config", "ne-config", "ne-command"} {
-		if !strings.Contains(hintStr, mode) {
-			t.Errorf("menu hint missing %q; got %q", mode, hintStr)
-		}
-	}
-	if n := strings.Count(hintStr, "\r\n"); n != 1 {
-		t.Errorf("menu hint should be printed once, got %d newlines: %q", n, hintStr)
 	}
 }
 

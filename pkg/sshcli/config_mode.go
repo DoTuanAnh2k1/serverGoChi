@@ -50,20 +50,19 @@ func RunConfigMode(sess io.ReadWriter, client *MgtClient) error {
 }
 
 // makeAutoComplete returns a term.AutoCompleteCallback that rotates through
-// Candidates on each tab press. Any non-tab key resets the cycle.
-//
-// When a new cycle begins (first Tab after any text change) and there's more
-// than one option, we print the list of candidates on the line *below* the
-// prompt using DECSC save-cursor (`ESC 7`) + `\r\n` + erase + list + DECRC
-// restore (`ESC 8`). The prompt itself is untouched because the cursor is
-// restored right after writing the hint.
-//
-// When the cycle ends (user presses any non-Tab key), the hint line is erased
-// with the same save/restore trick so the display doesn't keep a stale list.
-//
-// Cycling works by remembering the (line, pos) we returned from the previous
-// Tab: if the next Tab fires with the same line/pos, the user hasn't typed
+// Candidates on each tab press. Any non-tab key resets the cycle. Cycling
+// works by remembering the (line, pos) we returned from the previous Tab:
+// if the next Tab fires with the same line/pos, the user hasn't typed
 // anything and we advance the index. Otherwise we start a fresh cycle.
+//
+// The candidate list is drawn on the line below the prompt. To avoid the
+// known bug where the prompt sits at the terminal's bottom row and `\r\n`
+// scrolls the screen — which would invalidate the DECSC-saved position and
+// cause the prompt to be overwritten by the hint — we first emit IND+CUU
+// (`\x1bD\x1b[A`). IND scrolls once if we're at the bottom, and CUU puts
+// the cursor back on the prompt row (row N-1 after a scroll, or unchanged
+// otherwise). From that point, DECSC/`\r\n`/DECRC is safe because the row
+// below the prompt is guaranteed to exist.
 func makeAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (string, int, bool) {
 	var st struct {
 		list      []string
@@ -78,14 +77,14 @@ func makeAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (str
 		if !st.hintShown || hintW == nil {
 			return
 		}
-		fmt.Fprint(hintW, "\x1b7\r\n\x1b[2K\x1b8")
+		fmt.Fprint(hintW, "\x1bD\x1b[A\x1b7\r\n\x1b[2K\x1b8")
 		st.hintShown = false
 	}
 	showHint := func(opts []string) {
 		if hintW == nil || len(opts) <= 1 {
 			return
 		}
-		fmt.Fprintf(hintW, "\x1b7\r\n\x1b[2K%s\x1b8", strings.Join(opts, "  "))
+		fmt.Fprintf(hintW, "\x1bD\x1b[A\x1b7\r\n\x1b[2K%s\x1b8", strings.Join(opts, "  "))
 		st.hintShown = true
 	}
 	return func(line string, pos int, key rune) (string, int, bool) {

@@ -104,10 +104,16 @@ func (s *SessionRunner) runProxy(sess io.ReadWriter, addr string) {
 // makeMenuAutoComplete rotates through the menu modes on repeated Tab presses.
 // It detects a "same Tab again" by remembering the (line, pos) it returned
 // last: if the terminal fires Tab again with an unchanged line, we advance;
-// otherwise we start a fresh cycle using the current line as prefix. On the
-// first Tab of a new cycle with multiple candidates, it prints the list *below*
-// the prompt (save/restore cursor) so the prompt itself stays intact. The
-// hint is erased as soon as any non-Tab key is pressed.
+// otherwise we start a fresh cycle using the current line as prefix.
+//
+// The candidate list is drawn on the line below the prompt. To avoid the
+// known bug where the prompt sits at the terminal's bottom row and `\r\n`
+// scrolls the screen — which would invalidate the DECSC-saved position and
+// cause the prompt to be overwritten by the hint — we first emit IND+CUU
+// (`\x1bD\x1b[A`). IND scrolls once if we're at the bottom, and CUU puts
+// the cursor back on the prompt row (row N-1 after a scroll, or unchanged
+// otherwise). From that point, DECSC/`\r\n`/DECRC is safe because the row
+// below the prompt is guaranteed to exist.
 func makeMenuAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (string, int, bool) {
 	var st struct {
 		list      []string
@@ -121,14 +127,14 @@ func makeMenuAutoComplete(hintW io.Writer) func(line string, pos int, key rune) 
 		if !st.hintShown || hintW == nil {
 			return
 		}
-		fmt.Fprint(hintW, "\x1b7\r\n\x1b[2K\x1b8")
+		fmt.Fprint(hintW, "\x1bD\x1b[A\x1b7\r\n\x1b[2K\x1b8")
 		st.hintShown = false
 	}
 	showHint := func(opts []string) {
 		if hintW == nil || len(opts) <= 1 {
 			return
 		}
-		fmt.Fprintf(hintW, "\x1b7\r\n\x1b[2K%s\x1b8", strings.Join(opts, "  "))
+		fmt.Fprintf(hintW, "\x1bD\x1b[A\x1b7\r\n\x1b[2K%s\x1b8", strings.Join(opts, "  "))
 		st.hintShown = true
 	}
 	return func(line string, pos int, key rune) (string, int, bool) {
