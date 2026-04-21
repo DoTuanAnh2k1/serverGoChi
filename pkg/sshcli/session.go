@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync"
 
 	"golang.org/x/crypto/ssh"
 	"golang.org/x/term"
@@ -23,24 +24,39 @@ var menuModes = []string{string(ModeCliConfig), string(ModeNeConfig), string(Mod
 
 // SessionRunner glues together the three modes for one SSH login.
 type SessionRunner struct {
-	Client           *MgtClient
-	Username         string
-	Password         string
-	NeConfigAddr     string
-	NeCommandAddr    string
-	PTYTerm          string
-	PTYWidth         uint32
-	PTYHeight        uint32
-	PTYModes         map[uint8]uint32
-	WindowChanges    <-chan WindowSize
+	Client        *MgtClient
+	Username      string
+	Password      string
+	NeConfigAddr  string
+	NeCommandAddr string
+	PTYTerm       string
+	PTYWidth      uint32
+	PTYHeight     uint32
+	PTYModes      map[uint8]uint32
+	WindowChanges <-chan WindowSize
+
+	// Window-change fan-out. Set by pumpResizes at Run start. Only one mode
+	// is active at a time, so a single sink slot is sufficient; the active
+	// mode registers via SetResizeSink and clears it on exit.
+	sizeMu   sync.Mutex
+	sizeSink func(w, h uint32)
+	curW     uint32
+	curH     uint32
 }
 
 // Run loops through the menu until the user exits. It writes a banner and
 // prompts for a mode; on return from a mode, it re-prompts.
 func (s *SessionRunner) Run(sess io.ReadWriter) error {
+	s.sizeMu.Lock()
+	s.curW, s.curH = s.PTYWidth, s.PTYHeight
+	s.sizeMu.Unlock()
+	go s.pumpResizes()
+
 	t := term.NewTerminal(sess, "")
 	t.SetPrompt("mode> ")
 	t.AutoCompleteCallback = makeMenuAutoComplete(sess)
+	menuSink := func(w, h uint32) { applyTermSize(t, w, h) }
+	s.SetResizeSink(menuSink)
 
 	banner := fmt.Sprintf("\r\nWelcome %s — management CLI.\r\n", s.Username)
 	banner += "Available modes: cli-config, ne-config, ne-command (Tab to cycle / autocomplete, 'exit' to quit).\r\n\r\n"
@@ -62,37 +78,109 @@ func (s *SessionRunner) Run(sess io.ReadWriter) error {
 			fmt.Fprint(sess, "bye.\r\n")
 			return nil
 		case string(ModeCliConfig):
-			if err := RunConfigMode(sess, s.Client); err != nil {
+			s.SetResizeSink(nil)
+			if err := RunConfigMode(sess, s.Client, s); err != nil {
 				fmt.Fprintf(sess, "cli-config ended with error: %s\r\n", err)
 			}
+			s.SetResizeSink(menuSink)
 		case string(ModeNeConfig):
 			if s.NeConfigAddr == "" {
 				fmt.Fprint(sess, "ne-config address not configured on this server.\r\n")
 				continue
 			}
+			s.SetResizeSink(nil)
 			s.runProxy(sess, s.NeConfigAddr)
+			s.SetResizeSink(menuSink)
 		case string(ModeNeCommand):
 			if s.NeCommandAddr == "" {
 				fmt.Fprint(sess, "ne-command address not configured on this server.\r\n")
 				continue
 			}
+			s.SetResizeSink(nil)
 			s.runProxy(sess, s.NeCommandAddr)
+			s.SetResizeSink(menuSink)
 		default:
 			fmt.Fprintf(sess, "unknown mode %q — choose one of: %s\r\n", choice, strings.Join(menuModes, ", "))
 		}
 	}
 }
 
+// pumpResizes consumes WindowChanges forever. Each event updates the cached
+// size and fans out to the currently registered sink (if any).
+func (s *SessionRunner) pumpResizes() {
+	for ws := range s.WindowChanges {
+		s.sizeMu.Lock()
+		s.curW, s.curH = ws.Width, ws.Height
+		fn := s.sizeSink
+		s.sizeMu.Unlock()
+		if fn != nil {
+			fn(ws.Width, ws.Height)
+		}
+	}
+}
+
+// SetResizeSink installs fn as the active window-change handler. fn is
+// invoked immediately with the cached size so the new owner sees the current
+// dimensions without waiting for the next resize event. Pass nil to clear.
+func (s *SessionRunner) SetResizeSink(fn func(w, h uint32)) {
+	s.sizeMu.Lock()
+	s.sizeSink = fn
+	w, h := s.curW, s.curH
+	s.sizeMu.Unlock()
+	if fn != nil {
+		fn(w, h)
+	}
+}
+
+// CurrentSize returns the last-known PTY size. Used by proxy mode for the
+// initial upstream RequestPty call.
+func (s *SessionRunner) CurrentSize() (uint32, uint32) {
+	s.sizeMu.Lock()
+	defer s.sizeMu.Unlock()
+	return s.curW, s.curH
+}
+
+// applyTermSize applies a PTY size to a term.Terminal, enforcing sane
+// minimums so the x/term word-wrap code doesn't divide by zero on early
+// events before the client has announced a size.
+func applyTermSize(t *term.Terminal, w, h uint32) {
+	ww := int(w)
+	hh := int(h)
+	if ww < 1 {
+		ww = 80
+	}
+	if hh < 1 {
+		hh = 24
+	}
+	_ = t.SetSize(ww, hh)
+}
+
 func (s *SessionRunner) runProxy(sess io.ReadWriter, addr string) {
+	// Forwarding channel: the sink pushes resize events here for ProxySession
+	// to consume and relay upstream. Buffered so a burst of resizes doesn't
+	// block the pumpResizes goroutine.
+	ch := make(chan WindowSize, 8)
+	s.SetResizeSink(func(w, h uint32) {
+		select {
+		case ch <- WindowSize{Width: w, Height: h}:
+		default:
+		}
+	})
+	defer func() {
+		s.SetResizeSink(nil)
+		close(ch)
+	}()
+
+	w, h := s.CurrentSize()
 	p := &ProxySession{
 		UpstreamAddr:  addr,
 		Username:      s.Username,
 		Password:      s.Password,
 		Term:          s.PTYTerm,
-		Width:         s.PTYWidth,
-		Height:        s.PTYHeight,
+		Width:         w,
+		Height:        h,
 		Modes:         sshTerminalModes(s.PTYModes),
-		WindowChanges: s.WindowChanges,
+		WindowChanges: ch,
 	}
 	fmt.Fprintf(sess, "Connecting to %s ...\r\n", addr)
 	if err := p.Run(sess); err != nil {

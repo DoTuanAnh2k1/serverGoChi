@@ -11,10 +11,17 @@ import (
 
 // RunConfigMode starts an interactive REPL on the given SSH session io, bound
 // to the given MgtClient. It returns when the user exits or the channel closes.
-func RunConfigMode(sess io.ReadWriter, client *MgtClient) error {
+// The session runner is used to register a resize sink so the cli-config
+// terminal's word-wrap tracks the client's real PTY size instead of the
+// x/term default of 80x24.
+func RunConfigMode(sess io.ReadWriter, client *MgtClient, sr *SessionRunner) error {
 	t := term.NewTerminal(sess, "")
 	t.SetPrompt("cli-config> ")
 	t.AutoCompleteCallback = makeAutoComplete(sess)
+	if sr != nil {
+		sr.SetResizeSink(func(w, h uint32) { applyTermSize(t, w, h) })
+		defer sr.SetResizeSink(nil)
+	}
 	d := &Dispatcher{Client: client, Out: t}
 
 	fmt.Fprint(t, "\r\n== cli-config mode ==\r\n")
