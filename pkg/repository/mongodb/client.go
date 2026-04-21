@@ -2,6 +2,7 @@ package mongodb
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
@@ -109,7 +110,23 @@ func (c *Client) opCtx() (context.Context, context.CancelFunc) {
 
 // ensureIndexes creates the unique + performance indexes that MySQL/Postgres
 // get from db.sql. Idempotent — Mongo silently skips already-present indexes.
+// Also drops obsolete indexes from previous schema versions so upgrades work.
 func (c *Client) ensureIndexes(ctx context.Context) error {
+	// Obsolete indexes to drop on startup. Keep this list small and use
+	// SetName when creating indexes so upgrades can target them by name.
+	obsolete := map[string][]string{
+		colNe: {"uq_ne_name"}, // replaced by uq_ne_name_namespace
+	}
+	for coll, names := range obsolete {
+		for _, name := range names {
+			if _, err := c.col(coll).Indexes().DropOne(ctx, name); err != nil &&
+				!strings.Contains(err.Error(), "index not found") &&
+				!strings.Contains(err.Error(), "ns not found") {
+				return err
+			}
+		}
+	}
+
 	plan := map[string][]mongo.IndexModel{
 		colAccounts: {
 			{Keys: bson.D{{Key: "account_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_account_id")},
@@ -117,7 +134,8 @@ func (c *Client) ensureIndexes(ctx context.Context) error {
 		},
 		colNe: {
 			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_id")},
-			{Keys: bson.D{{Key: "ne_name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_name")},
+			// Allow same ne_name across different namespaces (e.g. per-tenant NEs).
+			{Keys: bson.D{{Key: "ne_name", Value: 1}, {Key: "namespace", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_name_namespace")},
 			{Keys: bson.D{{Key: "system_type", Value: 1}}, Options: options.Index().SetName("ix_ne_system_type")},
 		},
 		colGroup: {
