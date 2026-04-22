@@ -144,9 +144,16 @@ func Init() {
 		})
 
 		router.Route("/history", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/list", HandlerListHistory)
+			// /save is open: the SSH proxy and downstream services log commands
+			// before the user's JWT is available (and forwarding the token adds
+			// friction for a simple audit sink). The caller supplies the account
+			// in the body. /list stays authenticated — reading the audit log is
+			// an admin-side concern.
 			r.Post("/save", HandlerSaveHistory)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.Authenticate)
+				g.Get("/list", HandlerListHistory)
+			})
 		})
 
 		router.Route("/list", func(r chi.Router) {

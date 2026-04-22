@@ -224,6 +224,15 @@ show ne namespace tenant-a        # tất cả NE trong namespace tenant-a
 show group name dev               # detail group
 ```
 
+**Delete confirmation**: mọi lệnh `delete user|ne|group <target>` đều prompt `Delete <kind> "<target>"? [y/N]:`. Chỉ `y` / `yes` (không phân biệt hoa thường) mới thực hiện; input khác, dòng trống, Ctrl+C / Ctrl+D, hoặc lỗi đọc đều abort và in `aborted`.
+
+**Re-enable disabled user**: khi gọi `set user name <u> password <p>` mà `<u>` đã tồn tại nhưng đang disable, server sẽ:
+- Merge các trường non-empty từ request (email, full_name, phone, address, description, account_type) vào record cũ. Trường không truyền ⇒ giữ nguyên giá trị cũ. Password luôn được refresh (CLI luôn gửi).
+- Validate lại required-fields cho admin trên kết quả merged (full_name + phone). Group mappings cũ được giữ; nếu truyền thêm `group_ids` thì add thêm (không ghi đè).
+- Bật `is_enable=true` và `UpdateUser` — trả 201 Created.
+
+**Email uniqueness**: `EnsureEmailUnique` bỏ qua tài khoản `is_enable=false`. Nghĩa là email thuộc về user đã disable coi như "free" — user mới hoặc flow re-enable có thể dùng lại email đó. Chỉ email của user đang active mới reject 400 "email already in use".
+
 ---
 
 ## Metrics & Profiling
@@ -275,10 +284,10 @@ Header: `Authorization: Basic <jwt_token>` (token từ `/aa/authenticate` đã c
 | `POST` | `/aa/admin/ne/update` | Cập nhật NE |
 
 ### History
-| Method | Path | Mô tả |
-|---|---|---|
-| `GET`  | `/aa/history/list` | Lịch sử lệnh (`?limit=N&scope=X&ne_name=Y`) |
-| `POST` | `/aa/history/save` | Lưu bản ghi lịch sử |
+| Method | Path | Auth | Mô tả |
+|---|---|---|---|
+| `GET`  | `/aa/history/list` | JWT | Lịch sử lệnh (`?limit=N&scope=X&ne_name=Y`) |
+| `POST` | `/aa/history/save` | **không yêu cầu JWT** | Lưu bản ghi lịch sử. Caller truyền `account` trong body (nếu có JWT trong context thì ưu tiên username từ JWT; thiếu cả hai fallback `unknown`). |
 
 ### Import & Others
 | Method | Path | Mô tả |

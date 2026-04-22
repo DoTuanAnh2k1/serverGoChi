@@ -94,7 +94,9 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 //         500 nếu lỗi DB khi tạo hoặc cập nhật user
 // Flow  : decode body → validate username/password → lấy actor từ context →
 //         GetUserByUserName → nếu không tồn tại thì AddUser (hash password, set defaults) →
-//         nếu đang bị disable thì re-enable → ghi operation history
+//         nếu đang bị disable thì merge non-empty fields vào bản ghi cũ, bật is_enable
+//         và UpdateUser (admin required fields được validate trên kết quả merged) →
+//         ghi operation history
 func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
@@ -126,7 +128,9 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 		response.Write(w, http.StatusBadRequest, "password is required")
 		return
 	}
-	// Apply common validation (email format + unique, phone format).
+	// Baseline format + uniqueness checks. EnsureEmailUnique skips disabled
+	// accounts so a fresh username can reuse an email freed by a disabled
+	// account, and the re-enable path doesn't conflict with its own record.
 	if err := service.ValidateUserCommon(&userInfo, userInfo.AccountName); err != nil {
 		response.Write(w, http.StatusBadRequest, err.Error())
 		return
@@ -134,11 +138,6 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	// Prevent elevation to SuperAdmin via this endpoint.
 	if userInfo.AccountType == 0 {
 		response.Write(w, http.StatusForbidden, "cannot create SuperAdmin account")
-		return
-	}
-	// For admin users enforce required fields + ≥1 group.
-	if err := service.ValidateAdminUserFields(&userInfo, extra.GroupIDs); err != nil {
-		response.Write(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
@@ -164,15 +163,23 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	hashPass := bcrypt.Encode(userInfo.AccountName + userInfo.Password)
-	userInfo.Password = hashPass
 
 	if existing == nil {
+		// NEW USER PATH
+		// Admin required-fields check (full_name, phone, ≥1 group) applies only
+		// when creating fresh — re-enable validates against the merged result
+		// below so admins aren't forced to resend fields already on file.
+		if err := service.ValidateAdminUserFields(&userInfo, extra.GroupIDs); err != nil {
+			response.Write(w, http.StatusBadRequest, err.Error())
+			return
+		}
+
+		userInfo.Password = hashPass
 		userInfo.IsEnable = true
 		userInfo.CreatedBy = actor.Username
 		now := time.Now()
 		userInfo.CreatedDate, userInfo.UpdatedDate = now, now
 		userInfo.LastLoginTime, userInfo.LastChangePass, userInfo.LockedTime = now, now, now
-		// Default to normal user if caller did not specify a valid non-super type.
 		if userInfo.AccountType != 1 && userInfo.AccountType != 2 {
 			userInfo.AccountType = 2
 		}
@@ -184,7 +191,6 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 			response.InternalError(w, "failed to create user")
 			return
 		}
-		// Persist group assignments (required for admin, optional for normal users).
 		if len(extra.GroupIDs) > 0 {
 			created, _ := service.GetUserByUserName(userInfo.AccountName)
 			if created != nil {
@@ -202,17 +208,68 @@ func HandlerAuthenticateUserSet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !existing.IsEnable {
+		// RE-ENABLE PATH: merge only non-empty fields from the request so the
+		// caller can pass just the fields they want to update. Password is
+		// always refreshed (CLI requires it in the request).
+		existing.Password = hashPass
+		if v := strings.TrimSpace(userInfo.Email); v != "" {
+			existing.Email = v
+		}
+		if v := strings.TrimSpace(userInfo.FullName); v != "" {
+			existing.FullName = v
+		}
+		if v := strings.TrimSpace(userInfo.PhoneNumber); v != "" {
+			existing.PhoneNumber = v
+		}
+		if v := strings.TrimSpace(userInfo.Address); v != "" {
+			existing.Address = v
+		}
+		if v := strings.TrimSpace(userInfo.Description); v != "" {
+			existing.Description = v
+		}
+		if userInfo.AccountType == 1 || userInfo.AccountType == 2 {
+			existing.AccountType = userInfo.AccountType
+		}
 		existing.IsEnable = true
+		existing.Status = true
 		existing.CreatedBy = actor.Username
 		existing.UpdatedDate = time.Now()
 		existing.LoginFailureCount = 0
+
+		// Validate merged result for admin accounts — full_name + phone
+		// required regardless of whether they came from the request or were
+		// already on file. Group requirement is NOT re-enforced here: prior
+		// group mappings persist; the caller can optionally add more.
+		if service.IsAdminAccountType(existing.AccountType) {
+			if strings.TrimSpace(existing.FullName) == "" {
+				response.Write(w, http.StatusBadRequest, "full_name is required for admin users")
+				return
+			}
+			if strings.TrimSpace(existing.PhoneNumber) == "" {
+				response.Write(w, http.StatusBadRequest, "phone_number is required for admin users")
+				return
+			}
+			if err := service.ValidatePhone(existing.PhoneNumber); err != nil {
+				response.Write(w, http.StatusBadRequest, err.Error())
+				return
+			}
+		}
+
 		if err := service.UpdateUser(existing); err != nil {
 			log.Errorf("authenticate/user/set: re-enable user: %v", err)
 			saveHistory(opHistory, "failure")
 			response.InternalError(w, "failed to enable user")
 			return
 		}
-		log.Info("authenticate/user/set: user re-enabled")
+		// Additive group assignments (re-enable doesn't clear prior mappings).
+		if len(extra.GroupIDs) > 0 {
+			for _, gid := range extra.GroupIDs {
+				if err := service.AssignUserToGroup(existing.AccountID, gid); err != nil {
+					log.Errorf("authenticate/user/set: assign group %d: %v", gid, err)
+				}
+			}
+		}
+		log.Info("authenticate/user/set: user re-enabled with merged fields")
 		saveHistory(opHistory, "success")
 		response.Created(w)
 		return

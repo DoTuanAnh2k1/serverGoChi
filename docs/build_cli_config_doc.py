@@ -302,6 +302,23 @@ def main():
     add_code(doc, "cli-config> set user name bob password 123456")
     add_code(doc, "OK: user created")
 
+    add_para(doc, "Re-enable user đã bị disable (merge fields mới):", bold=True)
+    add_bullet(doc,
+               "Nếu account_name đã tồn tại nhưng đang disable → server merge các field "
+               "non-empty từ request vào record cũ, bật is_enable=true, trả 201.")
+    add_bullet(doc, "Field không truyền trong request giữ nguyên giá trị cũ.")
+    add_bullet(doc, "Password luôn được refresh theo giá trị request.")
+    add_bullet(doc,
+               "Email: EnsureEmailUnique bỏ qua tài khoản disable, nghĩa là email "
+               "thuộc user đã disable coi như free — có thể tái sử dụng cho user mới "
+               "hoặc tiếp tục dùng khi re-enable chính user đó.")
+    add_code(doc,
+             "# alice đang bị disable, email cũ 'old@example.com', phone 0900000000\n"
+             "cli-config> set user name alice password newpass email new@example.com \\\n"
+             "            full_name \"Alice New\"\n"
+             "OK: user created        # 201, re-enabled với email/full_name mới;\n"
+             "                        # phone giữ 0900000000 vì request không truyền")
+
     add_h3(doc, "Ví dụ — ne")
     add_code(doc,
              "cli-config> set ne ne_name HTSMF01 namespace default ip 10.0.0.10 \\\n"
@@ -336,19 +353,31 @@ def main():
     add_code(doc, "OK: group updated")
 
     # ---- DELETE ----
-    add_h2(doc, "3.4. delete — xoá record")
+    add_h2(doc, "3.4. delete — xoá record (có prompt xác nhận)")
     add_code(doc, "delete user|ne|group <name|id>")
     add_bullet(doc, "user: target là account_name. SuperAdmin KHÔNG thể bị xoá.")
     add_bullet(doc, "ne:   target là ne_name hoặc id; xoá cascade mapping user↔NE, group↔NE.")
     add_bullet(doc, "group: target là name hoặc id.")
+    add_para(doc, "Mọi lệnh delete đều hỏi confirm trước khi thực hiện:", bold=True)
+    add_bullet(doc, "Nhập 'y' hoặc 'yes' (không phân biệt hoa thường) → xoá.")
+    add_bullet(doc, "Bỏ trống + Enter, 'n', hoặc bất kỳ input khác → abort, in 'aborted'.")
+    add_bullet(doc, "Ctrl+C / Ctrl+D / đóng session → abort.")
 
-    add_h3(doc, "Ví dụ")
-    add_code(doc, "cli-config> delete user alice")
-    add_code(doc, "OK: user deleted")
-    add_code(doc, "cli-config> delete ne HTSMF02")
-    add_code(doc, "OK: NE deleted")
-    add_code(doc, "cli-config> delete group dev")
-    add_code(doc, "OK: group deleted")
+    add_h3(doc, "Ví dụ — confirm yes")
+    add_code(doc,
+             "cli-config> delete user alice\n"
+             "Delete user \"alice\"? [y/N]: y\n"
+             "OK: user deleted")
+
+    add_h3(doc, "Ví dụ — confirm no / abort")
+    add_code(doc,
+             "cli-config> delete ne HTSMF02\n"
+             "Delete NE \"HTSMF02\"? [y/N]: \n"
+             "aborted")
+    add_code(doc,
+             "cli-config> delete group dev\n"
+             "Delete group \"dev\"? [y/N]: n\n"
+             "aborted")
 
     # ---- MAP / UNMAP ----
     add_h2(doc, "3.5. map / unmap — quan hệ")

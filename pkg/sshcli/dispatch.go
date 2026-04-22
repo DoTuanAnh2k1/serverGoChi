@@ -14,6 +14,23 @@ import (
 type Dispatcher struct {
 	Client *MgtClient
 	Out    io.Writer
+	// Confirm, when set, is invoked before destructive operations (delete).
+	// It returns true only when the user explicitly agrees. When nil, the
+	// dispatcher auto-confirms — this keeps unit tests that don't care about
+	// the prompt working; production wires it to a real terminal prompt.
+	Confirm func(msg string) bool
+}
+
+// confirmDelete asks the user to confirm a deletion, returning true only on
+// explicit agreement. Any other input (including empty, non-"y" characters,
+// Ctrl+C byte embedded in the line, or a read error / EOF from the session)
+// counts as abort.
+func (d *Dispatcher) confirmDelete(kind, target string) bool {
+	if d.Confirm == nil {
+		return true
+	}
+	msg := fmt.Sprintf("Delete %s %q?", kind, target)
+	return d.Confirm(msg)
 }
 
 func (d *Dispatcher) Run(c *Command) error {
@@ -336,6 +353,10 @@ func (d *Dispatcher) handleUpdate(c *Command) error {
 func (d *Dispatcher) handleDelete(c *Command) error {
 	switch c.Entity {
 	case "user":
+		if !d.confirmDelete("user", c.Target) {
+			fmt.Fprintln(d.Out, "aborted")
+			return nil
+		}
 		if err := d.Client.DeleteUser(c.Target); err != nil {
 			return err
 		}
@@ -345,6 +366,10 @@ func (d *Dispatcher) handleDelete(c *Command) error {
 		if err != nil {
 			return err
 		}
+		if !d.confirmDelete("NE", c.Target) {
+			fmt.Fprintln(d.Out, "aborted")
+			return nil
+		}
 		if err := d.Client.DeleteNEByID(id); err != nil {
 			return err
 		}
@@ -353,6 +378,10 @@ func (d *Dispatcher) handleDelete(c *Command) error {
 		id, err := d.Client.ResolveGroupID(c.Target)
 		if err != nil {
 			return err
+		}
+		if !d.confirmDelete("group", c.Target) {
+			fmt.Fprintln(d.Out, "aborted")
+			return nil
 		}
 		if err := d.Client.DeleteGroupByID(id); err != nil {
 			return err

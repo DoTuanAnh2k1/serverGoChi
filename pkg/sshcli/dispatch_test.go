@@ -448,6 +448,107 @@ func TestDispatch_DeleteUser(t *testing.T) {
 	}
 }
 
+// --- delete confirmation ---
+
+func TestDispatch_DeleteUser_ConfirmYes(t *testing.T) {
+	var body map[string]any
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodPost, "/aa/authenticate/user/delete"}: func(w http.ResponseWriter, r *http.Request) {
+			readJSON(t, r, &body)
+			writeJSON(w, 200, map[string]string{"status": "success"})
+		},
+	})
+	defer done()
+
+	var prompted string
+	d.Confirm = func(msg string) bool { prompted = msg; return true }
+
+	if err := d.Run(mustParse(t, "delete user alice")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if prompted == "" || !strings.Contains(prompted, "alice") {
+		t.Errorf("confirm prompt should mention target, got %q", prompted)
+	}
+	if body["account_name"] != "alice" {
+		t.Errorf("confirmed delete did not hit API: %+v", body)
+	}
+	if !strings.Contains(buf.String(), "OK: user deleted") {
+		t.Errorf("ack missing: %s", buf.String())
+	}
+}
+
+func TestDispatch_DeleteUser_ConfirmNo(t *testing.T) {
+	called := false
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodPost, "/aa/authenticate/user/delete"}: func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			writeJSON(w, 200, map[string]string{"status": "success"})
+		},
+	})
+	defer done()
+	d.Confirm = func(msg string) bool { return false }
+
+	if err := d.Run(mustParse(t, "delete user alice")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if called {
+		t.Errorf("delete API should NOT be called on confirm=no")
+	}
+	if !strings.Contains(buf.String(), "aborted") {
+		t.Errorf("expected 'aborted' message, got %q", buf.String())
+	}
+}
+
+func TestDispatch_DeleteNe_ConfirmNo(t *testing.T) {
+	called := false
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodGet, "/aa/admin/ne/list"}: func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, []NeInfo{{ID: 42, NeName: "HTSMF01"}})
+		},
+		{http.MethodPost, "/aa/authorize/ne/remove"}: func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			writeJSON(w, 200, map[string]string{"status": "success"})
+		},
+	})
+	defer done()
+	d.Confirm = func(msg string) bool { return false }
+
+	if err := d.Run(mustParse(t, "delete ne HTSMF01")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if called {
+		t.Errorf("remove API should NOT be called on confirm=no")
+	}
+	if !strings.Contains(buf.String(), "aborted") {
+		t.Errorf("expected 'aborted', got %q", buf.String())
+	}
+}
+
+func TestDispatch_DeleteGroup_ConfirmNo(t *testing.T) {
+	called := false
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodGet, "/aa/group/list"}: func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, []GroupInfo{{ID: 5, Name: "dev"}})
+		},
+		{http.MethodPost, "/aa/group/delete"}: func(w http.ResponseWriter, r *http.Request) {
+			called = true
+			writeJSON(w, 200, map[string]string{"status": "success"})
+		},
+	})
+	defer done()
+	d.Confirm = func(msg string) bool { return false }
+
+	if err := d.Run(mustParse(t, "delete group dev")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if called {
+		t.Errorf("delete API should NOT be called on confirm=no")
+	}
+	if !strings.Contains(buf.String(), "aborted") {
+		t.Errorf("expected 'aborted', got %q", buf.String())
+	}
+}
+
 func TestDispatch_DeleteGroup(t *testing.T) {
 	var body map[string]any
 	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{

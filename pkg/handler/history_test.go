@@ -137,8 +137,47 @@ func TestHandlerSaveHistory_DBError(t *testing.T) {
 	}
 }
 
-func TestHandlerSaveHistory_NoUserInContext(t *testing.T) {
-	store.SetSingleton(&testutil.MockStore{})
+// HandlerSaveHistory is now unauthenticated — no JWT/middleware in front of
+// it. Calls without a user in context succeed, using the body's `account`
+// field (or "unknown" if that is also missing).
+func TestHandlerSaveHistory_NoUserInContext_UsesBodyAccount(t *testing.T) {
+	var saved db_models.CliOperationHistory
+	store.SetSingleton(&testutil.MockStore{
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error {
+			saved = h
+			return nil
+		},
+	})
+
+	body := makeHistoryBody(t, map[string]interface{}{
+		"cmd_name": "show version",
+		"ne_name":  "NE-01",
+		"account":  "ssh-proxy",
+	})
+	req := httptest.NewRequest(http.MethodPost, "/aa/history/save", body)
+	req.Header.Set("Content-Type", "application/json")
+	// no user injected — simulates the unauthenticated code path.
+	w := httptest.NewRecorder()
+
+	handler.HandlerSaveHistory(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Errorf("status: got %d, want 201", w.Code)
+	}
+	if saved.Account != "ssh-proxy" {
+		t.Errorf("Account: got %q, want %q", saved.Account, "ssh-proxy")
+	}
+}
+
+// When no JWT and no body account, save still succeeds with "unknown".
+func TestHandlerSaveHistory_NoContextNoAccount_FallbackUnknown(t *testing.T) {
+	var saved db_models.CliOperationHistory
+	store.SetSingleton(&testutil.MockStore{
+		SaveHistoryCommandFn: func(h db_models.CliOperationHistory) error {
+			saved = h
+			return nil
+		},
+	})
 
 	body := makeHistoryBody(t, map[string]interface{}{
 		"cmd_name": "show version",
@@ -146,12 +185,14 @@ func TestHandlerSaveHistory_NoUserInContext(t *testing.T) {
 	})
 	req := httptest.NewRequest(http.MethodPost, "/aa/history/save", body)
 	req.Header.Set("Content-Type", "application/json")
-	// no user injected
 	w := httptest.NewRecorder()
 
 	handler.HandlerSaveHistory(w, req)
 
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("status: got %d, want 500", w.Code)
+	if w.Code != http.StatusCreated {
+		t.Errorf("status: got %d, want 201", w.Code)
+	}
+	if saved.Account != "unknown" {
+		t.Errorf("Account: got %q, want %q", saved.Account, "unknown")
 	}
 }

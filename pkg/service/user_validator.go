@@ -42,10 +42,11 @@ func ValidateEmailFormat(email string) error {
 	return nil
 }
 
-// EnsureEmailUnique checks that no other user owns this email.
-// excludeAccountName is skipped (used on update so a user keeps their own email).
-// Empty email is always allowed (stored as empty — DB treats empty as NULL via the
-// normalization done in handlers before persistence, MySQL UNIQUE allows multiple NULLs).
+// EnsureEmailUnique checks that no other ACTIVE user owns this email.
+// excludeAccountName is skipped (used on update so a user keeps their own
+// email). Empty email is always allowed. Disabled accounts (is_enable=false)
+// are skipped so their email can be reused — either by re-enabling the same
+// account (merge path) or by creating a fresh account with that email.
 func EnsureEmailUnique(email, excludeAccountName string) error {
 	e := strings.TrimSpace(email)
 	if e == "" {
@@ -57,6 +58,9 @@ func EnsureEmailUnique(email, excludeAccountName string) error {
 	}
 	for _, u := range all {
 		if u == nil {
+			continue
+		}
+		if !u.IsEnable {
 			continue
 		}
 		if strings.EqualFold(u.AccountName, excludeAccountName) {

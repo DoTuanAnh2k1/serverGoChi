@@ -15,14 +15,35 @@ import (
 // terminal's word-wrap tracks the client's real PTY size instead of the
 // x/term default of 80x24.
 func RunConfigMode(sess io.ReadWriter, client *MgtClient, sr *SessionRunner) error {
+	const mainPrompt = "cli-config> "
 	t := term.NewTerminal(sess, "")
-	t.SetPrompt("cli-config> ")
+	t.SetPrompt(mainPrompt)
 	t.AutoCompleteCallback = makeAutoComplete(sess)
 	if sr != nil {
 		sr.SetResizeSink(func(w, h uint32) { applyTermSize(t, w, h) })
 		defer sr.SetResizeSink(nil)
 	}
-	d := &Dispatcher{Client: client, Out: t}
+	// Confirm prompt for destructive ops (delete). Temporarily disables the
+	// autocomplete callback so Tab doesn't try to complete the y/N answer,
+	// swaps the prompt, reads a line, then restores both. Anything other
+	// than "y"/"yes" (case-insensitive, trimmed) — including an empty line,
+	// an embedded Ctrl+C byte, or a read error — counts as abort.
+	confirm := func(msg string) bool {
+		prevAC := t.AutoCompleteCallback
+		t.AutoCompleteCallback = nil
+		t.SetPrompt(msg + " [y/N]: ")
+		defer func() {
+			t.SetPrompt(mainPrompt)
+			t.AutoCompleteCallback = prevAC
+		}()
+		line, err := t.ReadLine()
+		if err != nil {
+			return false
+		}
+		ans := strings.ToLower(strings.TrimSpace(line))
+		return ans == "y" || ans == "yes"
+	}
+	d := &Dispatcher{Client: client, Out: t, Confirm: confirm}
 
 	fmt.Fprint(t, "\r\n== cli-config mode ==\r\n")
 	fmt.Fprint(t, "Type 'help' for commands. Type 'exit' to return to the mode menu.\r\n\r\n")

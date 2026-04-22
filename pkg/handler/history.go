@@ -14,13 +14,17 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// saveHistoryReq is the body for POST /aa/history/save.
+// saveHistoryReq is the body for POST /aa/history/save. The endpoint is
+// unauthenticated, so the caller supplies `account` (the actor that ran the
+// command) in the body. If omitted we fall back to the JWT actor when one is
+// available, and finally to "unknown".
 type saveHistoryReq struct {
 	CmdName string `json:"cmd_name"`
 	NeName  string `json:"ne_name"`
 	NeIP    string `json:"ne_ip"`
 	Scope   string `json:"scope"`
 	Result  string `json:"result"`
+	Account string `json:"account"`
 }
 
 // HandlerListHistory trả về lịch sử thao tác gần đây, có hỗ trợ lọc.
@@ -68,16 +72,14 @@ func HandlerListHistory(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandlerSaveHistory lưu một bản ghi lịch sử thao tác CLI vào database.
+// Endpoint này KHÔNG yêu cầu JWT — caller tự cung cấp `account` trong body.
+// Nếu có JWT trong context vẫn ưu tiên lấy từ JWT (thao tác từ UI đã đăng nhập).
 //
 // Input : POST body JSON { "cmd_name": string (bắt buộc), "ne_name": string (bắt buộc),
-//         "ne_ip", "ne_id", "scope", "result", "input_type", "session",
-//         "batch_id", "time_to_complete" }
+//         "ne_ip", "scope", "result", "account" }
 // Output: 201 { ...CliOperationHistory } nếu lưu thành công
 //         400 nếu thiếu cmd_name/ne_name hoặc body không hợp lệ
 //         500 nếu lỗi DB
-// Flow  : decode body → validate cmd_name và ne_name không rỗng →
-//         lấy actor từ context → tạo CliOperationHistory với timestamp hiện tại →
-//         SaveHistoryCommand → trả bản ghi đã lưu
 func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 	var req saveHistoryReq
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -95,10 +97,13 @@ func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userCtx, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
-	if !ok {
-		response.InternalError(w, "cannot retrieve user from context")
-		return
+	// Resolve the actor: JWT (if present) > explicit account in body > "unknown".
+	account := strings.TrimSpace(req.Account)
+	if u, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User); ok && u != nil {
+		account = u.Username
+	}
+	if account == "" {
+		account = "unknown"
 	}
 
 	now := time.Now()
@@ -108,7 +113,7 @@ func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 		NeIP:         req.NeIP,
 		Scope:        req.Scope,
 		Result:       req.Result,
-		Account:      userCtx.Username,
+		Account:      account,
 		CreatedDate:  now,
 		ExecutedTime: now,
 	}
@@ -119,6 +124,6 @@ func HandlerSaveHistory(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.Logger.Infof("save history: saved cmd=%q ne=%q by=%q", req.CmdName, req.NeName, userCtx.Username)
+	logger.Logger.Infof("save history: saved cmd=%q ne=%q by=%q", req.CmdName, req.NeName, account)
 	response.Write(w, http.StatusCreated, record)
 }
