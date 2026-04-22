@@ -190,7 +190,7 @@ ssh anhdt195@localhost -p 2223
 Pairs là `field value` (space-separated, không `=`). Quote cho value có khoảng trắng.
 
 ```
-show user|ne|group [<name|id>]
+show user|ne|group [<field> <value> | <name|id>]
 set user name <u> password <p> [email <e>] [full_name <f>] [account_type 1|2] [...]
 set ne ne_name <n> namespace <ns> conf_master_ip <ip> conf_port_master_tcp <port> command_url <url> [...]
 set group name <n> [description <d>]
@@ -198,11 +198,31 @@ update <entity> <name|id> <field> <value> [<field> <value> ...]
 delete <entity> <name|id>
 map user <u> ne <ne|id>           map user <u> group <g|id>         map group <g|id> ne <ne|id>
 unmap ...                         (cùng shape)
-help [command]
+help [command [entity]]           # hoặc append '--help' / '-h' vào bất kỳ lệnh
 exit
 ```
 
 Alias: `name` → `account_name` (user) hoặc `ne_name` (ne). `port` → `conf_port_master_tcp`. `ip` → `conf_master_ip`. `type` → `account_type`.
+
+**Help contextual**: thêm `--help` (hoặc `-h`) vào bất kỳ vị trí nào trên dòng lệnh để in help cho lệnh đó. Ví dụ: `set user --help`, `show ne --help`, `map --help`. Help topic được suy ra từ verb + entity (nếu có), fallback về verb-only nếu không có entry chuyên biệt.
+
+**Show filters**: ngoài dạng legacy `show <entity> <name|id>`, `show` nhận thêm `<field> <value>`:
+
+| Entity | Filter fields | Ghi chú |
+|--------|---------------|--------|
+| user | `name` \| `id` \| `email` \| `role` | `role` in bảng (SuperAdmin/Admin/Normal hoặc 0/1/2); các field khác in detail khi match duy nhất. |
+| ne   | `name` \| `id` \| `site` \| `namespace` | `name` in bảng nếu trùng `ne_name` qua nhiều namespace; `site`/`namespace` luôn in bảng. |
+| group | `name` \| `id` | In detail (users + ne_ids). |
+
+Ví dụ:
+```
+show user role Admin              # list tất cả user role Admin
+show user email alice@example.com # tra cứu theo email
+show ne name HTSMF01              # liệt kê tất cả NE trùng tên (nếu có)
+show ne site HN                   # tất cả NE ở site HN
+show ne namespace tenant-a        # tất cả NE trong namespace tenant-a
+show group name dev               # detail group
+```
 
 ---
 

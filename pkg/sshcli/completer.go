@@ -102,8 +102,26 @@ func candidatesAt(prev []string, index int) []string {
 		default:
 			return nil
 		}
+	case "show":
+		return showFilterCandidate(entity, prev, 2)
 	}
 	return nil
+}
+
+// showFilterCandidate suggests filter field aliases at index 2 of a show
+// command, and enum values at index 3 when the preceding token is a known
+// filter field with an enum (e.g. role → SuperAdmin/Admin/Normal).
+func showFilterCandidate(entity string, prev []string, pairsStart int) []string {
+	relOffset := len(prev) - pairsStart
+	if relOffset%2 == 0 {
+		return ShowFilterAliases(entity)
+	}
+	fieldAlias := strings.ToLower(prev[len(prev)-1])
+	canon, ok := ResolveShowFilter(entity, fieldAlias)
+	if !ok {
+		return nil
+	}
+	return ShowFilterEnumValues(entity, canon)
 }
 
 // fieldOrEnumCandidate decides, given that pairs start at `pairsStart`, whether

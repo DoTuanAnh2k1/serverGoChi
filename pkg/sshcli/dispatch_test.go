@@ -600,6 +600,190 @@ func TestDispatch_HelpUnknownTopic(t *testing.T) {
 	}
 }
 
+func TestDispatch_HelpFlagRouting(t *testing.T) {
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{})
+	defer done()
+
+	// set user --help should print the entity-specific help.
+	if err := d.Run(mustParse(t, "set user --help")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "set user name") || !strings.Contains(out, "Required fields") {
+		t.Errorf("set user --help missing entity-specific content:\n%s", out)
+	}
+
+	// Unknown entity-specific topic falls back to verb-only help.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "help set group")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !strings.Contains(buf.String(), "set group name") {
+		t.Errorf("help set group should hit entity-specific topic:\n%s", buf.String())
+	}
+
+	// show ne --help
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show ne --help")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !strings.Contains(buf.String(), "show ne [<field>") {
+		t.Errorf("show ne --help missing:\n%s", buf.String())
+	}
+}
+
+// --- show user by field ---
+
+func TestDispatch_ShowUserByField(t *testing.T) {
+	users := []UserInfo{
+		{AccountID: 1, AccountName: "alice", AccountType: 1, Email: "alice@example.com"},
+		{AccountID: 2, AccountName: "bob", AccountType: 2, Email: "bob@example.com"},
+		{AccountID: 3, AccountName: "carol", AccountType: 1, Email: "carol@example.com"},
+	}
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodGet, "/aa/admin/user/list"}: func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, users)
+		},
+	})
+	defer done()
+
+	// show user name alice → detail
+	if err := d.Run(mustParse(t, "show user name alice")); err != nil {
+		t.Fatalf("name: %v", err)
+	}
+	if !strings.Contains(buf.String(), "name:         alice") {
+		t.Errorf("show user name alice: %s", buf.String())
+	}
+
+	// show user email bob@example.com → detail
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show user email bob@example.com")); err != nil {
+		t.Fatalf("email: %v", err)
+	}
+	if !strings.Contains(buf.String(), "name:         bob") {
+		t.Errorf("show user email: %s", buf.String())
+	}
+
+	// show user role Admin → table with all admins
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show user role Admin")); err != nil {
+		t.Fatalf("role Admin: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "alice") || !strings.Contains(out, "carol") {
+		t.Errorf("role Admin table missing users:\n%s", out)
+	}
+	if strings.Contains(out, "bob") {
+		t.Errorf("role Admin should not contain Normal user bob:\n%s", out)
+	}
+	if !strings.Contains(out, "(2 users)") {
+		t.Errorf("role Admin count: %s", out)
+	}
+
+	// Numeric role value.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show user role 2")); err != nil {
+		t.Fatalf("role 2: %v", err)
+	}
+	if !strings.Contains(buf.String(), "bob") || strings.Contains(buf.String(), "alice") {
+		t.Errorf("role 2 (Normal):\n%s", buf.String())
+	}
+
+	// Unknown filter field.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show user bogus value")); err == nil {
+		t.Errorf("unknown filter field should error")
+	}
+
+	// No match.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show user role SuperAdmin")); err == nil {
+		t.Errorf("expected no-match error for role SuperAdmin")
+	}
+}
+
+// --- show ne by field ---
+
+func TestDispatch_ShowNeByField(t *testing.T) {
+	nes := []NeInfo{
+		{ID: 1, NeName: "HTSMF01", SiteName: "HN", Namespace: "default"},
+		{ID: 2, NeName: "HTSMF01", SiteName: "HCM", Namespace: "tenant-a"}, // duplicate name in different ns
+		{ID: 3, NeName: "HTSMF02", SiteName: "HN", Namespace: "default"},
+	}
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodGet, "/aa/admin/ne/list"}: func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, nes)
+		},
+	})
+	defer done()
+
+	// Duplicate name → table.
+	if err := d.Run(mustParse(t, "show ne name HTSMF01")); err != nil {
+		t.Fatalf("name dup: %v", err)
+	}
+	out := buf.String()
+	if !strings.Contains(out, "HTSMF01") || !strings.Contains(out, "HN") || !strings.Contains(out, "HCM") {
+		t.Errorf("dup-name table incomplete:\n%s", out)
+	}
+	if !strings.Contains(out, "(2 NEs)") {
+		t.Errorf("dup-name count: %s", out)
+	}
+
+	// Site filter → table.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show ne site HN")); err != nil {
+		t.Fatalf("site: %v", err)
+	}
+	if c := strings.Count(buf.String(), "HTSMF"); c != 2 {
+		t.Errorf("site HN should match 2 NEs, got %d:\n%s", c, buf.String())
+	}
+
+	// Namespace filter.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show ne namespace tenant-a")); err != nil {
+		t.Fatalf("namespace: %v", err)
+	}
+	if !strings.Contains(buf.String(), "HCM") || strings.Contains(buf.String(), "(2 NEs)") {
+		t.Errorf("namespace tenant-a should match 1 NE:\n%s", buf.String())
+	}
+
+	// ID filter → detail (single match).
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show ne id 3")); err != nil {
+		t.Fatalf("id: %v", err)
+	}
+	if !strings.Contains(buf.String(), "ne_name:               HTSMF02") {
+		t.Errorf("id 3:\n%s", buf.String())
+	}
+
+	// Unknown filter field.
+	buf.Reset()
+	if err := d.Run(mustParse(t, "show ne bogus value")); err == nil {
+		t.Errorf("unknown filter field should error")
+	}
+}
+
+// Legacy: show ne <name> where name matches multiple across namespaces should
+// now print a table instead of the old "first match wins" detail.
+func TestDispatch_ShowNeLegacyAmbiguous(t *testing.T) {
+	nes := []NeInfo{
+		{ID: 1, NeName: "HTSMF01", Namespace: "default"},
+		{ID: 2, NeName: "HTSMF01", Namespace: "tenant-a"},
+	}
+	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
+		{http.MethodGet, "/aa/admin/ne/list"}: func(w http.ResponseWriter, r *http.Request) {
+			writeJSON(w, 200, nes)
+		},
+	})
+	defer done()
+	if err := d.Run(mustParse(t, "show ne HTSMF01")); err != nil {
+		t.Fatalf("err: %v", err)
+	}
+	if !strings.Contains(buf.String(), "(2 NEs)") {
+		t.Errorf("ambiguous legacy show ne should print table of 2:\n%s", buf.String())
+	}
+}
+
 func TestDispatch_GroupShow(t *testing.T) {
 	d, buf, done := newDispatcher(t, map[route]http.HandlerFunc{
 		{http.MethodGet, "/aa/group/list"}: func(w http.ResponseWriter, r *http.Request) {

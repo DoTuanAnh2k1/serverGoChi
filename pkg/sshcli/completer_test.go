@@ -62,6 +62,35 @@ func TestCandidates_SetUserFields(t *testing.T) {
 	}
 }
 
+func TestCandidates_ShowUserFilterField(t *testing.T) {
+	got := Candidates("show user ", 10)
+	// Should include filter aliases: name, id, email, role, ...
+	for _, want := range []string{"name", "id", "email", "role"} {
+		if !containsString(got, want) {
+			t.Errorf("show user _: missing %q in %v", want, got)
+		}
+	}
+}
+
+func TestCandidates_ShowUserRoleEnum(t *testing.T) {
+	got := Candidates("show user role ", 15)
+	sort.Strings(got)
+	want := []string{"Admin", "Normal", "SuperAdmin"}
+	sort.Strings(want)
+	if !equalSlice(got, want) {
+		t.Errorf("show user role _: got %v want %v", got, want)
+	}
+}
+
+func TestCandidates_ShowNeFilterField(t *testing.T) {
+	got := Candidates("show ne ", 8)
+	for _, want := range []string{"name", "id", "site", "namespace"} {
+		if !containsString(got, want) {
+			t.Errorf("show ne _: missing %q in %v", want, got)
+		}
+	}
+}
+
 func TestCandidates_SetEnumValue(t *testing.T) {
 	got := Candidates("set user name a password b account_type ", 40)
 	sort.Strings(got)

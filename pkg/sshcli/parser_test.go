@@ -69,14 +69,75 @@ func TestParse_Show(t *testing.T) {
 	if err != nil || c.Target != "alice" {
 		t.Fatalf("show user alice: %+v err=%v", c, err)
 	}
-	if _, err := Parse("show user alice bob"); err == nil {
-		t.Errorf("show with too many args should error")
+	// New form: <field> <value> populates Fields + FieldOrder.
+	c, err = Parse("show user name alice")
+	if err != nil {
+		t.Fatalf("show user name alice: err=%v", err)
+	}
+	if c.Target != "" || c.Fields["name"] != "alice" || len(c.FieldOrder) != 1 || c.FieldOrder[0] != "name" {
+		t.Errorf("show user name alice: %+v", c)
+	}
+	c, err = Parse("show user role Admin")
+	if err != nil {
+		t.Fatalf("show user role Admin: err=%v", err)
+	}
+	if c.Fields["role"] != "Admin" {
+		t.Errorf("show user role Admin: %+v", c)
+	}
+	if _, err := Parse("show user a b c"); err == nil {
+		t.Errorf("show with 3 args after entity should error")
 	}
 	if _, err := Parse("show"); err == nil {
 		t.Errorf("show without entity should error")
 	}
 	if _, err := Parse("show widget"); err == nil {
 		t.Errorf("show with unknown entity should error")
+	}
+}
+
+func TestParse_HelpFlag(t *testing.T) {
+	// --help anywhere should route to help with context.
+	c, err := Parse("set user --help")
+	if err != nil {
+		t.Fatalf("set user --help: %v", err)
+	}
+	if c.Verb != "help" || c.Target != "set user" {
+		t.Errorf("set user --help: got verb=%q target=%q", c.Verb, c.Target)
+	}
+	c, err = Parse("show ne name HTSMF01 --help")
+	if err != nil {
+		t.Fatalf("show ne ... --help: %v", err)
+	}
+	if c.Verb != "help" || c.Target != "show ne" {
+		t.Errorf("show ne ... --help: got verb=%q target=%q", c.Verb, c.Target)
+	}
+	c, err = Parse("--help")
+	if err != nil {
+		t.Fatalf("--help: %v", err)
+	}
+	if c.Verb != "help" || c.Target != "" {
+		t.Errorf("--help: got verb=%q target=%q", c.Verb, c.Target)
+	}
+	// -h alias.
+	c, err = Parse("set -h")
+	if err != nil {
+		t.Fatalf("set -h: %v", err)
+	}
+	if c.Verb != "help" || c.Target != "set" {
+		t.Errorf("set -h: got verb=%q target=%q", c.Verb, c.Target)
+	}
+}
+
+func TestParse_HelpMultiToken(t *testing.T) {
+	c, err := Parse("help show ne")
+	if err != nil {
+		t.Fatalf("help show ne: %v", err)
+	}
+	if c.Target != "show ne" {
+		t.Errorf("help show ne: got %q", c.Target)
+	}
+	if _, err := Parse("help show ne extra"); err == nil {
+		t.Errorf("help with too many args should error")
 	}
 }
 

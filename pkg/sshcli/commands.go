@@ -184,3 +184,89 @@ func FieldAliasNames(entity string) []string {
 	sort.Strings(out)
 	return out
 }
+
+// ShowFilterSpec describes the filter fields supported by `show <entity> <field> <value>`.
+// These are separate from the full CRUD field set because the show command
+// only filters on a handful of columns (name/id/email/role/site/namespace).
+type ShowFilterSpec struct {
+	// Alias → canonical filter name.
+	FieldAliases map[string]string
+	// Canonical → allowed enum values (used for Tab completion on value position).
+	EnumValues map[string][]string
+}
+
+var showFilterSpecs = map[string]ShowFilterSpec{
+	"user": {
+		FieldAliases: map[string]string{
+			"name":         "name",
+			"username":     "name",
+			"account_name": "name",
+			"id":           "id",
+			"account_id":   "id",
+			"email":        "email",
+			"role":         "role",
+			"type":         "role",
+			"account_type": "role",
+		},
+		EnumValues: map[string][]string{
+			"role": {"SuperAdmin", "Admin", "Normal"},
+		},
+	},
+	"ne": {
+		FieldAliases: map[string]string{
+			"name":      "name",
+			"ne_name":   "name",
+			"id":        "id",
+			"site":      "site",
+			"site_name": "site",
+			"namespace": "namespace",
+		},
+	},
+	"group": {
+		FieldAliases: map[string]string{
+			"name": "name",
+			"id":   "id",
+		},
+	},
+}
+
+// ResolveShowFilter normalizes a user-supplied alias against an entity's
+// show-filter spec and returns the canonical filter name, or false if the
+// alias isn't recognized.
+func ResolveShowFilter(entity, alias string) (string, bool) {
+	spec, ok := showFilterSpecs[entity]
+	if !ok {
+		return "", false
+	}
+	canon, ok := spec.FieldAliases[strings.ToLower(alias)]
+	return canon, ok
+}
+
+// ShowFilterAliases returns all alias names for an entity's show filters,
+// used for Tab completion.
+func ShowFilterAliases(entity string) []string {
+	spec, ok := showFilterSpecs[entity]
+	if !ok {
+		return nil
+	}
+	out := make([]string, 0, len(spec.FieldAliases))
+	for k := range spec.FieldAliases {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// ShowFilterEnumValues returns the enum values allowed for a canonical
+// show-filter field (if any), for Tab completion at the value position.
+func ShowFilterEnumValues(entity, canonical string) []string {
+	spec, ok := showFilterSpecs[entity]
+	if !ok {
+		return nil
+	}
+	v, ok := spec.EnumValues[canonical]
+	if !ok {
+		return nil
+	}
+	return append([]string(nil), v...)
+}
