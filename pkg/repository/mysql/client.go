@@ -64,6 +64,15 @@ func (c *Client) autoMigrate() error {
 		&db_models.CliGroup{},
 		&db_models.CliUserGroupMapping{},
 		&db_models.CliGroupNeMapping{},
+		// RBAC (docs/rbac-design.md §4.7–4.11)
+		&db_models.CliNeProfile{},
+		&db_models.CliCommandDef{},
+		&db_models.CliCommandGroup{},
+		&db_models.CliCommandGroupMapping{},
+		&db_models.CliGroupCmdPermission{},
+		&db_models.CliPasswordPolicy{},
+		&db_models.CliPasswordHistory{},
+		&db_models.CliGroupMgtPermission{},
 	)
 }
 
