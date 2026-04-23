@@ -268,6 +268,11 @@ GET  /aa/authorize/rbac/effective              # full list NE + rules để cach
 POST /aa/authorize/rbac/check-command          # realtime { service, command, ne_id } → { allowed, reason }
 ```
 
+**Frontend (`/admin`)**: 4 tab mới đã có sẵn — `NE Profiles`, `Command Defs`, `Command Groups`, `Group Permissions` (tất cả `admin-only`). Command Defs hỗ trợ **CSV import/export** đầy đủ:
+- Download CSV của toàn bộ command-def đang có (filter theo service/profile/category).
+- Upload CSV với header `service,ne_profile,pattern,category,risk_level,description` — parse client-side, POST batch đến `/aa/command-def/import`.
+- Có nút "Load Sample" để điền sample data 9 lệnh (mix `*`/SMF/AMF, ne-command + ne-config).
+
 **CRUD qua CLI** (admin only):
 ```
 show ne-profile                                   set ne-profile name SMF description "..."

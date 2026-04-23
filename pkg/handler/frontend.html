@@ -111,6 +111,10 @@ body.role-user .admin-only{display:none !important}
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
   <a onclick="showSection('groups')" data-section="groups" data-i18n="nav_groups">Groups</a>
   <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
+  <a onclick="showSection('ne-profiles')" data-section="ne-profiles" data-i18n="nav_ne_profiles" class="admin-only">NE Profiles</a>
+  <a onclick="showSection('command-defs')" data-section="command-defs" data-i18n="nav_command_defs" class="admin-only">Command Defs</a>
+  <a onclick="showSection('command-groups')" data-section="command-groups" data-i18n="nav_command_groups" class="admin-only">Command Groups</a>
+  <a onclick="showSection('group-perms')" data-section="group-perms" data-i18n="nav_group_perms" class="admin-only">Group Permissions</a>
   <a onclick="showSection('import')" data-section="import" data-i18n="nav_import" class="admin-only">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
   <div class="lang-switch">
@@ -290,6 +294,132 @@ body.role-user .admin-only{display:none !important}
   </div>
 </div>
 
+<!-- NE Profiles -->
+<div class="section admin-only" id="sec-ne-profiles">
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="create_ne_profile">Create NE Profile</h3>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="name">Name</label> *<input id="newNpName" placeholder="SMF"></div>
+      <div class="form-group"><label data-i18n="description">Description</label><input id="newNpDesc" placeholder="Session Management Function"></div>
+    </div>
+    <button class="btn btn-primary" onclick="createNeProfile()" data-i18n="create" style="margin-top:.5rem">Create</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:1rem" data-i18n="all_ne_profiles">All NE Profiles</h3>
+    <div id="neProfilesTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Command Defs -->
+<div class="section admin-only" id="sec-command-defs">
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="create_command_def">Create Command Definition</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Service</label> *
+        <select id="newCdService"><option value="ne-command">ne-command</option><option value="ne-config">ne-config</option><option value="*">*</option></select>
+      </div>
+      <div class="form-group"><label>NE Profile</label>
+        <input id="newCdProfile" placeholder="* or SMF">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Pattern</label> *<input id="newCdPattern" placeholder="get subscriber"></div>
+      <div class="form-group"><label>Category</label> *
+        <select id="newCdCategory"><option value="monitoring">monitoring</option><option value="configuration">configuration</option><option value="admin">admin</option><option value="debug">debug</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Risk Level</label>
+        <select id="newCdRisk"><option value="0">0 safe</option><option value="1">1</option><option value="2">2 dangerous</option></select>
+      </div>
+      <div class="form-group"><label data-i18n="description">Description</label><input id="newCdDesc" placeholder="..."></div>
+    </div>
+    <button class="btn btn-primary" onclick="createCommandDef()" data-i18n="create" style="margin-top:.5rem">Create</button>
+  </div>
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="csv_import_export">CSV Import / Export</h3>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:.75rem" data-i18n="csv_desc">Header: service,ne_profile,pattern,category,risk_level,description. Quote values containing commas with double quotes.</p>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem">
+      <input type="file" id="cdCsvFile" accept=".csv,.txt" style="display:none" onchange="handleCdCsvFile(event)">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('cdCsvFile').click()" data-i18n="upload_csv">Upload CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadCdCsv()" data-i18n="download_csv">Download CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="fillSampleCd()" data-i18n="load_sample">Load Sample</button>
+    </div>
+    <div class="form-group">
+      <textarea id="cdCsvText" rows="10" style="width:100%;padding:.75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem;font-family:monospace;resize:vertical;outline:none" placeholder="service,ne_profile,pattern,category,risk_level,description&#10;ne-command,SMF,get subscriber,monitoring,0,"></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="runCdCsvImport()" data-i18n="import">Import</button>
+  </div>
+  <div class="card">
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.75rem;align-items:center">
+      <h3 style="flex:1;margin:0" data-i18n="all_command_defs">All Command Definitions</h3>
+      <select id="cdFilterService" onchange="loadCommandDefs()" style="padding:.3rem .5rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem"><option value="">Any service</option><option value="ne-command">ne-command</option><option value="ne-config">ne-config</option><option value="*">*</option></select>
+      <input id="cdFilterProfile" oninput="loadCommandDefs()" placeholder="Any profile" style="padding:.3rem .5rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem;max-width:140px">
+      <select id="cdFilterCategory" onchange="loadCommandDefs()" style="padding:.3rem .5rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem"><option value="">Any category</option><option value="monitoring">monitoring</option><option value="configuration">configuration</option><option value="admin">admin</option><option value="debug">debug</option></select>
+    </div>
+    <div id="commandDefsTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Command Groups -->
+<div class="section admin-only" id="sec-command-groups">
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="create_command_group">Create Command Group</h3>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="name">Name</label> *<input id="newCgName" placeholder="smf-subscriber-ops"></div>
+      <div class="form-group"><label>Service</label>
+        <select id="newCgService"><option value="*">*</option><option value="ne-command">ne-command</option><option value="ne-config">ne-config</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>NE Profile</label><input id="newCgProfile" placeholder="* or SMF"></div>
+      <div class="form-group"><label data-i18n="description">Description</label><input id="newCgDesc" placeholder="..."></div>
+    </div>
+    <button class="btn btn-primary" onclick="createCommandGroup()" data-i18n="create" style="margin-top:.5rem">Create</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:1rem" data-i18n="all_command_groups">All Command Groups</h3>
+    <div id="commandGroupsTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Group Permissions -->
+<div class="section admin-only" id="sec-group-perms">
+  <div class="card">
+    <h3 style="margin-bottom:.75rem" data-i18n="group_permissions">Group Permissions</h3>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="select_group">Group</label>
+        <select id="gpGroupSelect" onchange="loadGroupPermissions()"></select>
+      </div>
+    </div>
+  </div>
+  <div class="card admin-only">
+    <h3 style="margin-bottom:.75rem" data-i18n="add_permission">Add Permission</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Effect</label>
+        <select id="gpEffect"><option value="allow">allow</option><option value="deny">deny</option></select>
+      </div>
+      <div class="form-group"><label>Service</label>
+        <select id="gpService"><option value="*">*</option><option value="ne-command">ne-command</option><option value="ne-config">ne-config</option></select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Grant Type</label>
+        <select id="gpGrantType"><option value="command_group">command-group</option><option value="category">category</option><option value="pattern">pattern</option></select>
+      </div>
+      <div class="form-group"><label>Grant Value</label><input id="gpGrantValue" placeholder="e.g. smf-subscriber-ops | monitoring | show *"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>NE Scope</label><input id="gpNeScope" placeholder="* | profile:SMF | ne:HTSMF01" value="*"></div>
+    </div>
+    <button class="btn btn-primary" onclick="addGroupPermission()" data-i18n="add" style="margin-top:.5rem">Add</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:.75rem" data-i18n="current_permissions">Current Permissions</h3>
+    <div id="groupPermsTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
 <!-- Import -->
 <div class="section admin-only" id="sec-import">
   <div class="card">
@@ -357,6 +487,23 @@ const I18N = {
     // nav
     nav_dashboard:'Dashboard', nav_users:'Users', nav_nes:'Network Elements',
     nav_ne_mapping:'NE Mapping', nav_groups:'Groups', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
+    nav_ne_profiles:'NE Profiles', nav_command_defs:'Command Defs', nav_command_groups:'Command Groups', nav_group_perms:'Group Permissions',
+    // RBAC
+    name:'Name',
+    create_ne_profile:'Create NE Profile', all_ne_profiles:'All NE Profiles', no_ne_profiles:'No NE profiles',
+    ne_profile_created:'NE profile created', ne_profile_updated:'NE profile updated', ne_profile_deleted:'NE profile deleted',
+    create_command_def:'Create Command Definition', all_command_defs:'All Command Definitions', no_command_defs:'No command defs',
+    command_def_created:'Command def created', command_def_updated:'Command def updated', command_def_deleted:'Command def deleted',
+    command_def_imported:'Imported {n} commands',
+    csv_import_export:'CSV Import / Export', csv_desc:'Header: service,ne_profile,pattern,category,risk_level,description. Quote values with commas using double quotes.',
+    upload_csv:'Upload CSV', download_csv:'Download CSV',
+    create_command_group:'Create Command Group', all_command_groups:'All Command Groups', no_command_groups:'No command groups',
+    command_group_created:'Command group created', command_group_updated:'Command group updated', command_group_deleted:'Command group deleted',
+    manage_commands:'Manage Commands', current_members:'Current Members', no_members:'No members yet', add_member:'Add Member',
+    member_added:'Member added', member_removed:'Member removed', close:'Close', add:'Add',
+    group_permissions:'Group Permissions', select_group:'Group', select_group_first:'Select a group to view permissions',
+    add_permission:'Add Permission', current_permissions:'Current Permissions', no_permissions:'No permissions yet',
+    permission_added:'Permission added', permission_revoked:'Permission revoked', revoke:'Revoke',
     create_group:'Create Group', all_groups:'All Groups', group_name:'Group Name',
     edit_group:'Edit Group', group_members:'Members', group_nes:'Network Elements',
     manage_group:'Manage Group', group_created:'Group created', group_updated:'Group updated', group_deleted:'Group deleted',
@@ -443,6 +590,22 @@ const I18N = {
   vi: {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_nes:'Phần tử mạng',
     nav_ne_mapping:'Gán NE', nav_groups:'Nhóm', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
+    nav_ne_profiles:'NE Profiles', nav_command_defs:'Định nghĩa lệnh', nav_command_groups:'Nhóm lệnh', nav_group_perms:'Phân quyền nhóm',
+    name:'Tên',
+    create_ne_profile:'Tạo NE Profile', all_ne_profiles:'Tất cả NE Profile', no_ne_profiles:'Chưa có NE profile',
+    ne_profile_created:'Đã tạo NE profile', ne_profile_updated:'Đã cập nhật NE profile', ne_profile_deleted:'Đã xoá NE profile',
+    create_command_def:'Tạo định nghĩa lệnh', all_command_defs:'Tất cả định nghĩa lệnh', no_command_defs:'Chưa có định nghĩa lệnh',
+    command_def_created:'Đã tạo định nghĩa lệnh', command_def_updated:'Đã cập nhật định nghĩa lệnh', command_def_deleted:'Đã xoá định nghĩa lệnh',
+    command_def_imported:'Đã nhập {n} lệnh',
+    csv_import_export:'Nhập / Xuất CSV', csv_desc:'Header: service,ne_profile,pattern,category,risk_level,description. Giá trị chứa dấu phẩy phải đặt trong dấu nháy kép.',
+    upload_csv:'Tải lên CSV', download_csv:'Tải xuống CSV',
+    create_command_group:'Tạo nhóm lệnh', all_command_groups:'Tất cả nhóm lệnh', no_command_groups:'Chưa có nhóm lệnh',
+    command_group_created:'Đã tạo nhóm lệnh', command_group_updated:'Đã cập nhật nhóm lệnh', command_group_deleted:'Đã xoá nhóm lệnh',
+    manage_commands:'Quản lý lệnh', current_members:'Thành viên hiện tại', no_members:'Chưa có thành viên', add_member:'Thêm thành viên',
+    member_added:'Đã thêm thành viên', member_removed:'Đã gỡ thành viên', close:'Đóng', add:'Thêm',
+    group_permissions:'Phân quyền nhóm', select_group:'Nhóm', select_group_first:'Chọn nhóm để xem quyền',
+    add_permission:'Thêm quyền', current_permissions:'Quyền hiện tại', no_permissions:'Chưa có quyền nào',
+    permission_added:'Đã thêm quyền', permission_revoked:'Đã huỷ quyền', revoke:'Huỷ quyền',
     create_group:'Tạo nhóm', all_groups:'Tất cả nhóm', group_name:'Tên nhóm',
     edit_group:'Sửa nhóm', group_members:'Thành viên', group_nes:'Phần tử mạng',
     manage_group:'Quản lý nhóm', group_created:'Đã tạo nhóm', group_updated:'Đã cập nhật nhóm', group_deleted:'Đã xoá nhóm',
@@ -715,6 +878,10 @@ function showSection(name) {
   if (name === 'ne-mapping') loadNeMapping();
   if (name === 'groups') loadGroups();
   if (name === 'history') loadHistory();
+  if (name === 'ne-profiles') loadNeProfiles();
+  if (name === 'command-defs') loadCommandDefs();
+  if (name === 'command-groups') loadCommandGroups();
+  if (name === 'group-perms') { populateGpGroupSelect(); loadGroupPermissions(); }
 }
 
 // ── Auth ──
@@ -1318,6 +1485,450 @@ async function runImport(){
   document.getElementById('importResults').innerHTML=html;
   await refreshCaches();
   toast('Import: '+ok+' ok, '+skip+' skipped, '+err+' errors', err?'error':'success');
+}
+
+// ────────────────────────────────────────────────────────────────
+// RBAC (docs/rbac-design.md) — NE profiles, command defs, command
+// groups, group permissions. All paths under /aa/... are admin-only
+// on the server; the sidebar links carry .admin-only so Normal
+// users don't see them. CSV import/export covers command-def since
+// that's the heaviest bulk surface.
+// ────────────────────────────────────────────────────────────────
+
+let cachedNeProfiles = [], cachedCommandDefs = [], cachedCommandGroups = [];
+
+async function loadNeProfiles(){
+  const res = await api('GET', '/ne-profile/list');
+  const data = Array.isArray(res.data) ? res.data : [];
+  cachedNeProfiles = data;
+  if (!data.length) { document.getElementById('neProfilesTable').innerHTML = '<div class="empty">'+t('no_ne_profiles')+'</div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>'+t('name')+'</th><th>'+t('description')+'</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(p => {
+    html += '<tr><td>'+p.id+'</td><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.description||'-')+'</td>'
+      +'<td class="actions admin-only">'
+      +'<button class="btn btn-outline btn-sm" onclick="openEditNeProfileModal('+p.id+')">'+t('edit')+'</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteNeProfile('+p.id+',\''+esc(p.name)+'\')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('neProfilesTable').innerHTML = html;
+}
+
+async function createNeProfile(){
+  const name = document.getElementById('newNpName').value.trim();
+  const description = document.getElementById('newNpDesc').value;
+  if (!name) { toast(t('name')+' *', 'error'); return; }
+  const res = await api('POST', '/ne-profile/create', {name, description});
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('ne_profile_created'));
+  document.getElementById('newNpName').value = '';
+  document.getElementById('newNpDesc').value = '';
+  loadNeProfiles();
+}
+
+function openEditNeProfileModal(id){
+  const p = cachedNeProfiles.find(x => x.id === id);
+  if (!p) return;
+  const body = '<div class="form-group"><label>'+t('name')+'</label><input id="mNpName" value="'+esc(p.name)+'"></div>'
+    +'<div class="form-group"><label>'+t('description')+'</label><input id="mNpDesc" value="'+esc(p.description||'')+'"></div>';
+  openModal(t('edit')+' '+p.name, body, async () => {
+    const payload = {id, name: document.getElementById('mNpName').value.trim(), description: document.getElementById('mNpDesc').value};
+    const res = await api('POST', '/ne-profile/update', payload);
+    if (res.status !== 200 && res.status !== 201) { toast(failMsg(res), 'error'); return; }
+    closeModal();
+    toast(t('ne_profile_updated'));
+    loadNeProfiles();
+  });
+}
+
+async function deleteNeProfile(id, name){
+  if (!confirm(t('delete_btn')+' '+name+'?')) return;
+  const res = await api('DELETE', '/ne-profile/'+id);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('ne_profile_deleted'));
+  loadNeProfiles();
+}
+
+// ── Command Defs ──
+
+function cdFilters(){
+  return {
+    service: document.getElementById('cdFilterService').value,
+    ne_profile: document.getElementById('cdFilterProfile').value.trim(),
+    category: document.getElementById('cdFilterCategory').value,
+  };
+}
+
+async function loadCommandDefs(){
+  const f = cdFilters();
+  const q = new URLSearchParams();
+  if (f.service) q.set('service', f.service);
+  if (f.ne_profile) q.set('ne_profile', f.ne_profile);
+  if (f.category) q.set('category', f.category);
+  const path = '/command-def/list' + (q.toString() ? '?'+q.toString() : '');
+  const res = await api('GET', path);
+  const data = Array.isArray(res.data) ? res.data : [];
+  cachedCommandDefs = data;
+  if (!data.length) { document.getElementById('commandDefsTable').innerHTML = '<div class="empty">'+t('no_command_defs')+'</div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>Service</th><th>Profile</th><th>Pattern</th><th>Category</th><th>Risk</th><th>Description</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(d => {
+    html += '<tr>'
+      +'<td>'+d.id+'</td>'
+      +'<td><span class="badge badge-blue">'+esc(d.service)+'</span></td>'
+      +'<td>'+esc(d.ne_profile||'*')+'</td>'
+      +'<td><code style="font-size:.85em">'+esc(d.pattern)+'</code></td>'
+      +'<td>'+esc(d.category)+'</td>'
+      +'<td>'+(d.risk_level>=2?'<span class="badge badge-red">'+d.risk_level+'</span>':d.risk_level)+'</td>'
+      +'<td style="font-size:.82rem;color:#94a3b8">'+esc(d.description||'-')+'</td>'
+      +'<td class="actions admin-only">'
+      +'<button class="btn btn-outline btn-sm" onclick="openEditCommandDefModal('+d.id+')">'+t('edit')+'</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteCommandDef('+d.id+')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('commandDefsTable').innerHTML = html;
+}
+
+async function createCommandDef(){
+  const body = {
+    service: document.getElementById('newCdService').value,
+    ne_profile: document.getElementById('newCdProfile').value.trim() || '*',
+    pattern: document.getElementById('newCdPattern').value.trim(),
+    category: document.getElementById('newCdCategory').value,
+    risk_level: parseInt(document.getElementById('newCdRisk').value, 10) || 0,
+    description: document.getElementById('newCdDesc').value,
+  };
+  if (!body.pattern) { toast('pattern *', 'error'); return; }
+  const res = await api('POST', '/command-def/create', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('command_def_created'));
+  ['newCdPattern','newCdDesc'].forEach(id => document.getElementById(id).value = '');
+  loadCommandDefs();
+}
+
+function openEditCommandDefModal(id){
+  const d = cachedCommandDefs.find(x => x.id === id);
+  if (!d) return;
+  const body = '<div class="form-row">'
+    +'<div class="form-group"><label>Service</label><select id="mCdService"><option '+(d.service==='ne-command'?'selected':'')+'>ne-command</option><option '+(d.service==='ne-config'?'selected':'')+'>ne-config</option><option '+(d.service==='*'?'selected':'')+'>*</option></select></div>'
+    +'<div class="form-group"><label>NE Profile</label><input id="mCdProfile" value="'+esc(d.ne_profile||'*')+'"></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Pattern</label><input id="mCdPattern" value="'+esc(d.pattern)+'"></div>'
+    +'<div class="form-row">'
+    +'<div class="form-group"><label>Category</label><select id="mCdCategory"><option '+(d.category==='monitoring'?'selected':'')+'>monitoring</option><option '+(d.category==='configuration'?'selected':'')+'>configuration</option><option '+(d.category==='admin'?'selected':'')+'>admin</option><option '+(d.category==='debug'?'selected':'')+'>debug</option></select></div>'
+    +'<div class="form-group"><label>Risk Level</label><select id="mCdRisk"><option '+(d.risk_level==0?'selected':'')+'>0</option><option '+(d.risk_level==1?'selected':'')+'>1</option><option '+(d.risk_level==2?'selected':'')+'>2</option></select></div>'
+    +'</div>'
+    +'<div class="form-group"><label>Description</label><input id="mCdDesc" value="'+esc(d.description||'')+'"></div>';
+  openModal(t('edit')+' #'+id, body, async () => {
+    const payload = {
+      id,
+      service: document.getElementById('mCdService').value,
+      ne_profile: document.getElementById('mCdProfile').value.trim() || '*',
+      pattern: document.getElementById('mCdPattern').value.trim(),
+      category: document.getElementById('mCdCategory').value,
+      risk_level: parseInt(document.getElementById('mCdRisk').value, 10) || 0,
+      description: document.getElementById('mCdDesc').value,
+    };
+    const res = await api('POST', '/command-def/update', payload);
+    if (res.status !== 200 && res.status !== 201) { toast(failMsg(res), 'error'); return; }
+    closeModal();
+    toast(t('command_def_updated'));
+    loadCommandDefs();
+  });
+}
+
+async function deleteCommandDef(id){
+  if (!confirm(t('delete_btn')+' command-def #'+id+'?')) return;
+  const res = await api('DELETE', '/command-def/'+id);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('command_def_deleted'));
+  loadCommandDefs();
+}
+
+// CSV helpers.
+//
+// parseCsv handles CRLF/LF, double-quoted fields with escaped "" inside.
+// Returns array of rows (each row = array of string fields).
+function parseCsv(text){
+  const rows = [];
+  let cur = [];
+  let field = '';
+  let inQuote = false;
+  for (let i = 0; i < text.length; i++){
+    const c = text[i];
+    if (inQuote){
+      if (c === '"'){
+        if (text[i+1] === '"'){ field += '"'; i++; }
+        else { inQuote = false; }
+      } else { field += c; }
+    } else {
+      if (c === '"'){ inQuote = true; }
+      else if (c === ','){ cur.push(field); field = ''; }
+      else if (c === '\n'){ cur.push(field); rows.push(cur); cur = []; field = ''; }
+      else if (c === '\r'){ /* swallow — LF pushes row */ }
+      else { field += c; }
+    }
+  }
+  if (field.length > 0 || cur.length > 0){ cur.push(field); rows.push(cur); }
+  return rows.filter(r => r.length && !(r.length === 1 && r[0].trim() === ''));
+}
+
+function csvEscape(s){
+  if (s === null || s === undefined) return '';
+  const v = String(s);
+  if (v.includes(',') || v.includes('"') || v.includes('\n')) return '"' + v.replace(/"/g, '""') + '"';
+  return v;
+}
+
+function handleCdCsvFile(ev){
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { document.getElementById('cdCsvText').value = r.result; };
+  r.readAsText(f);
+}
+
+function fillSampleCd(){
+  document.getElementById('cdCsvText').value =
+    'service,ne_profile,pattern,category,risk_level,description\n'
+    + 'ne-command,*,show version,monitoring,0,Show device version\n'
+    + 'ne-command,*,ping *,monitoring,0,Network reachability test\n'
+    + 'ne-command,SMF,get subscriber,monitoring,0,\n'
+    + 'ne-command,SMF,get session,monitoring,0,\n'
+    + 'ne-command,SMF,"delete session *",admin,2,Destructive: remove PDU session\n'
+    + 'ne-command,AMF,show sctp,monitoring,0,\n'
+    + 'ne-command,AMF,show ue *,monitoring,0,\n'
+    + 'ne-config,*,get-config *,monitoring,0,\n'
+    + 'ne-config,*,edit-config *,configuration,1,\n';
+}
+
+function downloadCdCsv(){
+  const header = 'service,ne_profile,pattern,category,risk_level,description\n';
+  const rows = cachedCommandDefs.map(d =>
+    [d.service, d.ne_profile, d.pattern, d.category, d.risk_level, d.description||''].map(csvEscape).join(',')
+  ).join('\n');
+  const blob = new Blob([header + rows + '\n'], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'command_defs.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+async function runCdCsvImport(){
+  const text = document.getElementById('cdCsvText').value.trim();
+  if (!text) { toast('empty CSV', 'error'); return; }
+  const rows = parseCsv(text);
+  if (!rows.length) { toast('no rows parsed', 'error'); return; }
+  const header = rows[0].map(s => s.trim().toLowerCase());
+  const idx = (name) => header.indexOf(name);
+  const iSvc = idx('service'), iPf = idx('ne_profile'), iPat = idx('pattern'),
+        iCat = idx('category'), iRisk = idx('risk_level'), iDesc = idx('description');
+  if (iSvc < 0 || iPat < 0 || iCat < 0) {
+    toast('CSV header must include service, pattern, category', 'error'); return;
+  }
+  const body = [];
+  for (let r = 1; r < rows.length; r++) {
+    const row = rows[r];
+    if (!row.length || !row.some(v => v.trim())) continue;
+    body.push({
+      service: (row[iSvc]||'').trim(),
+      ne_profile: (iPf >= 0 ? row[iPf] : '').trim() || '*',
+      pattern: (row[iPat]||'').trim(),
+      category: (row[iCat]||'').trim(),
+      risk_level: iRisk >= 0 ? parseInt(row[iRisk]||'0', 10) || 0 : 0,
+      description: iDesc >= 0 ? (row[iDesc]||'') : '',
+    });
+  }
+  if (!body.length) { toast('no data rows', 'error'); return; }
+  const res = await api('POST', '/command-def/import', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res, 'import failed'), 'error'); return; }
+  toast(t('command_def_imported').replace('{n}', body.length));
+  document.getElementById('cdCsvText').value = '';
+  loadCommandDefs();
+}
+
+// ── Command Groups ──
+
+async function loadCommandGroups(){
+  const res = await api('GET', '/command-group/list');
+  const data = Array.isArray(res.data) ? res.data : [];
+  cachedCommandGroups = data;
+  if (!data.length) { document.getElementById('commandGroupsTable').innerHTML = '<div class="empty">'+t('no_command_groups')+'</div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>'+t('name')+'</th><th>Service</th><th>Profile</th><th>'+t('description')+'</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(g => {
+    html += '<tr>'
+      +'<td>'+g.id+'</td>'
+      +'<td><b>'+esc(g.name)+'</b></td>'
+      +'<td>'+esc(g.service||'*')+'</td>'
+      +'<td>'+esc(g.ne_profile||'*')+'</td>'
+      +'<td style="font-size:.82rem;color:#94a3b8">'+esc(g.description||'-')+'</td>'
+      +'<td class="actions admin-only">'
+      +'<button class="btn btn-outline btn-sm" onclick="openManageCommandGroupModal('+g.id+')">'+t('manage_commands')+'</button>'
+      +'<button class="btn btn-outline btn-sm" onclick="openEditCommandGroupModal('+g.id+')">'+t('edit')+'</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deleteCommandGroup('+g.id+',\''+esc(g.name)+'\')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('commandGroupsTable').innerHTML = html;
+}
+
+async function createCommandGroup(){
+  const name = document.getElementById('newCgName').value.trim();
+  if (!name) { toast(t('name')+' *', 'error'); return; }
+  const body = {
+    name,
+    service: document.getElementById('newCgService').value,
+    ne_profile: document.getElementById('newCgProfile').value.trim() || '*',
+    description: document.getElementById('newCgDesc').value,
+  };
+  const res = await api('POST', '/command-group/create', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('command_group_created'));
+  ['newCgName','newCgProfile','newCgDesc'].forEach(id => document.getElementById(id).value = '');
+  loadCommandGroups();
+}
+
+function openEditCommandGroupModal(id){
+  const g = cachedCommandGroups.find(x => x.id === id);
+  if (!g) return;
+  const body = '<div class="form-row">'
+    +'<div class="form-group"><label>'+t('name')+'</label><input id="mCgName" value="'+esc(g.name)+'"></div>'
+    +'<div class="form-group"><label>Service</label><select id="mCgService"><option '+(g.service==='*'?'selected':'')+'>*</option><option '+(g.service==='ne-command'?'selected':'')+'>ne-command</option><option '+(g.service==='ne-config'?'selected':'')+'>ne-config</option></select></div>'
+    +'</div>'
+    +'<div class="form-row">'
+    +'<div class="form-group"><label>NE Profile</label><input id="mCgProfile" value="'+esc(g.ne_profile||'*')+'"></div>'
+    +'<div class="form-group"><label>Description</label><input id="mCgDesc" value="'+esc(g.description||'')+'"></div>'
+    +'</div>';
+  openModal(t('edit')+' '+g.name, body, async () => {
+    const payload = {
+      id,
+      name: document.getElementById('mCgName').value.trim(),
+      service: document.getElementById('mCgService').value,
+      ne_profile: document.getElementById('mCgProfile').value.trim() || '*',
+      description: document.getElementById('mCgDesc').value,
+    };
+    const res = await api('POST', '/command-group/update', payload);
+    if (res.status !== 200 && res.status !== 201) { toast(failMsg(res), 'error'); return; }
+    closeModal();
+    toast(t('command_group_updated'));
+    loadCommandGroups();
+  });
+}
+
+async function deleteCommandGroup(id, name){
+  if (!confirm(t('delete_btn')+' '+name+'?')) return;
+  const res = await api('DELETE', '/command-group/'+id);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('command_group_deleted'));
+  loadCommandGroups();
+}
+
+async function openManageCommandGroupModal(id){
+  const g = cachedCommandGroups.find(x => x.id === id);
+  if (!g) return;
+  // Fetch members + all defs eligible for this group (filter by service + profile).
+  const membersRes = await api('GET', '/command-group/'+id+'/commands');
+  const members = Array.isArray(membersRes.data) ? membersRes.data : [];
+  const memberIds = new Set(members.map(m => m.id));
+  // All defs — let caller pick from any; the server doesn't restrict.
+  const defsRes = await api('GET', '/command-def/list');
+  const allDefs = Array.isArray(defsRes.data) ? defsRes.data : [];
+  const eligible = allDefs.filter(d => !memberIds.has(d.id));
+  let body = '<h4 style="margin:.5rem 0">'+t('current_members')+' ('+members.length+')</h4>';
+  body += '<div style="max-height:200px;overflow-y:auto;border:1px solid #334155;border-radius:6px;padding:.5rem;margin-bottom:1rem">';
+  if (!members.length) body += '<div style="color:#64748b;font-size:.85rem">'+t('no_members')+'</div>';
+  members.forEach(m => {
+    body += '<div style="display:flex;justify-content:space-between;align-items:center;padding:.2rem 0">'
+      +'<span><span class="badge badge-blue">'+esc(m.service)+'</span> <span style="color:#94a3b8">'+esc(m.ne_profile||'*')+'</span> <code style="font-size:.85em">'+esc(m.pattern)+'</code></span>'
+      +'<button class="btn btn-danger btn-sm" onclick="cgRemoveMember('+id+','+m.id+')">-</button>'
+      +'</div>';
+  });
+  body += '</div>';
+  body += '<h4 style="margin:.5rem 0">'+t('add_member')+'</h4>';
+  body += '<select id="mCgAddDef" style="width:100%;padding:.4rem">';
+  eligible.forEach(d => {
+    body += '<option value="'+d.id+'">#'+d.id+' ['+esc(d.service)+'/'+esc(d.ne_profile||'*')+'] '+esc(d.pattern)+'</option>';
+  });
+  body += '</select>';
+  body += '<div style="margin-top:.75rem"><button class="btn btn-primary btn-sm" onclick="cgAddMember('+id+')">'+t('add')+'</button></div>';
+  openModal(t('manage_commands')+' — '+g.name, body, () => closeModal(), t('close'));
+}
+
+async function cgAddMember(groupID){
+  const defID = parseInt(document.getElementById('mCgAddDef').value, 10);
+  if (!defID) { toast('select a command-def', 'error'); return; }
+  const res = await api('POST', '/command-group/'+groupID+'/commands', {command_def_id: defID});
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  closeModal();
+  toast(t('member_added'));
+  openManageCommandGroupModal(groupID);
+}
+
+async function cgRemoveMember(groupID, defID){
+  const res = await api('DELETE', '/command-group/'+groupID+'/commands/'+defID);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  closeModal();
+  toast(t('member_removed'));
+  openManageCommandGroupModal(groupID);
+}
+
+// ── Group Permissions ──
+
+function populateGpGroupSelect(){
+  const sel = document.getElementById('gpGroupSelect');
+  sel.innerHTML = (cachedGroups||[]).map(g => '<option value="'+g.id+'">'+esc(g.name)+' (#'+g.id+')</option>').join('');
+}
+
+async function loadGroupPermissions(){
+  const sel = document.getElementById('gpGroupSelect');
+  const gid = parseInt(sel.value || '0', 10);
+  if (!gid) { document.getElementById('groupPermsTable').innerHTML = '<div class="empty">'+t('select_group_first')+'</div>'; return; }
+  const res = await api('GET', '/group/'+gid+'/cmd-permissions');
+  const data = Array.isArray(res.data) ? res.data : [];
+  if (!data.length) { document.getElementById('groupPermsTable').innerHTML = '<div class="empty">'+t('no_permissions')+'</div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>Effect</th><th>Service</th><th>NE Scope</th><th>Grant Type</th><th>Grant Value</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(p => {
+    const effectBadge = p.effect === 'allow'
+      ? '<span class="badge badge-green">allow</span>'
+      : '<span class="badge badge-red">deny</span>';
+    html += '<tr>'
+      +'<td>'+p.id+'</td>'
+      +'<td>'+effectBadge+'</td>'
+      +'<td>'+esc(p.service||'*')+'</td>'
+      +'<td><code style="font-size:.85em">'+esc(p.ne_scope||'*')+'</code></td>'
+      +'<td>'+esc(p.grant_type)+'</td>'
+      +'<td><code style="font-size:.85em">'+esc(p.grant_value)+'</code></td>'
+      +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="revokePermission('+gid+','+p.id+')">'+t('revoke')+'</button></td>'
+      +'</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('groupPermsTable').innerHTML = html;
+}
+
+async function addGroupPermission(){
+  const gid = parseInt(document.getElementById('gpGroupSelect').value || '0', 10);
+  if (!gid) { toast(t('select_group_first'), 'error'); return; }
+  const body = {
+    effect: document.getElementById('gpEffect').value,
+    service: document.getElementById('gpService').value,
+    grant_type: document.getElementById('gpGrantType').value,
+    grant_value: document.getElementById('gpGrantValue').value.trim(),
+    ne_scope: document.getElementById('gpNeScope').value.trim() || '*',
+  };
+  if (!body.grant_value) { toast('grant_value *', 'error'); return; }
+  const res = await api('POST', '/group/'+gid+'/cmd-permissions', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('permission_added'));
+  document.getElementById('gpGrantValue').value = '';
+  loadGroupPermissions();
+}
+
+async function revokePermission(gid, permID){
+  if (!confirm(t('revoke')+' #'+permID+'?')) return;
+  const res = await api('DELETE', '/group/'+gid+'/cmd-permissions/'+permID);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('permission_revoked'));
+  loadGroupPermissions();
 }
 
 // ── Init ──
