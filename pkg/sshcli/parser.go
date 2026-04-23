@@ -87,18 +87,22 @@ func Parse(line string) (*Command, error) {
 		c.Target = strings.Join(parts, " ")
 		return c, nil
 	case "show", "set", "update", "delete", "map", "unmap":
+	case "allow", "deny":
+		return parseGrant(verb, tokens, c)
+	case "revoke":
+		return parseRevoke(tokens, c)
 	default:
 		return nil, fmt.Errorf("unknown command %q", verb)
 	}
 
 	if len(tokens) < 2 {
-		return nil, fmt.Errorf("%s requires an entity (user, ne, group)", verb)
+		return nil, fmt.Errorf("%s requires an entity (user, ne, group, ne-profile, command-def, command-group)", verb)
 	}
 	c.Entity = strings.ToLower(tokens[1])
 	switch c.Entity {
-	case "user", "ne", "group":
+	case "user", "ne", "group", "ne-profile", "command-def", "command-group":
 	default:
-		return nil, fmt.Errorf("unknown entity %q (expected user, ne, group)", c.Entity)
+		return nil, fmt.Errorf("unknown entity %q (expected user, ne, group, ne-profile, command-def, command-group)", c.Entity)
 	}
 
 	rest := tokens[2:]
@@ -152,6 +156,45 @@ func Parse(line string) (*Command, error) {
 	return c, nil
 }
 
+// parseGrant handles `allow|deny <group_name> <grant_type> <grant_value>
+// [<field> <value> ...]`. The permission is stored in c.Fields so we reuse
+// the existing field-pair machinery for optional service / ne_scope
+// arguments. c.Target = group name, c.Relation = grant_type, c.Related =
+// grant_value, c.Entity = "group" (always — permissions are group-scoped).
+func parseGrant(verb string, tokens []string, c *Command) (*Command, error) {
+	// allow <group> <grant_type> <grant_value> [pairs...]
+	if len(tokens) < 4 {
+		return nil, fmt.Errorf("%s requires <group> <grant_type> <grant_value> [<field> <value>...]", verb)
+	}
+	c.Entity = "group"
+	c.Target = tokens[1]
+	c.Relation = strings.ToLower(tokens[2])
+	c.Related = tokens[3]
+	switch c.Relation {
+	case "command-group", "command_group", "commandgroup", "category", "pattern":
+	default:
+		return nil, fmt.Errorf("%s grant_type must be one of command-group | category | pattern, got %q", verb, c.Relation)
+	}
+	if len(tokens) > 4 {
+		if err := parsePairs(tokens[4:], c); err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
+}
+
+// parseRevoke handles `revoke <group_name> <perm_id>` — tears down a single
+// permission row by its numeric id.
+func parseRevoke(tokens []string, c *Command) (*Command, error) {
+	if len(tokens) != 3 {
+		return nil, fmt.Errorf("revoke requires <group> <perm_id>")
+	}
+	c.Entity = "group"
+	c.Target = tokens[1]
+	c.Related = tokens[2]
+	return c, nil
+}
+
 // extractHelpTopic returns the help topic and true if any token is --help or
 // -h. The topic is "verb entity" when an entity is present after the verb,
 // otherwise just the verb; empty when the flag is alone on the line. The
@@ -176,7 +219,8 @@ func extractHelpTopic(tokens []string) (string, bool) {
 	verb := strings.ToLower(clean[0])
 	if len(clean) >= 2 {
 		ent := strings.ToLower(clean[1])
-		if ent == "user" || ent == "ne" || ent == "group" {
+		switch ent {
+		case "user", "ne", "group", "ne-profile", "command-def", "command-group":
 			return verb + " " + ent, true
 		}
 	}
@@ -211,6 +255,10 @@ func validateMapShape(c *Command) error {
 		}
 	case "ne":
 		return fmt.Errorf("map ne is not supported; use map user <u> ne <ne> or map group <g> ne <ne>")
+	case "command-group":
+		if c.Relation != "command" {
+			return fmt.Errorf("map command-group supports relation 'command' (e.g. map command-group <cg> command <cmd_id>)")
+		}
 	}
 	return nil
 }

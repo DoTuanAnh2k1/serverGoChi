@@ -438,6 +438,67 @@ def main():
     add_h2(doc, "3.7. exit / quit")
     add_para(doc, "Thoát mode cli-config, quay lại menu 'mode>'. Không nhận tham số.")
 
+    add_h2(doc, "3.8. RBAC — NE profile, command registry, group permission")
+    add_para(doc,
+             "Hệ thống RBAC (docs/rbac-design.md) bổ sung 3 entity mới và các verb "
+             "allow / deny / revoke. Dùng để trả lời câu hỏi \"user X được chạy command Z "
+             "trên NE Y không?\" cho downstream ne-config / ne-command.")
+    add_para(doc, "Entity mới:", bold=True)
+    add_bullet(doc, "ne-profile — phân loại NE theo tập lệnh (SMF / AMF / UPF / generic-router ...).")
+    add_bullet(doc, "command-def — registry lệnh; mỗi def có (service, ne_profile, pattern, category, risk_level).")
+    add_bullet(doc, "command-group — bundle nhiều command-def cùng ne_profile, để gán permission 1 lần.")
+    add_para(doc, "Verb mới:", bold=True)
+    add_bullet(doc, "allow <group> <grant_type> <grant_value> [ne_scope <scope>] [service <svc>]")
+    add_bullet(doc, "deny  <group> <grant_type> <grant_value> [ne_scope <scope>] [service <svc>]")
+    add_bullet(doc, "revoke <group> <perm_id>  (xoá 1 rule theo id).")
+    add_para(doc, "grant_type ∈ {command-group, category, pattern}. ne_scope ∈ {\"*\", \"profile:<name>\", \"ne:<ne_name>\"}.")
+    add_para(doc,
+             "Evaluation: kết hợp AWS-IAM (explicit deny > explicit allow > implicit deny) "
+             "với scope specificity (ne > profile > *). Tại scope cụ thể nhất có match, deny thắng allow.")
+    add_h3(doc, "Kịch bản ví dụ (end-to-end)")
+    add_code(doc,
+             "# 1) Tạo profile và gán cho NE\n"
+             "cli-config> set ne-profile name SMF description \"Session Management Function\"\n"
+             "OK: ne-profile created\n"
+             "cli-config> update ne HTSMF01 ne_profile SMF\n"
+             "OK: NE updated\n"
+             "\n"
+             "# 2) Khai báo command-def\n"
+             "cli-config> set command-def service ne-command ne_profile SMF \\\n"
+             "            pattern \"get subscriber\" category monitoring\n"
+             "OK: command-def created\n"
+             "cli-config> set command-def service ne-command ne_profile SMF \\\n"
+             "            pattern \"get session\" category monitoring\n"
+             "OK: command-def created\n"
+             "\n"
+             "# 3) Gom thành group\n"
+             "cli-config> set command-group name smf-subscriber-ops ne_profile SMF service ne-command\n"
+             "OK: command-group created\n"
+             "cli-config> map command-group smf-subscriber-ops command 1\n"
+             "OK: map command-group↔command\n"
+             "\n"
+             "# 4) Gán permission cho user group\n"
+             "cli-config> allow team-smf-l1 command-group smf-subscriber-ops ne_scope profile:SMF\n"
+             "OK: allow command_group=smf-subscriber-ops on scope=profile:SMF added to group \"team-smf-l1\"\n"
+             "cli-config> deny team-smf-l1 pattern \"delete *\" ne_scope ne:SMF-01\n"
+             "OK: deny pattern=delete * on scope=ne:SMF-01 added to group \"team-smf-l1\"\n"
+             "\n"
+             "# 5) Kiểm tra / gỡ\n"
+             "cli-config> show command-group smf-subscriber-ops\n"
+             "id:          1  name: smf-subscriber-ops  ...\n"
+             "members:     1:get subscriber\n"
+             "cli-config> revoke team-smf-l1 42\n"
+             "Delete permission \"42\"? [y/N]: y\n"
+             "OK: permission revoked")
+
+    add_h2(doc, "3.9. Giới hạn mode khi SSH")
+    add_para(doc,
+             "Sau khi SSH login thành công: SuperAdmin / Admin thấy đủ 3 mode; Normal user "
+             "chỉ thấy ne-config và ne-command — cli-config bị ẩn khỏi menu 'mode>'. "
+             "Whitelist command cho Normal user được 2 service downstream tự fetch từ "
+             "mgt-svc qua endpoint /aa/authorize/rbac/effective (cache mỗi session) hoặc "
+             "/aa/authorize/rbac/check-command (realtime).")
+
     # --- Session walkthrough ---
     add_h1(doc, "4. Kịch bản mẫu end-to-end")
     add_para(doc,

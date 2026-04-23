@@ -72,9 +72,9 @@ func (c *MgtClient) Authenticate(username, password string) error {
 		return fmt.Errorf("extract role: %w", err)
 	}
 	c.Role = role
-	if role != "admin" {
-		return fmt.Errorf("role %q is not authorized for the CLI (admin/superadmin required)", role)
-	}
+	// Normal users (role=="user") are now allowed to SSH in. The mode menu
+	// below will hide cli-config from them; ne-config / ne-command remain
+	// open and enforce per-command allow/deny via mgt-svc /authorize/rbac.
 	return nil
 }
 

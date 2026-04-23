@@ -178,6 +178,75 @@ func Init() {
 			r.Get("/list", HandlerConfigBackupList)
 			r.Get("/{id}", HandlerConfigBackupGet)
 		})
+
+		// ── RBAC (docs/rbac-design.md) ────────────────────────────────────
+		//
+		// NE profiles classify NEs by command set (SMF/AMF/UPF/...).
+		// Command defs are the registry of allowed patterns per profile.
+		// Command groups bundle defs so permissions can reference whole
+		// bundles. Group cmd-permissions tie a group to commands at a
+		// specific ne_scope with an effect ("allow" | "deny"), evaluated
+		// by the AWS-IAM + scope-specificity logic in service/rbac.
+		router.Route("/ne-profile", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/list", HandlerListNeProfiles)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/create", HandlerCreateNeProfile)
+				g.Post("/update", HandlerUpdateNeProfile)
+				g.Delete("/{id}", HandlerDeleteNeProfile)
+			})
+		})
+
+		router.Route("/ne/{ne_id}/profile", func(r chi.Router) {
+			r.Use(middleware.Authenticate, middleware.CheckRole)
+			r.Post("/", HandlerAssignNeProfile)
+		})
+
+		router.Route("/command-def", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/list", HandlerListCommandDefs)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/create", HandlerCreateCommandDef)
+				g.Post("/update", HandlerUpdateCommandDef)
+				g.Post("/import", HandlerImportCommandDefs)
+				g.Delete("/{id}", HandlerDeleteCommandDef)
+			})
+		})
+
+		router.Route("/command-group", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/list", HandlerListCommandGroups)
+			r.Get("/{id}/commands", HandlerListCommandsOfGroup)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/create", HandlerCreateCommandGroup)
+				g.Post("/update", HandlerUpdateCommandGroup)
+				g.Delete("/{id}", HandlerDeleteCommandGroup)
+				g.Post("/{id}/commands", HandlerAddCommandToGroup)
+				g.Delete("/{id}/commands/{cmd_id}", HandlerRemoveCommandFromGroup)
+			})
+		})
+
+		router.Route("/group/{id}/cmd-permissions", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/", HandlerListGroupCmdPermissions)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/", HandlerCreateGroupCmdPermission)
+				g.Delete("/{perm_id}", HandlerDeleteGroupCmdPermission)
+			})
+		})
+
+		// Authorize — queried by downstream ne-config / ne-command services
+		// once per session (effective) or per-command (check-command). Both
+		// need only a valid JWT; evaluation handles the allow/deny.
+		router.Route("/authorize/rbac", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/effective", HandlerAuthorizeEffective)
+			r.Post("/check-command", HandlerAuthorizeCheckCommand)
+		})
 	})
 }
 

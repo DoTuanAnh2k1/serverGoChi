@@ -63,6 +63,8 @@ var entitySpecs = map[string]EntitySpec{
 			"conf_port_slave_tcp":  "conf_port_slave_tcp",
 			"conf_username":        "conf_username",
 			"conf_password":        "conf_password",
+			"ne_profile":           "ne_profile",
+			"profile":              "ne_profile",
 		},
 		Required: []string{"ne_name", "namespace", "conf_master_ip", "conf_port_master_tcp", "command_url"},
 		IntFields: map[string]bool{
@@ -81,6 +83,44 @@ var entitySpecs = map[string]EntitySpec{
 			"description": "description",
 		},
 		Required: []string{"name"},
+	},
+	"ne-profile": {
+		FieldAliases: map[string]string{
+			"name":        "name",
+			"description": "description",
+		},
+		Required: []string{"name"},
+	},
+	"command-def": {
+		FieldAliases: map[string]string{
+			"service":     "service",
+			"ne_profile":  "ne_profile",
+			"profile":     "ne_profile",
+			"pattern":     "pattern",
+			"category":    "category",
+			"risk_level":  "risk_level",
+			"risk":        "risk_level",
+			"description": "description",
+		},
+		Required:  []string{"service", "pattern", "category"},
+		IntFields: map[string]bool{"risk_level": true},
+		EnumFields: map[string][]string{
+			"service":  {"ne-command", "ne-config", "*"},
+			"category": {"monitoring", "configuration", "admin", "debug"},
+		},
+	},
+	"command-group": {
+		FieldAliases: map[string]string{
+			"name":        "name",
+			"ne_profile":  "ne_profile",
+			"profile":     "ne_profile",
+			"service":     "service",
+			"description": "description",
+		},
+		Required: []string{"name"},
+		EnumFields: map[string][]string{
+			"service": {"ne-command", "ne-config", "*"},
+		},
 	},
 }
 
@@ -226,6 +266,37 @@ var showFilterSpecs = map[string]ShowFilterSpec{
 		FieldAliases: map[string]string{
 			"name": "name",
 			"id":   "id",
+		},
+	},
+	"ne-profile": {
+		FieldAliases: map[string]string{
+			"name": "name",
+			"id":   "id",
+		},
+	},
+	"command-def": {
+		FieldAliases: map[string]string{
+			"service":    "service",
+			"ne_profile": "ne_profile",
+			"profile":    "ne_profile",
+			"category":   "category",
+			"id":         "id",
+		},
+		EnumValues: map[string][]string{
+			"service":  {"ne-command", "ne-config", "*"},
+			"category": {"monitoring", "configuration", "admin", "debug"},
+		},
+	},
+	"command-group": {
+		FieldAliases: map[string]string{
+			"name":       "name",
+			"service":    "service",
+			"ne_profile": "ne_profile",
+			"profile":    "ne_profile",
+			"id":         "id",
+		},
+		EnumValues: map[string][]string{
+			"service": {"ne-command", "ne-config", "*"},
 		},
 	},
 }

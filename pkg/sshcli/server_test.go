@@ -182,7 +182,10 @@ func TestServer_AuthFailure(t *testing.T) {
 	}
 }
 
-func TestServer_RejectNormalUser(t *testing.T) {
+// Normal users (role=="user") are now admitted — the mode menu filters
+// cli-config out for them. This test verifies the handshake succeeds; the
+// mode-filter behavior is covered by TestAvailableModes.
+func TestServer_AcceptNormalUser(t *testing.T) {
 	userTok := fakeJWT("user")
 	mgt := newFakeMgt(t, map[route]http.HandlerFunc{
 		{http.MethodPost, "/aa/authenticate"}: func(w http.ResponseWriter, r *http.Request) {
@@ -218,7 +221,25 @@ func TestServer_RejectNormalUser(t *testing.T) {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         2 * time.Second,
 	}
-	if _, err := ssh.Dial("tcp", lst.Addr().String(), clientCfg); err == nil {
-		t.Errorf("normal user should be rejected")
+	conn, err := ssh.Dial("tcp", lst.Addr().String(), clientCfg)
+	if err != nil {
+		t.Fatalf("normal user should be accepted: %v", err)
+	}
+	_ = conn.Close()
+}
+
+func TestAvailableModes(t *testing.T) {
+	admin := availableModes("admin")
+	if len(admin) != 3 {
+		t.Errorf("admin should see 3 modes, got %v", admin)
+	}
+	user := availableModes("user")
+	if len(user) != 2 {
+		t.Errorf("normal user should see 2 modes, got %v", user)
+	}
+	for _, m := range user {
+		if m == "cli-config" {
+			t.Errorf("normal user must not see cli-config, got %v", user)
+		}
 	}
 }

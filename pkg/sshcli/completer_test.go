@@ -29,7 +29,7 @@ func TestCandidates_Verbs(t *testing.T) {
 func TestCandidates_Entities(t *testing.T) {
 	got := Candidates("show ", 5)
 	sort.Strings(got)
-	if !equalSlice(got, []string{"group", "ne", "user"}) {
+	if !equalSlice(got, []string{"command-def", "command-group", "group", "ne", "ne-profile", "user"}) {
 		t.Errorf("show _: %v", got)
 	}
 
@@ -38,8 +38,10 @@ func TestCandidates_Entities(t *testing.T) {
 		t.Errorf("show u: %v", got)
 	}
 
+	// "set n" should match both 'ne' and 'ne-profile' now.
 	got = Candidates("set n", 5)
-	if len(got) != 1 || got[0] != "ne" {
+	sort.Strings(got)
+	if !equalSlice(got, []string{"ne", "ne-profile"}) {
 		t.Errorf("set n: %v", got)
 	}
 }
@@ -136,22 +138,25 @@ func TestCandidates_MapRelation(t *testing.T) {
 
 func TestCycleState(t *testing.T) {
 	var s CycleState
-	// "show " → 3 entities
+	// Six entities are exposed: command-def, command-group, group, ne,
+	// ne-profile, user. Cycling 7 times should return to the first.
 	line := "show "
 	pos := len(line)
 	first, ok := s.Next(line, pos)
 	if !ok {
 		t.Fatal("expected candidates")
 	}
-	second, _ := s.Next(line, pos)
-	third, _ := s.Next(line, pos)
-	fourth, _ := s.Next(line, pos)
-	seen := map[string]bool{first: true, second: true, third: true}
-	if len(seen) != 3 {
-		t.Errorf("rotation produced duplicates before full cycle: %q %q %q", first, second, third)
+	seen := map[string]bool{first: true}
+	for i := 0; i < 5; i++ {
+		next, _ := s.Next(line, pos)
+		seen[next] = true
 	}
-	if fourth != first {
-		t.Errorf("rotation didn't wrap: first=%q, fourth=%q", first, fourth)
+	if len(seen) != 6 {
+		t.Errorf("rotation produced duplicates before full cycle: seen=%v", seen)
+	}
+	seventh, _ := s.Next(line, pos)
+	if seventh != first {
+		t.Errorf("rotation didn't wrap at 7th: first=%q, seventh=%q", first, seventh)
 	}
 
 	// New prefix → reset.
@@ -181,7 +186,8 @@ func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
 	line, pos := "show ", 5
 	seen := map[string]bool{}
 	var seq []string
-	for i := 0; i < 4; i++ {
+	// Six entities → seven tabs to confirm wrap.
+	for i := 0; i < 7; i++ {
 		nl, np, ok := cb(line, pos, '\t')
 		if !ok {
 			t.Fatalf("tab %d: callback returned !ok", i)
@@ -190,11 +196,11 @@ func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
 		seq = append(seq, line[5:])
 		seen[line[5:]] = true
 	}
-	if len(seen) != 3 {
-		t.Errorf("expected 3 distinct entities across cycle, got seq=%v", seq)
+	if len(seen) != 6 {
+		t.Errorf("expected 6 distinct entities across cycle, got seq=%v", seq)
 	}
-	if seq[0] != seq[3] {
-		t.Errorf("expected wrap: seq[0]=%q seq[3]=%q", seq[0], seq[3])
+	if seq[0] != seq[6] {
+		t.Errorf("expected wrap at 7th: seq[0]=%q seq[6]=%q", seq[0], seq[6])
 	}
 }
 
@@ -213,7 +219,7 @@ func TestAutoCompleteCallback_ResetOnNonTab(t *testing.T) {
 }
 
 func TestMenuAutoComplete_CyclesThroughModes(t *testing.T) {
-	cb := makeMenuAutoComplete(nil)
+	cb := makeMenuAutoComplete(nil, nil)
 	line, pos := "", 0
 	seen := map[string]bool{}
 	var seq []string
@@ -240,7 +246,7 @@ func TestMenuAutoComplete_CyclesThroughModes(t *testing.T) {
 }
 
 func TestMenuAutoComplete_PrefixFilter(t *testing.T) {
-	cb := makeMenuAutoComplete(nil)
+	cb := makeMenuAutoComplete(nil, nil)
 	// "ne" should cycle between ne-config and ne-command only.
 	line, pos := "ne", 2
 	first, _, ok := cb(line, pos, '\t')

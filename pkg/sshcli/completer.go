@@ -7,8 +7,8 @@ import (
 )
 
 var (
-	topVerbs = []string{"show", "set", "update", "delete", "map", "unmap", "help", "exit"}
-	entities = []string{"user", "ne", "group"}
+	topVerbs = []string{"show", "set", "update", "delete", "map", "unmap", "allow", "deny", "revoke", "help", "exit"}
+	entities = []string{"user", "ne", "group", "ne-profile", "command-def", "command-group"}
 )
 
 // Candidates returns the list of completion candidates that extend the current
@@ -77,6 +77,9 @@ func candidatesAt(prev []string, index int) []string {
 		switch verb {
 		case "show", "set", "update", "delete", "map", "unmap":
 			return entities
+		case "allow", "deny", "revoke":
+			// verb <group_name> ... — nothing to complete at the group-name slot.
+			return nil
 		case "help":
 			return topVerbs
 		default:
@@ -84,6 +87,27 @@ func candidatesAt(prev []string, index int) []string {
 		}
 	}
 	verb := strings.ToLower(prev[0])
+	switch verb {
+	case "allow", "deny":
+		// allow <group> <grant_type> <grant_value> [pairs...]
+		// index 2: grant_type; index 3: grant_value (free); ≥4: pairs (service, ne_scope)
+		switch index {
+		case 2:
+			return []string{"command-group", "category", "pattern"}
+		case 3:
+			return nil
+		}
+		// From index 4 onwards we're in pair territory. Treat grant pairs as
+		// having no spec but still offer the known field names.
+		relOffset := index - 4
+		if relOffset%2 == 0 {
+			return []string{"ne_scope", "service"}
+		}
+		return nil
+	case "revoke":
+		// revoke <group> <perm_id> — no candidates.
+		return nil
+	}
 	entity := strings.ToLower(prev[1])
 	switch verb {
 	case "set":
@@ -170,6 +194,8 @@ func relationCandidates(entity string) []string {
 		return []string{"ne", "group"}
 	case "group":
 		return []string{"ne"}
+	case "command-group":
+		return []string{"command"}
 	}
 	return nil
 }

@@ -78,6 +78,7 @@ type mNe struct {
 	ConfPortSlaveTCP  int32  `bson:"conf_port_slave_tcp"`
 	ConfUsername      string `bson:"conf_username"`
 	ConfPassword      string `bson:"conf_password"`
+	NeProfileID       *int64 `bson:"ne_profile_id,omitempty"`
 }
 
 func toMNe(n *db_models.CliNe) *mNe {
@@ -88,6 +89,7 @@ func toMNe(n *db_models.CliNe) *mNe {
 		ConfPortMasterSSH: n.ConfPortMasterSSH, ConfPortSlaveSSH: n.ConfPortSlaveSSH,
 		ConfPortMasterTCP: n.ConfPortMasterTCP, ConfPortSlaveTCP: n.ConfPortSlaveTCP,
 		ConfUsername: n.ConfUsername, ConfPassword: n.ConfPassword,
+		NeProfileID: n.NeProfileID,
 	}
 }
 
@@ -99,6 +101,7 @@ func fromMNe(m *mNe) *db_models.CliNe {
 		ConfPortMasterSSH: m.ConfPortMasterSSH, ConfPortSlaveSSH: m.ConfPortSlaveSSH,
 		ConfPortMasterTCP: m.ConfPortMasterTCP, ConfPortSlaveTCP: m.ConfPortSlaveTCP,
 		ConfUsername: m.ConfUsername, ConfPassword: m.ConfPassword,
+		NeProfileID: m.NeProfileID,
 	}
 }
 

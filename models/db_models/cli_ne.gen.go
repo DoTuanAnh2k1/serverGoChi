@@ -20,6 +20,9 @@ type CliNe struct {
 	ConfPortSlaveTCP  int32  `gorm:"column:conf_port_slave_tcp" json:"conf_port_slave_tcp"`
 	ConfUsername      string `gorm:"column:conf_username" json:"conf_username"`
 	ConfPassword      string `gorm:"column:conf_password" json:"conf_password"`
+	// NeProfileID classifies the NE by command set (SMF, AMF, UPF, ...).
+	// Nullable: unclassified NEs only match commands with ne_profile="*".
+	NeProfileID *int64 `gorm:"column:ne_profile_id" json:"ne_profile_id,omitempty"`
 }
 
 // TableName CliNe's table name

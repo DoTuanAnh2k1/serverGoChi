@@ -52,6 +52,12 @@ func (d *Dispatcher) Run(c *Command) error {
 		return d.handleMap(c, true)
 	case "unmap":
 		return d.handleMap(c, false)
+	case "allow":
+		return d.handleGrant(c, "allow")
+	case "deny":
+		return d.handleGrant(c, "deny")
+	case "revoke":
+		return d.handleRevoke(c)
 	}
 	return fmt.Errorf("unhandled verb %q", c.Verb)
 }
@@ -64,6 +70,12 @@ func (d *Dispatcher) handleShow(c *Command) error {
 		return d.showNe(c)
 	case "group":
 		return d.showGroup(c)
+	case "ne-profile":
+		return d.showNeProfile(c)
+	case "command-def":
+		return d.showCommandDef(c)
+	case "command-group":
+		return d.showCommandGroup(c)
 	}
 	return fmt.Errorf("show %s not supported", c.Entity)
 }
@@ -290,6 +302,16 @@ func filterNes(nes []NeInfo, canon, value string) []NeInfo {
 }
 
 func (d *Dispatcher) handleSet(c *Command) error {
+	// RBAC entities have their own setters — route early so we don't try to
+	// normalize against the wrong entitySpec.
+	switch c.Entity {
+	case "ne-profile":
+		return d.setNeProfile(c)
+	case "command-def":
+		return d.setCommandDef(c)
+	case "command-group":
+		return d.setCommandGroup(c)
+	}
 	fields, _, err := NormalizedFields(c.Entity, c.Fields, c.FieldOrder, true)
 	if err != nil {
 		return err
@@ -315,6 +337,14 @@ func (d *Dispatcher) handleSet(c *Command) error {
 }
 
 func (d *Dispatcher) handleUpdate(c *Command) error {
+	switch c.Entity {
+	case "ne-profile":
+		return d.updateNeProfile(c)
+	case "command-def":
+		return d.updateCommandDef(c)
+	case "command-group":
+		return d.updateCommandGroup(c)
+	}
 	fields, _, err := NormalizedFields(c.Entity, c.Fields, c.FieldOrder, false)
 	if err != nil {
 		return err
@@ -331,9 +361,24 @@ func (d *Dispatcher) handleUpdate(c *Command) error {
 		if err != nil {
 			return err
 		}
-		fields["id"] = id
-		if err := d.Client.UpdateNE(fields); err != nil {
-			return err
+		// ne_profile alias resolves to ne_profile_id (numeric FK). Handle it
+		// via the dedicated /profile endpoint so we don't blindly overwrite
+		// conf fields along the way.
+		if name, ok := fields["ne_profile"].(string); ok && name != "" {
+			delete(fields, "ne_profile")
+			pid, perr := d.Client.ResolveNeProfileID(name)
+			if perr != nil {
+				return perr
+			}
+			if err := d.Client.AssignNeProfile(id, &pid); err != nil {
+				return err
+			}
+		}
+		if len(fields) > 0 {
+			fields["id"] = id
+			if err := d.Client.UpdateNE(fields); err != nil {
+				return err
+			}
 		}
 		fmt.Fprintln(d.Out, "OK: NE updated")
 	case "group":
@@ -351,6 +396,14 @@ func (d *Dispatcher) handleUpdate(c *Command) error {
 }
 
 func (d *Dispatcher) handleDelete(c *Command) error {
+	switch c.Entity {
+	case "ne-profile":
+		return d.deleteNeProfile(c)
+	case "command-def":
+		return d.deleteCommandDef(c)
+	case "command-group":
+		return d.deleteCommandGroup(c)
+	}
 	switch c.Entity {
 	case "user":
 		if !d.confirmDelete("user", c.Target) {
@@ -392,6 +445,9 @@ func (d *Dispatcher) handleDelete(c *Command) error {
 }
 
 func (d *Dispatcher) handleMap(c *Command, attach bool) error {
+	if c.Entity == "command-group" && c.Relation == "command" {
+		return d.mapCommandGroup(c, attach)
+	}
 	verb := "unmap"
 	if attach {
 		verb = "map"
@@ -532,14 +588,20 @@ func plural(n int) string {
 // ---- help ----
 
 const helpGeneral = `Available commands (type 'help <command>' or append '--help' to any command):
-  show user|ne|group [<field> <value> | <name|id>]
-  set user|ne|group <field> <value> [<field> <value> ...]
-  update user|ne|group <name|id> <field> <value> [...]
-  delete user|ne|group <name|id>
+  show user|ne|group|ne-profile|command-def|command-group [<field> <value> | <name|id>]
+  set   <entity> <field> <value> [<field> <value> ...]
+  update <entity> <name|id> <field> <value> [...]
+  delete <entity> <name|id>
   map user <name> ne <ne_name|id>
   map user <name> group <group_name|id>
   map group <group_name|id> ne <ne_name|id>
+  map command-group <cg_name|id> command <cmd_def_id>
   unmap ...  (same shape as map)
+  allow <group> command-group <cg> [ne_scope <scope>] [service <svc>]
+  allow <group> category <cat>       [ne_scope <scope>] [service <svc>]
+  allow <group> pattern "<pat>"      [ne_scope <scope>] [service <svc>]
+  deny  ... (same shape as allow — explicit deny wins over allow)
+  revoke <group> <perm_id>
   help [command [entity]]
   exit | quit
 
@@ -742,6 +804,89 @@ the other.
 	"unmap":        "unmap <entity> <target> <relation> <related>\n\nSame shape as 'map' — see 'help map'.\n",
 	"exit":         "exit | quit — end the CLI session.\n",
 	"help":         "help [command [entity]] — show general help or topic-specific help.\nYou can also append '--help' (or '-h') to any command to see its help.\n",
+
+	// ── RBAC topics ──
+	"set ne-profile": `set ne-profile name <name> [description <text>]
+
+Create a new NE profile. Profiles classify NEs by command set (SMF / AMF /
+UPF / generic-router / ...) so command definitions can be targeted at one
+profile. Example:
+  set ne-profile name SMF description "Session Management Function"
+  update ne HTSMF01 ne_profile SMF       # assign profile to an NE
+`,
+	"show ne-profile": "show ne-profile [<name|id>]\n\nList all profiles, or show one by name or id.\n",
+	"delete ne-profile": "delete ne-profile <name|id>\n\nRemove a profile. NEs referencing it will have ne_profile_id cleared on the server (FK cascade) or stay pointing at a missing id — set the NE's profile to something else first when in doubt.\n",
+
+	"set command-def": `set command-def service <svc> pattern "<pattern>" category <cat> \
+      [ne_profile <profile>] [risk_level <0|1|2>] [description "..."]
+
+Create a command definition — one pattern that's valid on NEs matching the
+given ne_profile (or "*" for any NE).
+
+Required:
+  service      ne-command | ne-config | *
+  pattern      the command pattern (e.g. "show version", "get subscriber", "delete session *")
+  category     monitoring | configuration | admin | debug
+
+Optional:
+  ne_profile (alias: profile)   "*" (default) or a profile name (e.g. SMF)
+  risk_level                    0 (safe, default) | 1 | 2 (dangerous)
+  description                   free text
+
+Example:
+  set command-def service ne-command ne_profile SMF pattern "get subscriber" \
+      category monitoring description "List SMF subscribers"
+`,
+	"show command-def": "show command-def [<field> <value>] | show command-def <id>\n\nFilter fields: service, ne_profile (alias: profile), category.\n  show command-def\n  show command-def service ne-command\n  show command-def ne_profile SMF\n  show command-def category admin\n",
+	"delete command-def": "delete command-def <id>\n\nRemove a command definition by numeric id.\n",
+
+	"set command-group": `set command-group name <name> [service <svc>] [ne_profile <profile>] [description "..."]
+
+Create a named bundle of commands. Members are added separately via
+'map command-group <cg> command <cmd_def_id>'.
+
+Required: name
+Optional: service (default "*"), ne_profile (alias: profile, default "*"),
+          description
+
+Examples:
+  set command-group name smf-subscriber-ops ne_profile SMF service ne-command
+  map command-group smf-subscriber-ops command 10
+  map command-group smf-subscriber-ops command 11
+  show command-group smf-subscriber-ops   # detail, lists members
+`,
+	"show command-group": "show command-group [<name|id>]\n\nList all command groups, or show one with its member commands.\nFilter table by service or ne_profile: 'show command-group service ne-command'.\n",
+	"delete command-group": "delete command-group <name|id>\n\nRemove a command group and all its member mappings.\n",
+
+	"allow": `allow <group> <grant_type> <grant_value> [ne_scope <scope>] [service <svc>]
+
+Add an allow rule to a group. grant_type is one of:
+  command-group   grant_value = name of a cli_command_group
+  category        grant_value = one of monitoring|configuration|admin|debug
+  pattern         grant_value = a pattern string (quote if it contains spaces)
+
+ne_scope (defaults to "*"):
+  "*"                all NEs
+  "profile:<name>"   all NEs with the given profile
+  "ne:<ne_name>"     one specific NE
+
+Evaluation follows AWS-IAM: explicit deny > explicit allow > implicit deny.
+Scope specificity ties break first: ne:X beats profile:Y beats *.
+
+Example:
+  allow team-smf-l1 command-group common-monitoring ne_scope "*"
+  allow team-smf-l1 command-group smf-subscriber-ops ne_scope profile:SMF
+`,
+	"deny": `deny <group> <grant_type> <grant_value> [ne_scope <scope>] [service <svc>]
+
+Same shape as 'allow'. A matching explicit deny beats any allow at the same
+or broader scope. Use to carve exceptions out of broader allow rules.
+
+Example:
+  deny team-smf-l2 pattern "delete *" ne_scope ne:SMF-01
+  deny team-smf-l1 command-group smf-session-ops ne_scope profile:SMF
+`,
+	"revoke": "revoke <group> <perm_id>\n\nRemove a single permission row from a group. perm_id is the numeric id from 'show group <name>' permissions output (or GET /aa/group/<id>/cmd-permissions).\n",
 }
 
 func (d *Dispatcher) printHelp(topic string) {

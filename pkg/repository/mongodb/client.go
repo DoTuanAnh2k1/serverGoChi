@@ -172,6 +172,27 @@ func (c *Client) ensureIndexes(ctx context.Context) error {
 		colCounters: {
 			{Keys: bson.D{{Key: "_id", Value: 1}}, Options: options.Index().SetName("ix_counters_id")},
 		},
+		colNeProfile: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_profile_id")},
+			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_profile_name")},
+		},
+		colCommandDef: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_def_id")},
+			{Keys: bson.D{{Key: "service", Value: 1}, {Key: "ne_profile", Value: 1}, {Key: "pattern", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_def_sig")},
+			{Keys: bson.D{{Key: "category", Value: 1}}, Options: options.Index().SetName("ix_command_def_category")},
+		},
+		colCommandGroup: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_group_id")},
+			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_group_name")},
+		},
+		colCommandGroupMapping: {
+			{Keys: bson.D{{Key: "command_group_id", Value: 1}, {Key: "command_def_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_group_mapping")},
+			{Keys: bson.D{{Key: "command_def_id", Value: 1}}, Options: options.Index().SetName("ix_cgm_def_id")},
+		},
+		colGroupCmdPermission: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_cmd_perm_id")},
+			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "service", Value: 1}, {Key: "ne_scope", Value: 1}, {Key: "grant_type", Value: 1}, {Key: "grant_value", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_cmd_perm")},
+		},
 	}
 	for coll, models := range plan {
 		if _, err := c.col(coll).Indexes().CreateMany(ctx, models); err != nil {

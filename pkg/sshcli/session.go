@@ -22,6 +22,19 @@ const (
 
 var menuModes = []string{string(ModeCliConfig), string(ModeNeConfig), string(ModeNeCommand)}
 
+// availableModes returns the list of mode names visible to a user of the
+// given role. Only SuperAdmin / Admin (role=="admin") see cli-config;
+// Normal users (role=="user") see ne-config and ne-command only.
+func availableModes(role string) []string {
+	if role == "admin" {
+		return menuModes
+	}
+	return []string{string(ModeNeConfig), string(ModeNeCommand)}
+}
+
+// isAdminRole reports whether the role tag grants access to cli-config.
+func isAdminRole(role string) bool { return role == "admin" }
+
 // SessionRunner glues together the three modes for one SSH login.
 type SessionRunner struct {
 	Client        *MgtClient
@@ -54,12 +67,13 @@ func (s *SessionRunner) Run(sess io.ReadWriter) error {
 
 	t := term.NewTerminal(sess, "")
 	t.SetPrompt("mode> ")
-	t.AutoCompleteCallback = makeMenuAutoComplete(sess)
+	modes := availableModes(s.Client.Role)
+	t.AutoCompleteCallback = makeMenuAutoComplete(sess, modes)
 	menuSink := func(w, h uint32) { applyTermSize(t, w, h) }
 	s.SetResizeSink(menuSink)
 
 	banner := fmt.Sprintf("\r\nWelcome %s — management CLI.\r\n", s.Username)
-	banner += "Available modes: cli-config, ne-config, ne-command (Tab to cycle / autocomplete, 'exit' to quit).\r\n\r\n"
+	banner += "Available modes: " + strings.Join(modes, ", ") + " (Tab to cycle / autocomplete, 'exit' to quit).\r\n\r\n"
 	fmt.Fprint(sess, banner)
 
 	for {
@@ -78,6 +92,10 @@ func (s *SessionRunner) Run(sess io.ReadWriter) error {
 			fmt.Fprint(sess, "bye.\r\n")
 			return nil
 		case string(ModeCliConfig):
+			if !isAdminRole(s.Client.Role) {
+				fmt.Fprint(sess, "cli-config is restricted to admin / superadmin accounts.\r\n")
+				continue
+			}
 			s.SetResizeSink(nil)
 			if err := RunConfigMode(sess, s.Client, s); err != nil {
 				fmt.Fprintf(sess, "cli-config ended with error: %s\r\n", err)
@@ -202,7 +220,10 @@ func (s *SessionRunner) runProxy(sess io.ReadWriter, addr string) {
 // the cursor back on the prompt row (row N-1 after a scroll, or unchanged
 // otherwise). From that point, DECSC/`\r\n`/DECRC is safe because the row
 // below the prompt is guaranteed to exist.
-func makeMenuAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (string, int, bool) {
+func makeMenuAutoComplete(hintW io.Writer, modes []string) func(line string, pos int, key rune) (string, int, bool) {
+	if modes == nil {
+		modes = menuModes
+	}
 	var st struct {
 		list      []string
 		idx       int
@@ -236,7 +257,7 @@ func makeMenuAutoComplete(hintW io.Writer) func(line string, pos int, key rune) 
 		} else {
 			prefix := strings.ToLower(strings.TrimLeft(line[:pos], " "))
 			list := st.list[:0]
-			for _, mode := range menuModes {
+			for _, mode := range modes {
 				if strings.HasPrefix(mode, prefix) {
 					list = append(list, mode)
 				}

@@ -190,14 +190,24 @@ ssh anhdt195@localhost -p 2223
 Pairs là `field value` (space-separated, không `=`). Quote cho value có khoảng trắng.
 
 ```
+# Legacy entities
 show user|ne|group [<field> <value> | <name|id>]
 set user name <u> password <p> [email <e>] [full_name <f>] [account_type 1|2] [...]
-set ne ne_name <n> namespace <ns> conf_master_ip <ip> conf_port_master_tcp <port> command_url <url> [...]
+set ne ne_name <n> namespace <ns> conf_master_ip <ip> conf_port_master_tcp <port> command_url <url> [ne_profile <p>] [...]
 set group name <n> [description <d>]
 update <entity> <name|id> <field> <value> [<field> <value> ...]
 delete <entity> <name|id>
 map user <u> ne <ne|id>           map user <u> group <g|id>         map group <g|id> ne <ne|id>
 unmap ...                         (cùng shape)
+
+# RBAC (docs/rbac-design.md)
+show|set|update|delete ne-profile|command-def|command-group ...
+map command-group <cg> command <cmd_def_id>
+unmap command-group <cg> command <cmd_def_id>
+allow  <group> <grant_type> <grant_value> [ne_scope <scope>] [service <svc>]
+deny   <group> <grant_type> <grant_value> [ne_scope <scope>] [service <svc>]
+revoke <group> <perm_id>
+
 help [command [entity]]           # hoặc append '--help' / '-h' vào bất kỳ lệnh
 exit
 ```
@@ -232,6 +242,44 @@ show group name dev               # detail group
 - Bật `is_enable=true` và `UpdateUser` — trả 201 Created.
 
 **Email uniqueness**: `EnsureEmailUnique` bỏ qua tài khoản `is_enable=false`. Nghĩa là email thuộc về user đã disable coi như "free" — user mới hoặc flow re-enable có thể dùng lại email đó. Chỉ email của user đang active mới reject 400 "email already in use".
+
+### RBAC — user X, NE Y, command Z
+
+Kiến trúc đầy đủ ở [docs/rbac-design.md](docs/rbac-design.md). Mgt-svc lưu 5 bảng mới + 1 cột thêm:
+
+| Bảng | Mục đích |
+|------|----------|
+| `cli_ne_profile` | Phân loại NE theo tập lệnh (SMF/AMF/UPF/generic-router/...) |
+| `cli_command_def` | Registry lệnh, gắn với `(service, ne_profile)`. Pattern hỗ trợ exact + prefix + `*` cuối |
+| `cli_command_group` | Bundle nhiều command-def cùng profile |
+| `cli_command_group_mapping` | M:N giữa group và def |
+| `cli_group_cmd_permission` | Rule allow/deny cho `cli_group` tại 1 `ne_scope` |
+| `cli_ne.ne_profile_id` | Cột mới — FK xuống `cli_ne_profile` |
+
+**Evaluation algorithm** (service/rbac.go): kết hợp AWS IAM (explicit deny > explicit allow > implicit deny) với Vault-style scope specificity (`ne:X` > `profile:Y` > `*`). Tại cấp scope cụ thể nhất có match, deny thắng allow. Scope broader chỉ thắng khi không có rule nào ở scope cụ thể hơn match.
+
+**Phân quyền SSH login**:
+- SuperAdmin / Admin → vào được cả 3 mode (`cli-config` / `ne-config` / `ne-command`).
+- Normal user → vào được `ne-config` / `ne-command`, KHÔNG thấy `cli-config` trong menu. Việc lệnh gì được chạy trên NE nào do downstream service (`ne-config`, `ne-command`) tự verify bằng cách gọi mgt-svc lấy whitelist (`/aa/authorize/rbac/effective`) rồi match local, hoặc per-command (`/aa/authorize/rbac/check-command`).
+
+**Endpoint whitelist cho downstream service**:
+```
+GET  /aa/authorize/rbac/effective              # full list NE + rules để cache
+POST /aa/authorize/rbac/check-command          # realtime { service, command, ne_id } → { allowed, reason }
+```
+
+**CRUD qua CLI** (admin only):
+```
+show ne-profile                                   set ne-profile name SMF description "..."
+show command-def [service X] [ne_profile Y]       set command-def service ne-command ne_profile SMF pattern "get subscriber" category monitoring
+show command-group [service X] [ne_profile Y]     set command-group name smf-subscriber-ops ne_profile SMF
+map command-group smf-subscriber-ops command 10   unmap command-group smf-subscriber-ops command 10
+allow team-smf-l1 command-group smf-subscriber-ops ne_scope profile:SMF
+deny  team-smf-l2 pattern "delete *"              ne_scope ne:SMF-01
+show group team-smf-l1                             # list all permissions via GET /aa/group/{id}/cmd-permissions
+revoke team-smf-l1 <perm_id>                       # remove a specific rule
+update ne HTSMF01 ne_profile SMF                   # assign NE profile to an existing NE
+```
 
 ---
 
@@ -288,6 +336,32 @@ Header: `Authorization: Basic <jwt_token>` (token từ `/aa/authenticate` đã c
 |---|---|---|---|
 | `GET`  | `/aa/history/list` | JWT | Lịch sử lệnh (`?limit=N&scope=X&ne_name=Y`) |
 | `POST` | `/aa/history/save` | **không yêu cầu JWT** | Lưu bản ghi lịch sử. Caller truyền `account` trong body (nếu có JWT trong context thì ưu tiên username từ JWT; thiếu cả hai fallback `unknown`). |
+
+### RBAC (docs/rbac-design.md)
+| Method | Path | Mô tả |
+|---|---|---|
+| `GET`    | `/aa/ne-profile/list`                       | Liệt kê profile |
+| `POST`   | `/aa/ne-profile/create`                     | Tạo profile |
+| `POST`   | `/aa/ne-profile/update`                     | Sửa profile |
+| `DELETE` | `/aa/ne-profile/{id}`                       | Xoá profile |
+| `POST`   | `/aa/ne/{ne_id}/profile`                    | Gán profile cho NE |
+| `GET`    | `/aa/command-def/list[?service=&ne_profile=&category=]` | Danh sách command-def |
+| `POST`   | `/aa/command-def/create`                    | Tạo command-def |
+| `POST`   | `/aa/command-def/update`                    | Sửa command-def |
+| `POST`   | `/aa/command-def/import`                    | Bulk import (array) |
+| `DELETE` | `/aa/command-def/{id}`                      | Xoá command-def |
+| `GET`    | `/aa/command-group/list[?service=&ne_profile=]` | Danh sách command-group |
+| `POST`   | `/aa/command-group/create`                  | Tạo command-group |
+| `POST`   | `/aa/command-group/update`                  | Sửa command-group |
+| `DELETE` | `/aa/command-group/{id}`                    | Xoá command-group |
+| `GET`    | `/aa/command-group/{id}/commands`           | Liệt kê lệnh trong group |
+| `POST`   | `/aa/command-group/{id}/commands`           | Thêm lệnh vào group |
+| `DELETE` | `/aa/command-group/{id}/commands/{cmd_id}`  | Gỡ lệnh khỏi group |
+| `GET`    | `/aa/group/{id}/cmd-permissions`            | Liệt kê permission của group |
+| `POST`   | `/aa/group/{id}/cmd-permissions`            | Thêm allow/deny rule |
+| `DELETE` | `/aa/group/{id}/cmd-permissions/{perm_id}`  | Xoá rule |
+| `GET`    | `/aa/authorize/rbac/effective`              | Full NE + rule của caller (để downstream cache) |
+| `POST`   | `/aa/authorize/rbac/check-command`          | `{ service, command, ne_id }` → `{ allowed, reason }` |
 
 ### Import & Others
 | Method | Path | Mô tả |

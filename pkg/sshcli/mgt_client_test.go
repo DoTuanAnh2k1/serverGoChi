@@ -109,7 +109,10 @@ func TestAuthenticate_WrongPassword(t *testing.T) {
 	}
 }
 
-func TestAuthenticate_RejectNormalUser(t *testing.T) {
+// Normal users (role=="user") are now admitted at the auth layer. The mode
+// menu filters cli-config out for them; the downstream ne-config / ne-command
+// services enforce per-command authorization via /aa/authorize/rbac.
+func TestAuthenticate_AcceptsNormalUser(t *testing.T) {
 	userTok := fakeJWT("user")
 	srv := newFakeMgt(t, map[route]http.HandlerFunc{
 		{http.MethodPost, "/aa/authenticate"}: func(w http.ResponseWriter, r *http.Request) {
@@ -123,9 +126,11 @@ func TestAuthenticate_RejectNormalUser(t *testing.T) {
 	defer srv.Close()
 
 	c := NewMgtClient(srv.URL)
-	err := c.Authenticate("alice", "pw")
-	if err == nil || !strings.Contains(err.Error(), "role") {
-		t.Fatalf("expected role rejection, got %v", err)
+	if err := c.Authenticate("alice", "pw"); err != nil {
+		t.Fatalf("normal user should authenticate: %v", err)
+	}
+	if c.Role != "user" {
+		t.Errorf("Role: got %q, want %q", c.Role, "user")
 	}
 }
 

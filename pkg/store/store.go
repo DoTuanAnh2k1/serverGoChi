@@ -117,4 +117,44 @@ type DatabaseStore interface {
 	GetAllGroupsOfNe(neId int64) ([]*db_models.CliGroupNeMapping, error)
 	DeleteAllGroupNeMappingByGroupId(groupId int64) error
 	DeleteAllGroupNeMappingByNeId(neId int64) error
+
+	// ── RBAC (docs/rbac-design.md) ─────────────────────────────────────────
+
+	// cli_ne_profile — NE classification by command set
+	CreateNeProfile(p *db_models.CliNeProfile) error
+	GetNeProfileById(id int64) (*db_models.CliNeProfile, error)
+	GetNeProfileByName(name string) (*db_models.CliNeProfile, error)
+	ListNeProfiles() ([]*db_models.CliNeProfile, error)
+	UpdateNeProfile(p *db_models.CliNeProfile) error
+	DeleteNeProfileById(id int64) error
+
+	// cli_command_def — command registry
+	CreateCommandDef(d *db_models.CliCommandDef) error
+	GetCommandDefById(id int64) (*db_models.CliCommandDef, error)
+	ListCommandDefs(service, neProfile, category string) ([]*db_models.CliCommandDef, error)
+	UpdateCommandDef(d *db_models.CliCommandDef) error
+	DeleteCommandDefById(id int64) error
+
+	// cli_command_group — command bundle
+	CreateCommandGroup(g *db_models.CliCommandGroup) error
+	GetCommandGroupById(id int64) (*db_models.CliCommandGroup, error)
+	GetCommandGroupByName(name string) (*db_models.CliCommandGroup, error)
+	ListCommandGroups(service, neProfile string) ([]*db_models.CliCommandGroup, error)
+	UpdateCommandGroup(g *db_models.CliCommandGroup) error
+	DeleteCommandGroupById(id int64) error
+
+	// cli_command_group_mapping
+	AddCommandToGroup(m *db_models.CliCommandGroupMapping) error
+	RemoveCommandFromGroup(m *db_models.CliCommandGroupMapping) error
+	ListCommandsOfGroup(groupId int64) ([]*db_models.CliCommandDef, error)
+	ListGroupsOfCommand(commandId int64) ([]*db_models.CliCommandGroup, error)
+	DeleteAllCommandGroupMappingByGroupId(groupId int64) error
+	DeleteAllCommandGroupMappingByCommandId(commandId int64) error
+
+	// cli_group_cmd_permission
+	CreateGroupCmdPermission(p *db_models.CliGroupCmdPermission) error
+	GetGroupCmdPermissionById(id int64) (*db_models.CliGroupCmdPermission, error)
+	ListGroupCmdPermissions(groupId int64) ([]*db_models.CliGroupCmdPermission, error)
+	DeleteGroupCmdPermissionById(id int64) error
+	DeleteAllGroupCmdPermissionByGroupId(groupId int64) error
 }

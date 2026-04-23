@@ -65,6 +65,40 @@ type MockStore struct {
 	GetAllGroupsOfNeFn                  func(neId int64) ([]*db_models.CliGroupNeMapping, error)
 	DeleteAllGroupNeMappingByGroupIdFn  func(groupId int64) error
 	DeleteAllGroupNeMappingByNeIdFn     func(neId int64) error
+
+	// ── RBAC (docs/rbac-design.md) ─────────────────────────────────────
+	CreateNeProfileFn    func(p *db_models.CliNeProfile) error
+	GetNeProfileByIdFn   func(id int64) (*db_models.CliNeProfile, error)
+	GetNeProfileByNameFn func(name string) (*db_models.CliNeProfile, error)
+	ListNeProfilesFn     func() ([]*db_models.CliNeProfile, error)
+	UpdateNeProfileFn    func(p *db_models.CliNeProfile) error
+	DeleteNeProfileByIdFn func(id int64) error
+
+	CreateCommandDefFn   func(d *db_models.CliCommandDef) error
+	GetCommandDefByIdFn  func(id int64) (*db_models.CliCommandDef, error)
+	ListCommandDefsFn    func(service, neProfile, category string) ([]*db_models.CliCommandDef, error)
+	UpdateCommandDefFn   func(d *db_models.CliCommandDef) error
+	DeleteCommandDefByIdFn func(id int64) error
+
+	CreateCommandGroupFn     func(g *db_models.CliCommandGroup) error
+	GetCommandGroupByIdFn    func(id int64) (*db_models.CliCommandGroup, error)
+	GetCommandGroupByNameFn  func(name string) (*db_models.CliCommandGroup, error)
+	ListCommandGroupsFn      func(service, neProfile string) ([]*db_models.CliCommandGroup, error)
+	UpdateCommandGroupFn     func(g *db_models.CliCommandGroup) error
+	DeleteCommandGroupByIdFn func(id int64) error
+
+	AddCommandToGroupFn                       func(x *db_models.CliCommandGroupMapping) error
+	RemoveCommandFromGroupFn                  func(x *db_models.CliCommandGroupMapping) error
+	ListCommandsOfGroupFn                     func(groupId int64) ([]*db_models.CliCommandDef, error)
+	ListGroupsOfCommandFn                     func(commandId int64) ([]*db_models.CliCommandGroup, error)
+	DeleteAllCommandGroupMappingByGroupIdFn   func(groupId int64) error
+	DeleteAllCommandGroupMappingByCommandIdFn func(commandId int64) error
+
+	CreateGroupCmdPermissionFn             func(p *db_models.CliGroupCmdPermission) error
+	GetGroupCmdPermissionByIdFn            func(id int64) (*db_models.CliGroupCmdPermission, error)
+	ListGroupCmdPermissionsFn              func(groupId int64) ([]*db_models.CliGroupCmdPermission, error)
+	DeleteGroupCmdPermissionByIdFn         func(id int64) error
+	DeleteAllGroupCmdPermissionByGroupIdFn func(groupId int64) error
 }
 
 func (m *MockStore) Init(cfg config_models.DatabaseConfig) error {
