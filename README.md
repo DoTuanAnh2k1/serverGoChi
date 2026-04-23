@@ -20,18 +20,28 @@ Phục vụ quản lý người dùng, phân quyền, Network Element (NE), lị
 
 | Nhóm | Mô tả |
 |---|---|
-| **Authentication** | Đăng nhập, sinh JWT, lịch sử đăng nhập. Role lấy từ JWT `aud` claim — không cần gọi lại listing để xác thực role |
-| **User Management** | Tạo / cập nhật / vô hiệu hóa tài khoản |
-| **Permission** | Phân quyền dựa trên `account_type` (SuperAdmin/Admin/Normal). SuperAdmin ẩn khỏi mọi listing (`/aa/admin/user/list`, `/aa/authenticate/user/show`) nhưng vẫn đăng nhập & thao tác được bình thường |
-| **Network Element** | Tạo / sửa / xóa NE (site, IP, port, namespace, conf_mode) |
+| **Authentication** | Đăng nhập, sinh JWT, lịch sử đăng nhập. Role lấy từ JWT `aud` claim |
+| **Account lockout** | Tự khoá account sau N lần sai password (theo per-group policy), tự mở sau T phút |
+| **User Management** | Tạo / cập nhật / vô hiệu hóa tài khoản. Re-enable user disabled sẽ merge field mới non-empty |
+| **Password Policy** | Per-group policy (min_length, max_age, history_count, require_{U,L,D,S}, lockout). Effective policy = strict-est union khi user thuộc nhiều group |
+| **Password History** | Chặn reuse N password gần nhất theo policy |
+| **Legacy Role** | SuperAdmin/Admin/Normal (`account_type`). SuperAdmin ẩn khỏi mọi listing |
+| **Mgt Permission** | Per-group resource×action cho user/ne/group/command/policy/history, hỗ trợ wildcard `*` |
+| **Network Element** | Tạo / sửa / xóa NE (site, IP, port, namespace, conf_mode, **ne_profile**) |
+| **NE Profile** | Phân loại NE theo tập lệnh (SMF / AMF / UPF / generic-router / ...) |
+| **Command Registry** | Định nghĩa pattern per (service, ne_profile), category (monitoring/configuration/admin/debug), risk_level 0-2 |
+| **Command Groups** | Gom command-def thành bundle theo profile |
+| **RBAC Evaluator** | Allow/deny rule với `ne_scope` (`*` / `profile:X` / `ne:Y`); logic AWS-IAM (explicit deny > explicit allow > implicit deny) × Vault scope-specificity. `/aa/authorize/rbac/effective` để cache per session, `/check-command` realtime |
 | **User-NE Authorization** | Phân quyền user truy cập NE — trực tiếp hoặc qua Group |
-| **Groups** | Gom user ↔ group ↔ NE; `/aa/list/ne` trả về hợp (union) của direct + via-group |
+| **Groups** | Gom user ↔ group ↔ NE; `/aa/list/ne` trả về hợp (union) direct + via-group |
 | **Config Backup** | Lưu backup config XML từ NETCONF commit |
-| **History / Audit** | Lưu lịch sử lệnh, filter theo scope/NE, export CSV, tự dọn dữ liệu cũ |
-| **Admin Frontend** | Giao diện quản trị tại `/admin` (embedded, song ngữ EN/VI) |
+| **History / Audit** | Lưu lịch sử lệnh, filter scope/NE, export CSV, tự dọn. `POST /aa/history/save` không cần JWT |
+| **Admin Frontend** | Embedded tại `/admin`, song ngữ EN/VI, 13 tab gom theo 5 category (Identity/Network/RBAC/Security/Audit), CSV import/export cho command-def, modal "Manage Commands" |
+| **SSH CLI bastion** | `cmd/ssh` — 3 mode (cli-config / ne-config / ne-command), Normal user chỉ vào ne-*; cli-config REPL có tab-completion + `--help` context-aware + delete y/N confirm + PTY size tracking |
 | **Import** | Import hàng loạt users/NEs/mappings từ file text hoặc frontend |
 | **Metrics & pprof** | Runtime metrics tại `/metrics`, Go pprof tại `:6060` |
-| **Multi-DB** | MySQL / MariaDB / PostgreSQL / MongoDB |
+| **Multi-DB** | MySQL / MariaDB / PostgreSQL / MongoDB (auto-migrate cho GORM, index + counter cho Mongo) |
+| **Test Coverage** | 35+ unit test cho RBAC evaluator + policy merge + lockout state + pattern matching |
 
 ---
 
@@ -138,25 +148,49 @@ admin,HTSMF01
 
 ## Admin Frontend
 
-Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / English.
+Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / English. Sidebar gom theo 5 category: **Identity**, **Network**, **RBAC / Commands**, **Security**, **Audit & Tools**. Mỗi RBAC category có accent màu riêng (cyan / amber / rose / violet) để dễ định hướng.
 
+**Identity**
 | Tab | Mô tả |
 |---|---|
-| Dashboard | Tổng quan users, NEs |
-| Users | Tạo (có password + confirm password) / sửa thông tin / admin reset password / đổi mật khẩu của chính mình / vô hiệu hóa |
-| Network Elements | Tạo / sửa (inline edit) / xóa NE |
-| NE Mapping | Gán quyền cho user — trực tiếp bằng NE hoặc qua Group (radio Target: NE / Group). Bảng tách cột **Direct** (badge xanh dương) và **Via group** (badge xanh lá); Remove chỉ áp dụng cho direct |
-| Groups | Tạo group → gán tập NE + tập user. User thuộc group thấy toàn bộ NE của group (hiển thị ở tab NE Mapping với badge xanh lá) |
-| History | Lịch sử thao tác, filter theo scope (cli-config/ne-command/ne-config) và NE |
-| Import | Upload file hoặc paste data để import hàng loạt |
+| Users | Tạo (password + confirm) / sửa / admin reset / đổi password của chính mình / disable |
+| Groups | Tạo group → gán tập user + tập NE, modal quản lý từng cái |
+
+**Network**
+| Tab | Mô tả |
+|---|---|
+| Network Elements | Tạo / sửa (inline) / xoá NE, hỗ trợ `ne_profile` |
+| NE Mapping | Gán user → NE trực tiếp hoặc qua Group; bảng tách **Direct** vs **Via group** |
+| NE Profiles | CRUD profile (SMF / AMF / UPF / ...) — phân loại NE theo tập lệnh |
+
+**RBAC / Commands** (admin-only, docs/rbac-design.md §4.7)
+| Tab | Mô tả |
+|---|---|
+| Command Defs | CRUD command registry + **CSV import/export** (Load Sample 9 rows, filter service/profile/category, risk-level colored badge) |
+| Command Groups | CRUD bundle + modal "Manage Commands" để add/remove member |
+| Group Permissions | Chọn group → list/add/revoke allow/deny rule với `ne_scope` (* / profile:X / ne:Y), effect ALLOW=green DENY=red |
+
+**Security** (admin-only, §4.8)
+| Tab | Mô tả |
+|---|---|
+| Password Policies | CRUD policy (min_length, max_age, history, lockout, require_{U,L,D,S}) + assign/unassign cho group |
+| Mgt Permissions | Chọn group → list/add/delete (resource, action) với wildcard `*` |
+
+**Audit & Tools**
+| Tab | Mô tả |
+|---|---|
+| History | Lịch sử thao tác, filter theo scope (cli-config/ne-command/ne-config) + NE |
+| Import | Upload file / paste data để bulk import legacy entities |
 | Guide | Hướng dẫn sử dụng (song ngữ) |
 
 ---
 
 ## SSH CLI (`cmd/ssh`)
 
-Một bastion SSH chạy song song với mgt-svc, cho phép Admin/SuperAdmin thao tác
-user/NE/group qua dòng lệnh và SSH proxy sang các NE CLI phía sau.
+Một bastion SSH chạy song song với mgt-svc. **Ai cũng SSH vào được** — sau khi authenticate, menu `mode>` hiển thị các mode dựa trên role:
+
+- **SuperAdmin / Admin**: cả 3 mode `cli-config`, `ne-config`, `ne-command`.
+- **Normal user**: chỉ `ne-config` + `ne-command` — `cli-config` bị ẩn khỏi menu. Whitelist lệnh trên NE do ne-config/ne-command tự fetch `/aa/authorize/rbac/effective` từ mgt-svc.
 
 ```bash
 # Local (cần mgt-svc đã chạy)
@@ -180,10 +214,11 @@ ssh anhdt195@localhost -p 2223
 
 ### Flow
 
-1. SSH bằng username/password → forward `/aa/authenticate` để lấy JWT; reject nếu `account_type=2` (Normal).
-2. Menu 3 mode (Tab cycle / autocomplete): `cli-config / ne-config / ne-command`. Tab lần đầu hiện gợi ý ngay **dưới prompt** (prompt được giữ nguyên); các lần Tab tiếp theo rotate qua từng candidate; phím bất kỳ khác Tab sẽ xoá dòng gợi ý.
-3. **cli-config**: REPL với tab completion (verb → entity → field → enum value); mọi lệnh đều gọi HTTP sang mgt-svc kèm JWT.
-4. **ne-config / ne-command**: mở SSH outbound với cùng username/password sang địa chỉ cấu hình, pipe stdin/stdout/stderr, forward window-change.
+1. SSH bằng username/password → forward `/aa/authenticate` để lấy JWT.
+2. Nếu account đang bị lockout (`max_login_failure` + `lockout_minutes` của policy) → 403 `{locked_until, retry_in_seconds}`.
+3. Role resolve từ JWT `aud` claim. Menu `mode>` filter theo role — `cli-config` chỉ hiện cho admin/superadmin. Tab cycle / autocomplete; Tab đầu tiên hiện gợi ý ngay dưới prompt, phím bất kỳ khác Tab xoá gợi ý.
+4. **cli-config**: REPL với tab completion (verb → entity → field → enum value); mọi lệnh đều gọi HTTP sang mgt-svc kèm JWT. Delete có prompt `y/N` confirm.
+5. **ne-config / ne-command**: mở SSH outbound với cùng username/password sang địa chỉ cấu hình, pipe stdin/stdout/stderr, forward window-change. Downstream service tự gọi `/aa/authorize/rbac/effective` (hoặc `check-command`) để verify từng lệnh.
 
 ### Command grammar (cli-config)
 
@@ -446,9 +481,13 @@ docker compose -f deploy/docker/docker-compose-private.yaml up -d
 Tag là số 5 chữ số tăng dần mỗi lần build (không reuse). Build ví dụ:
 
 ```bash
-docker build -f deploy/docker/Dockerfile_ssh -t hsdfat/cli-gate:21040 .
-docker push hsdfat/cli-gate:21040
+docker build -f deploy/docker/Dockerfile_ssh -t hsdfat/cli-gate:21046 .
+docker push hsdfat/cli-gate:21046
+docker build -f deploy/docker/Dockerfile -t hsdfat/cli-mgt:21049 .
+docker push hsdfat/cli-mgt:21049
 ```
+
+**Latest** (xem git log để tra rolling tag): `hsdfat/cli-mgt` → `21048`, `hsdfat/cli-gate` → `21045`.
 
 ### Kubernetes
 
