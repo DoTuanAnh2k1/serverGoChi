@@ -73,8 +73,50 @@ func HandlerChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u.Password = bcrypt.Encode(req.Username + req.NewPassword)
+	// Resolve the user's effective password policy and validate the new
+	// password against it BEFORE overwriting. Policy is nil when no group
+	// the user belongs to has a policy attached — in that case we skip
+	// complexity and history checks entirely.
+	policy, _ := service.GetEffectivePasswordPolicy(u.AccountID)
+	if err := service.ValidatePasswordAgainstPolicy(policy, req.NewPassword); err != nil {
+		log.Warnf("change-password: policy violation: %v", err)
+		saveHistory(opHistory, "failure")
+		response.Write(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	newHash := bcrypt.Encode(req.Username + req.NewPassword)
+	if policy != nil && policy.HistoryCount > 0 {
+		reused, herr := service.IsPasswordReused(u.AccountID, newHash, policy.HistoryCount)
+		if herr != nil {
+			log.Errorf("change-password: history check: %v", herr)
+			saveHistory(opHistory, "failure")
+			response.InternalError(w, "failed to validate password history")
+			return
+		}
+		if reused {
+			log.Warn("change-password: password reuse rejected")
+			saveHistory(opHistory, "failure")
+			response.Write(w, http.StatusBadRequest, fmt.Sprintf("new password must differ from your last %d passwords", policy.HistoryCount))
+			return
+		}
+	}
+
+	// Record the OLD hash into history before overwriting. Prune bound is 0
+	// when there is no policy, so the hook still bounds storage at zero.
+	var hist int32 = 0
+	if policy != nil {
+		hist = policy.HistoryCount
+	}
+	if herr := service.RecordPasswordChange(u.AccountID, u.Password, hist); herr != nil {
+		log.Errorf("change-password: record history: %v", herr)
+		// Non-fatal — continue.
+	}
+
+	u.Password = newHash
 	u.LockedTime = time.Now()
+	u.LoginFailureCount = 0
+	u.PasswordExpiresAt = service.ComputePasswordExpiry(policy, time.Now())
+	u.LastChangePass = time.Now()
 	if err = service.UpdateUser(u); err != nil {
 		log.Errorf("change-password: update user: %v", err)
 		saveHistory(opHistory, "failure")

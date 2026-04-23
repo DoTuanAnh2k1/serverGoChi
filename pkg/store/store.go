@@ -157,4 +157,23 @@ type DatabaseStore interface {
 	ListGroupCmdPermissions(groupId int64) ([]*db_models.CliGroupCmdPermission, error)
 	DeleteGroupCmdPermissionById(id int64) error
 	DeleteAllGroupCmdPermissionByGroupId(groupId int64) error
+
+	// cli_password_policy
+	CreatePasswordPolicy(p *db_models.CliPasswordPolicy) error
+	GetPasswordPolicyById(id int64) (*db_models.CliPasswordPolicy, error)
+	GetPasswordPolicyByName(name string) (*db_models.CliPasswordPolicy, error)
+	ListPasswordPolicies() ([]*db_models.CliPasswordPolicy, error)
+	UpdatePasswordPolicy(p *db_models.CliPasswordPolicy) error
+	DeletePasswordPolicyById(id int64) error
+
+	// cli_password_history
+	AppendPasswordHistory(h *db_models.CliPasswordHistory) error
+	GetRecentPasswordHistory(userId int64, limit int) ([]*db_models.CliPasswordHistory, error)
+	PrunePasswordHistory(userId int64, keep int) error
+
+	// cli_group_mgt_permission
+	CreateMgtPermission(p *db_models.CliGroupMgtPermission) error
+	ListMgtPermissions(groupId int64) ([]*db_models.CliGroupMgtPermission, error)
+	DeleteMgtPermissionById(id int64) error
+	DeleteAllMgtPermissionByGroupId(groupId int64) error
 }

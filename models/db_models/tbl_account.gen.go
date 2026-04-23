@@ -37,6 +37,9 @@ type TblAccount struct {
 	LockedTime        time.Time `gorm:"column:locked_time" json:"locked_time"`
 	FirstLogin        []uint8   `gorm:"column:first_login" json:"first_login"`
 	OnlyAD            bool      `gorm:"column:only_ad" json:"only_ad"`
+	// PasswordExpiresAt is set on each password change based on the user's
+	// effective password policy (max_age_days). Nil = never expires.
+	PasswordExpiresAt *time.Time `gorm:"column:password_expires_at" json:"password_expires_at,omitempty"`
 }
 
 // TableName TblAccount's table name

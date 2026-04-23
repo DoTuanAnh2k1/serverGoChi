@@ -163,3 +163,47 @@ ALTER TABLE `cli_ne`                 ADD CONSTRAINT `ne_profile_fk`    FOREIGN K
 ALTER TABLE `cli_command_group_mapping` ADD CONSTRAINT `cgm_group_fk`  FOREIGN KEY (`command_group_id`) REFERENCES `cli_command_group` (`id`) ON DELETE CASCADE;
 ALTER TABLE `cli_command_group_mapping` ADD CONSTRAINT `cgm_def_fk`    FOREIGN KEY (`command_def_id`)   REFERENCES `cli_command_def`   (`id`) ON DELETE CASCADE;
 ALTER TABLE `cli_group_cmd_permission`  ADD CONSTRAINT `gcp_group_fk`  FOREIGN KEY (`group_id`)         REFERENCES `cli_group` (`id`)        ON DELETE CASCADE;
+
+-- ─────────────────────────────────────────────────────────────────────────
+-- Password policy + history + mgt permissions (docs/rbac-design.md §4.8,
+-- §4.11, §5.2). Policy is attached per-group; when a user belongs to
+-- multiple groups the service picks the strict-est value per field.
+-- ─────────────────────────────────────────────────────────────────────────
+
+CREATE TABLE `cli_password_policy` (
+  `id`                 bigint PRIMARY KEY AUTO_INCREMENT,
+  `name`               varchar(64)  NOT NULL UNIQUE,
+  `max_age_days`       int          NOT NULL DEFAULT 0,     -- 0 = never expires
+  `min_length`         int          NOT NULL DEFAULT 8,
+  `require_uppercase`  boolean      NOT NULL DEFAULT FALSE,
+  `require_lowercase`  boolean      NOT NULL DEFAULT FALSE,
+  `require_digit`      boolean      NOT NULL DEFAULT FALSE,
+  `require_special`    boolean      NOT NULL DEFAULT FALSE,
+  `history_count`      int          NOT NULL DEFAULT 0,
+  `max_login_failure`  int          NOT NULL DEFAULT 0,     -- 0 = no lockout
+  `lockout_minutes`    int          NOT NULL DEFAULT 0
+);
+
+CREATE TABLE `cli_password_history` (
+  `id`            bigint PRIMARY KEY AUTO_INCREMENT,
+  `user_id`       bigint       NOT NULL,
+  `password_hash` varchar(256) NOT NULL,
+  `changed_at`    timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE `cli_group_mgt_permission` (
+  `id`        bigint PRIMARY KEY AUTO_INCREMENT,
+  `group_id`  bigint       NOT NULL,
+  `resource`  varchar(32)  NOT NULL,
+  `action`    varchar(16)  NOT NULL,
+  UNIQUE KEY `uq_mgt_perm` (`group_id`, `resource`, `action`)
+);
+
+ALTER TABLE `cli_group`   ADD COLUMN `password_policy_id` bigint;
+ALTER TABLE `cli_group`   ADD CONSTRAINT `cli_group_policy_fk` FOREIGN KEY (`password_policy_id`) REFERENCES `cli_password_policy` (`id`);
+ALTER TABLE `tbl_account` ADD COLUMN `password_expires_at`    timestamp NULL;
+
+ALTER TABLE `cli_password_history`     ADD CONSTRAINT `pwh_user_fk` FOREIGN KEY (`user_id`)  REFERENCES `tbl_account` (`account_id`) ON DELETE CASCADE;
+ALTER TABLE `cli_group_mgt_permission` ADD CONSTRAINT `gmp_group_fk` FOREIGN KEY (`group_id`) REFERENCES `cli_group` (`id`)           ON DELETE CASCADE;
+
+CREATE INDEX `idx_password_history_user_changed` ON `cli_password_history` (`user_id`, `changed_at`);

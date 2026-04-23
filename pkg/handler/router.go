@@ -247,6 +247,32 @@ func Init() {
 			r.Get("/effective", HandlerAuthorizeEffective)
 			r.Post("/check-command", HandlerAuthorizeCheckCommand)
 		})
+
+		router.Route("/password-policy", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/list", HandlerListPasswordPolicies)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/create", HandlerCreatePasswordPolicy)
+				g.Post("/update", HandlerUpdatePasswordPolicy)
+				g.Delete("/{id}", HandlerDeletePasswordPolicy)
+			})
+		})
+
+		router.Route("/group/{id}/password-policy", func(r chi.Router) {
+			r.Use(middleware.Authenticate, middleware.CheckRole)
+			r.Post("/", HandlerAssignPasswordPolicyToGroup)
+		})
+
+		router.Route("/group/{id}/mgt-permissions", func(r chi.Router) {
+			r.Use(middleware.Authenticate)
+			r.Get("/", HandlerListMgtPermissions)
+			r.Group(func(g chi.Router) {
+				g.Use(middleware.CheckRole)
+				g.Post("/", HandlerCreateMgtPermission)
+				g.Delete("/{perm_id}", HandlerDeleteMgtPermission)
+			})
+		})
 	})
 }
 

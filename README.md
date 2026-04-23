@@ -286,6 +286,49 @@ revoke team-smf-l1 <perm_id>                       # remove a specific rule
 update ne HTSMF01 ne_profile SMF                   # assign NE profile to an existing NE
 ```
 
+### Password policy + history + lockout (design §4.8, §5.2)
+
+Bảng mới: `cli_password_policy`, `cli_password_history`, thêm `cli_group.password_policy_id` + `tbl_account.password_expires_at`.
+
+**Effective policy**: user thuộc nhiều group → service merge strict-est per field (min_length max, require_* union, history_count max, max_age_days min-non-zero, max_login_failure min-non-zero, lockout_minutes max).
+
+**Change-password flow** (`POST /aa/change-password`):
+1. Verify old password (bcrypt).
+2. Resolve effective policy, validate new pass (min_length + require_*).
+3. `IsPasswordReused` so với N hash gần nhất.
+4. Append old hash + prune.
+5. Update, set `password_expires_at`, reset `login_failure_count`.
+
+**Login flow** (`POST /aa/authenticate`):
+1. `IsAccountLocked` → nếu đang lock trả 403 `{status:"locked", locked_until, retry_in_seconds}`.
+2. Verify password sai → `login_failure_count++`, set `locked_time=now`, 401.
+3. Đúng → reset counter, issue JWT.
+
+### Mgt permission (design §4.11)
+
+Bảng mới: `cli_group_mgt_permission(group_id, resource, action)` — resource ∈ {user, ne, group, command, policy, history, *}, action ∈ {create, read, update, delete, *}. Helper `service.UserHasMgtPermission(userID, resource, action)` check wildcard-aware. Middleware `CheckRole` dựa `account_type` vẫn giữ cho backward-compat; swap sang mgt-permission-based guard ở từng handler là follow-up.
+
+### Frontend — 6 tab RBAC admin-only
+
+1. **NE Profiles** — CRUD profile.
+2. **Command Defs** — CRUD + CSV import/export + filter theo service/profile/category.
+3. **Command Groups** — CRUD + modal "Manage Commands" add/remove member.
+4. **Group Permissions** — chọn group → list/add/revoke allow/deny rule.
+5. **Password Policies** — CRUD policy + assign/unassign cho group.
+6. **Mgt Permissions** — chọn group → add/delete (resource, action).
+
+### API mới (password + mgt)
+| Method | Path | Mô tả |
+|---|---|---|
+| `GET`    | `/aa/password-policy/list`                   | Liệt kê policy |
+| `POST`   | `/aa/password-policy/create`                 | Tạo |
+| `POST`   | `/aa/password-policy/update`                 | Sửa |
+| `DELETE` | `/aa/password-policy/{id}`                   | Xoá |
+| `POST`   | `/aa/group/{id}/password-policy`             | Gán/bỏ policy |
+| `GET`    | `/aa/group/{id}/mgt-permissions`             | Liệt kê mgt perm |
+| `POST`   | `/aa/group/{id}/mgt-permissions`             | Thêm (resource, action) |
+| `DELETE` | `/aa/group/{id}/mgt-permissions/{perm_id}`   | Xoá |
+
 ---
 
 ## Metrics & Profiling

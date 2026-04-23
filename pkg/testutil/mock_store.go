@@ -99,6 +99,23 @@ type MockStore struct {
 	ListGroupCmdPermissionsFn              func(groupId int64) ([]*db_models.CliGroupCmdPermission, error)
 	DeleteGroupCmdPermissionByIdFn         func(id int64) error
 	DeleteAllGroupCmdPermissionByGroupIdFn func(groupId int64) error
+
+	// Password policy + history + mgt permission.
+	CreatePasswordPolicyFn     func(p *db_models.CliPasswordPolicy) error
+	GetPasswordPolicyByIdFn    func(id int64) (*db_models.CliPasswordPolicy, error)
+	GetPasswordPolicyByNameFn  func(name string) (*db_models.CliPasswordPolicy, error)
+	ListPasswordPoliciesFn     func() ([]*db_models.CliPasswordPolicy, error)
+	UpdatePasswordPolicyFn     func(p *db_models.CliPasswordPolicy) error
+	DeletePasswordPolicyByIdFn func(id int64) error
+
+	AppendPasswordHistoryFn    func(h *db_models.CliPasswordHistory) error
+	GetRecentPasswordHistoryFn func(userID int64, limit int) ([]*db_models.CliPasswordHistory, error)
+	PrunePasswordHistoryFn     func(userID int64, keep int) error
+
+	CreateMgtPermissionFn             func(p *db_models.CliGroupMgtPermission) error
+	ListMgtPermissionsFn              func(groupID int64) ([]*db_models.CliGroupMgtPermission, error)
+	DeleteMgtPermissionByIdFn         func(id int64) error
+	DeleteAllMgtPermissionByGroupIdFn func(groupID int64) error
 }
 
 func (m *MockStore) Init(cfg config_models.DatabaseConfig) error {

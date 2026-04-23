@@ -115,6 +115,8 @@ body.role-user .admin-only{display:none !important}
   <a onclick="showSection('command-defs')" data-section="command-defs" data-i18n="nav_command_defs" class="admin-only">Command Defs</a>
   <a onclick="showSection('command-groups')" data-section="command-groups" data-i18n="nav_command_groups" class="admin-only">Command Groups</a>
   <a onclick="showSection('group-perms')" data-section="group-perms" data-i18n="nav_group_perms" class="admin-only">Group Permissions</a>
+  <a onclick="showSection('password-policies')" data-section="password-policies" data-i18n="nav_password_policies" class="admin-only">Password Policies</a>
+  <a onclick="showSection('mgt-perms')" data-section="mgt-perms" data-i18n="nav_mgt_perms" class="admin-only">Mgt Permissions</a>
   <a onclick="showSection('import')" data-section="import" data-i18n="nav_import" class="admin-only">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
   <div class="lang-switch">
@@ -420,6 +422,78 @@ body.role-user .admin-only{display:none !important}
   </div>
 </div>
 
+<!-- Password Policies -->
+<div class="section admin-only" id="sec-password-policies">
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="create_password_policy">Create Password Policy</h3>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="name">Name</label> *<input id="newPpName" placeholder="strict"></div>
+      <div class="form-group"><label>Min Length</label><input id="newPpMinLen" type="number" value="8"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Max Age (days, 0 = never)</label><input id="newPpMaxAge" type="number" value="0"></div>
+      <div class="form-group"><label>History Count</label><input id="newPpHistory" type="number" value="0"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Max Login Failures (0 = no lockout)</label><input id="newPpMaxFail" type="number" value="0"></div>
+      <div class="form-group"><label>Lockout Minutes</label><input id="newPpLockMin" type="number" value="0"></div>
+    </div>
+    <div class="form-row" style="gap:1rem">
+      <label style="display:flex;align-items:center;gap:.4rem;font-weight:normal"><input type="checkbox" id="newPpReqUpper">Require uppercase</label>
+      <label style="display:flex;align-items:center;gap:.4rem;font-weight:normal"><input type="checkbox" id="newPpReqLower">Require lowercase</label>
+      <label style="display:flex;align-items:center;gap:.4rem;font-weight:normal"><input type="checkbox" id="newPpReqDigit">Require digit</label>
+      <label style="display:flex;align-items:center;gap:.4rem;font-weight:normal"><input type="checkbox" id="newPpReqSpec">Require special</label>
+    </div>
+    <button class="btn btn-primary" onclick="createPasswordPolicy()" data-i18n="create" style="margin-top:.5rem">Create</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:1rem" data-i18n="all_password_policies">All Password Policies</h3>
+    <div id="passwordPoliciesTable"><div class="loading">Loading...</div></div>
+  </div>
+  <div class="card admin-only">
+    <h3 style="margin-bottom:1rem" data-i18n="assign_policy_to_group">Assign Policy to Group</h3>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="select_group">Group</label>
+        <select id="ppAssignGroup"></select>
+      </div>
+      <div class="form-group"><label data-i18n="policy">Policy</label>
+        <select id="ppAssignPolicy"></select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="assignPolicyToGroup()" data-i18n="assign" style="margin-top:.5rem">Assign</button>
+    <button class="btn btn-outline" onclick="assignPolicyToGroup(true)" data-i18n="unassign" style="margin-top:.5rem;margin-left:.5rem">Unassign</button>
+  </div>
+</div>
+
+<!-- Mgt Permissions -->
+<div class="section admin-only" id="sec-mgt-perms">
+  <div class="card">
+    <h3 style="margin-bottom:.75rem" data-i18n="mgt_permissions">Management Permissions</h3>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:.75rem" data-i18n="mgt_perm_desc">Grant a group (resource, action) access on the mgt-svc itself. Wildcard "*" works on either slot.</p>
+    <div class="form-row">
+      <div class="form-group"><label data-i18n="select_group">Group</label>
+        <select id="mpGroupSelect" onchange="loadMgtPermissions()"></select>
+      </div>
+    </div>
+  </div>
+  <div class="card admin-only">
+    <h3 style="margin-bottom:.75rem" data-i18n="add_permission">Add Permission</h3>
+    <div class="form-row">
+      <div class="form-group"><label>Resource</label>
+        <select id="mpResource"><option value="*">* (all)</option><option value="user">user</option><option value="ne">ne</option><option value="group">group</option><option value="command">command</option><option value="policy">policy</option><option value="history">history</option></select>
+      </div>
+      <div class="form-group"><label>Action</label>
+        <select id="mpAction"><option value="*">* (all)</option><option value="create">create</option><option value="read">read</option><option value="update">update</option><option value="delete">delete</option></select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="addMgtPermission()" data-i18n="add" style="margin-top:.5rem">Add</button>
+  </div>
+  <div class="card">
+    <h3 style="margin-bottom:.75rem" data-i18n="current_permissions">Current Permissions</h3>
+    <div id="mgtPermsTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
 <!-- Import -->
 <div class="section admin-only" id="sec-import">
   <div class="card">
@@ -488,6 +562,12 @@ const I18N = {
     nav_dashboard:'Dashboard', nav_users:'Users', nav_nes:'Network Elements',
     nav_ne_mapping:'NE Mapping', nav_groups:'Groups', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     nav_ne_profiles:'NE Profiles', nav_command_defs:'Command Defs', nav_command_groups:'Command Groups', nav_group_perms:'Group Permissions',
+    nav_password_policies:'Password Policies', nav_mgt_perms:'Mgt Permissions',
+    create_password_policy:'Create Password Policy', all_password_policies:'All Password Policies', no_password_policies:'No password policies',
+    password_policy_created:'Password policy created', password_policy_updated:'Password policy updated', password_policy_deleted:'Password policy deleted',
+    assign_policy_to_group:'Assign Policy to Group', policy:'Policy', assign:'Assign', unassign:'Unassign',
+    policy_assigned:'Policy assigned', policy_unassigned:'Policy unassigned',
+    mgt_permissions:'Management Permissions', mgt_perm_desc:'Grant a group (resource, action) access to manage the mgt-svc itself. Wildcard "*" works on either slot.',
     // RBAC
     name:'Name',
     create_ne_profile:'Create NE Profile', all_ne_profiles:'All NE Profiles', no_ne_profiles:'No NE profiles',
@@ -591,6 +671,12 @@ const I18N = {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_nes:'Phần tử mạng',
     nav_ne_mapping:'Gán NE', nav_groups:'Nhóm', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
     nav_ne_profiles:'NE Profiles', nav_command_defs:'Định nghĩa lệnh', nav_command_groups:'Nhóm lệnh', nav_group_perms:'Phân quyền nhóm',
+    nav_password_policies:'Chính sách mật khẩu', nav_mgt_perms:'Quyền quản trị',
+    create_password_policy:'Tạo chính sách mật khẩu', all_password_policies:'Tất cả chính sách mật khẩu', no_password_policies:'Chưa có chính sách mật khẩu',
+    password_policy_created:'Đã tạo chính sách mật khẩu', password_policy_updated:'Đã cập nhật chính sách mật khẩu', password_policy_deleted:'Đã xoá chính sách mật khẩu',
+    assign_policy_to_group:'Gán chính sách cho nhóm', policy:'Chính sách', assign:'Gán', unassign:'Bỏ gán',
+    policy_assigned:'Đã gán chính sách', policy_unassigned:'Đã bỏ gán chính sách',
+    mgt_permissions:'Quyền quản trị', mgt_perm_desc:'Gán cho nhóm (resource, action) để quản lý chính mgt-svc. "*" là wildcard ở cả hai vị trí.',
     name:'Tên',
     create_ne_profile:'Tạo NE Profile', all_ne_profiles:'Tất cả NE Profile', no_ne_profiles:'Chưa có NE profile',
     ne_profile_created:'Đã tạo NE profile', ne_profile_updated:'Đã cập nhật NE profile', ne_profile_deleted:'Đã xoá NE profile',
@@ -882,6 +968,8 @@ function showSection(name) {
   if (name === 'command-defs') loadCommandDefs();
   if (name === 'command-groups') loadCommandGroups();
   if (name === 'group-perms') { populateGpGroupSelect(); loadGroupPermissions(); }
+  if (name === 'password-policies') { loadPasswordPolicies(); populatePpAssignSelects(); }
+  if (name === 'mgt-perms') { populateMpGroupSelect(); loadMgtPermissions(); }
 }
 
 // ── Auth ──
@@ -1929,6 +2017,182 @@ async function revokePermission(gid, permID){
   if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
   toast(t('permission_revoked'));
   loadGroupPermissions();
+}
+
+// ────────────────────────────────────────────────────────────────
+// Password policies + mgt permissions (docs/rbac-design.md §4.8, §4.11).
+// ────────────────────────────────────────────────────────────────
+
+let cachedPasswordPolicies = [];
+
+async function loadPasswordPolicies(){
+  const res = await api('GET', '/password-policy/list');
+  const data = Array.isArray(res.data) ? res.data : [];
+  cachedPasswordPolicies = data;
+  if (!data.length) { document.getElementById('passwordPoliciesTable').innerHTML = '<div class="empty">'+t('no_password_policies')+'</div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>'+t('name')+'</th><th>Min Len</th><th>Age (d)</th><th>History</th><th>Max Fail</th><th>Lockout (min)</th><th>Required</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(p => {
+    const flags = [
+      p.require_uppercase ? 'U' : '-',
+      p.require_lowercase ? 'L' : '-',
+      p.require_digit ? 'D' : '-',
+      p.require_special ? 'S' : '-',
+    ].join('');
+    html += '<tr><td>'+p.id+'</td><td><b>'+esc(p.name)+'</b></td>'
+      +'<td>'+p.min_length+'</td>'
+      +'<td>'+(p.max_age_days||'-')+'</td>'
+      +'<td>'+(p.history_count||'-')+'</td>'
+      +'<td>'+(p.max_login_failure||'-')+'</td>'
+      +'<td>'+(p.lockout_minutes||'-')+'</td>'
+      +'<td><code>'+flags+'</code></td>'
+      +'<td class="actions admin-only">'
+      +'<button class="btn btn-outline btn-sm" onclick="openEditPolicyModal('+p.id+')">'+t('edit')+'</button>'
+      +'<button class="btn btn-danger btn-sm" onclick="deletePasswordPolicy('+p.id+',\''+esc(p.name)+'\')">'+t('delete_btn')+'</button>'
+      +'</td></tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('passwordPoliciesTable').innerHTML = html;
+}
+
+async function createPasswordPolicy(){
+  const body = {
+    name: document.getElementById('newPpName').value.trim(),
+    min_length: parseInt(document.getElementById('newPpMinLen').value, 10) || 0,
+    max_age_days: parseInt(document.getElementById('newPpMaxAge').value, 10) || 0,
+    history_count: parseInt(document.getElementById('newPpHistory').value, 10) || 0,
+    max_login_failure: parseInt(document.getElementById('newPpMaxFail').value, 10) || 0,
+    lockout_minutes: parseInt(document.getElementById('newPpLockMin').value, 10) || 0,
+    require_uppercase: document.getElementById('newPpReqUpper').checked,
+    require_lowercase: document.getElementById('newPpReqLower').checked,
+    require_digit: document.getElementById('newPpReqDigit').checked,
+    require_special: document.getElementById('newPpReqSpec').checked,
+  };
+  if (!body.name) { toast(t('name')+' *', 'error'); return; }
+  const res = await api('POST', '/password-policy/create', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('password_policy_created'));
+  ['newPpName'].forEach(id => document.getElementById(id).value = '');
+  loadPasswordPolicies(); populatePpAssignSelects();
+}
+
+function openEditPolicyModal(id){
+  const p = cachedPasswordPolicies.find(x => x.id === id);
+  if (!p) return;
+  const body = ''
+    + '<div class="form-row">'
+    + '<div class="form-group"><label>Name</label><input id="mPpName" value="'+esc(p.name)+'"></div>'
+    + '<div class="form-group"><label>Min Length</label><input id="mPpMinLen" type="number" value="'+p.min_length+'"></div>'
+    + '</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label>Max Age (days)</label><input id="mPpMaxAge" type="number" value="'+p.max_age_days+'"></div>'
+    + '<div class="form-group"><label>History Count</label><input id="mPpHistory" type="number" value="'+p.history_count+'"></div>'
+    + '</div>'
+    + '<div class="form-row">'
+    + '<div class="form-group"><label>Max Login Fail</label><input id="mPpMaxFail" type="number" value="'+p.max_login_failure+'"></div>'
+    + '<div class="form-group"><label>Lockout Minutes</label><input id="mPpLockMin" type="number" value="'+p.lockout_minutes+'"></div>'
+    + '</div>'
+    + '<div class="form-row" style="gap:1rem">'
+    + '<label><input type="checkbox" id="mPpReqUpper" '+(p.require_uppercase?'checked':'')+'> Uppercase</label>'
+    + '<label><input type="checkbox" id="mPpReqLower" '+(p.require_lowercase?'checked':'')+'> Lowercase</label>'
+    + '<label><input type="checkbox" id="mPpReqDigit" '+(p.require_digit?'checked':'')+'> Digit</label>'
+    + '<label><input type="checkbox" id="mPpReqSpec" '+(p.require_special?'checked':'')+'> Special</label>'
+    + '</div>';
+  openModal(t('edit')+' '+p.name, body, async () => {
+    const payload = {
+      id,
+      name: document.getElementById('mPpName').value.trim(),
+      min_length: parseInt(document.getElementById('mPpMinLen').value, 10) || 0,
+      max_age_days: parseInt(document.getElementById('mPpMaxAge').value, 10) || 0,
+      history_count: parseInt(document.getElementById('mPpHistory').value, 10) || 0,
+      max_login_failure: parseInt(document.getElementById('mPpMaxFail').value, 10) || 0,
+      lockout_minutes: parseInt(document.getElementById('mPpLockMin').value, 10) || 0,
+      require_uppercase: document.getElementById('mPpReqUpper').checked,
+      require_lowercase: document.getElementById('mPpReqLower').checked,
+      require_digit: document.getElementById('mPpReqDigit').checked,
+      require_special: document.getElementById('mPpReqSpec').checked,
+    };
+    const res = await api('POST', '/password-policy/update', payload);
+    if (res.status !== 200 && res.status !== 201) { toast(failMsg(res), 'error'); return; }
+    closeModal();
+    toast(t('password_policy_updated'));
+    loadPasswordPolicies();
+  });
+}
+
+async function deletePasswordPolicy(id, name){
+  if (!confirm(t('delete_btn')+' '+name+'?')) return;
+  const res = await api('DELETE', '/password-policy/'+id);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('password_policy_deleted'));
+  loadPasswordPolicies(); populatePpAssignSelects();
+}
+
+function populatePpAssignSelects(){
+  const grp = document.getElementById('ppAssignGroup');
+  const pol = document.getElementById('ppAssignPolicy');
+  if (grp) grp.innerHTML = (cachedGroups||[]).map(g => '<option value="'+g.id+'">'+esc(g.name)+'</option>').join('');
+  if (pol) pol.innerHTML = '<option value="">(none)</option>' + cachedPasswordPolicies.map(p => '<option value="'+p.id+'">'+esc(p.name)+'</option>').join('');
+}
+
+async function assignPolicyToGroup(unassign){
+  const gid = parseInt(document.getElementById('ppAssignGroup').value || '0', 10);
+  if (!gid) { toast(t('select_group_first'), 'error'); return; }
+  let pid = null;
+  if (!unassign) {
+    const v = document.getElementById('ppAssignPolicy').value;
+    if (v) pid = parseInt(v, 10);
+  }
+  const res = await api('POST', '/group/'+gid+'/password-policy', {password_policy_id: pid});
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(unassign ? t('policy_unassigned') : t('policy_assigned'));
+}
+
+// ── Mgt Permissions ──
+
+function populateMpGroupSelect(){
+  const sel = document.getElementById('mpGroupSelect');
+  sel.innerHTML = (cachedGroups||[]).map(g => '<option value="'+g.id+'">'+esc(g.name)+' (#'+g.id+')</option>').join('');
+}
+
+async function loadMgtPermissions(){
+  const sel = document.getElementById('mpGroupSelect');
+  const gid = parseInt(sel.value || '0', 10);
+  if (!gid) { document.getElementById('mgtPermsTable').innerHTML = '<div class="empty">'+t('select_group_first')+'</div>'; return; }
+  const res = await api('GET', '/group/'+gid+'/mgt-permissions');
+  const data = Array.isArray(res.data) ? res.data : [];
+  if (!data.length) { document.getElementById('mgtPermsTable').innerHTML = '<div class="empty">'+t('no_permissions')+'</div>'; return; }
+  let html = '<table><thead><tr><th>ID</th><th>Resource</th><th>Action</th><th class="admin-only">Actions</th></tr></thead><tbody>';
+  data.forEach(p => {
+    html += '<tr>'
+      +'<td>'+p.id+'</td>'
+      +'<td><code>'+esc(p.resource)+'</code></td>'
+      +'<td><code>'+esc(p.action)+'</code></td>'
+      +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deleteMgtPermission('+gid+','+p.id+')">'+t('delete_btn')+'</button></td>'
+      +'</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('mgtPermsTable').innerHTML = html;
+}
+
+async function addMgtPermission(){
+  const gid = parseInt(document.getElementById('mpGroupSelect').value || '0', 10);
+  if (!gid) { toast(t('select_group_first'), 'error'); return; }
+  const body = {
+    resource: document.getElementById('mpResource').value,
+    action: document.getElementById('mpAction').value,
+  };
+  const res = await api('POST', '/group/'+gid+'/mgt-permissions', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('permission_added'));
+  loadMgtPermissions();
+}
+
+async function deleteMgtPermission(gid, permID){
+  if (!confirm(t('delete_btn')+' #'+permID+'?')) return;
+  const res = await api('DELETE', '/group/'+gid+'/mgt-permissions/'+permID);
+  if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
+  toast(t('permission_revoked'));
+  loadMgtPermissions();
 }
 
 // ── Init ──

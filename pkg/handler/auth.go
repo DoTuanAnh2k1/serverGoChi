@@ -48,8 +48,31 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 
 	log := logger.Logger.WithField("user", req.UserName).WithField("ip", r.RemoteAddr)
 
+	// Lockout check BEFORE verifying the password — so an already-locked
+	// account can't have its failure counter bumped further, and the caller
+	// gets a clear signal.
+	existing, _ := service.GetUserByUserName(req.UserName)
+	if existing != nil {
+		policy, _ := service.GetEffectivePasswordPolicy(existing.AccountID)
+		if status := service.IsAccountLocked(existing, policy); status.Locked {
+			log.Warnf("authenticate: account locked until %s", status.Until.Format(time.RFC3339))
+			response.Write(w, http.StatusForbidden, map[string]any{
+				"status":          "locked",
+				"locked_until":    status.Until,
+				"retry_in_seconds": status.RemainingS,
+			})
+			return
+		}
+	}
+
 	ok, err, _ := service.Authenticate(req.UserName, req.Password)
 	if err != nil || !ok {
+		// Bump failure counter + set locked_time so the next attempt sees it.
+		if existing != nil {
+			existing.LoginFailureCount++
+			existing.LockedTime = time.Now()
+			_ = service.UpdateUser(existing)
+		}
 		log.Warn("authenticate: login failed")
 		response.Unauthorized(w)
 		return
@@ -60,6 +83,11 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 		log.Errorf("authenticate: get user: %v", err)
 		response.InternalError(w, "failed to load user")
 		return
+	}
+	// Reset the failure counter on successful login.
+	if u.LoginFailureCount > 0 {
+		u.LoginFailureCount = 0
+		_ = service.UpdateUser(u)
 	}
 	permission := service.GetPermissionByUser(u)
 

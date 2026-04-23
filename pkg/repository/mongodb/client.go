@@ -193,6 +193,18 @@ func (c *Client) ensureIndexes(ctx context.Context) error {
 			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_cmd_perm_id")},
 			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "service", Value: 1}, {Key: "ne_scope", Value: 1}, {Key: "grant_type", Value: 1}, {Key: "grant_value", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_cmd_perm")},
 		},
+		colPasswordPolicy: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_password_policy_id")},
+			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_password_policy_name")},
+		},
+		colPasswordHistory: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_password_history_id")},
+			{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "changed_at", Value: -1}}, Options: options.Index().SetName("ix_password_history_user_changed")},
+		},
+		colMgtPermission: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_mgt_perm_id")},
+			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "resource", Value: 1}, {Key: "action", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_mgt_perm")},
+		},
 	}
 	for coll, models := range plan {
 		if _, err := c.col(coll).Indexes().CreateMany(ctx, models); err != nil {
