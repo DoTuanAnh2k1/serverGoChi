@@ -6,51 +6,107 @@
 <title>MGT Service - Admin Panel</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#0f172a;color:#e2e8f0;min-height:100vh}
+/* ── Palette accents ──
+   --accent-primary  sky blue (user/dashboard)
+   --accent-ne       cyan       (NE / network)
+   --accent-cmd      amber      (RBAC command)
+   --accent-sec      rose       (security / password)
+   --accent-mgt      violet     (mgt permission)
+   --accent-ok       emerald
+   --accent-warn     amber
+   --accent-err      rose
+*/
+:root{
+  --bg-base:#0b1220; --bg-surface:#111c2f; --bg-elev:#172238; --border:#283549;
+  --accent-primary:#60a5fa; --accent-primary-2:#3b82f6;
+  --accent-ne:#22d3ee; --accent-cmd:#f59e0b; --accent-sec:#f472b6; --accent-mgt:#a78bfa;
+  --text:#e2e8f0; --text-dim:#94a3b8; --text-faint:#64748b;
+}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:radial-gradient(1200px 600px at 10% -10%,#1b2b4d 0%,var(--bg-base) 55%) fixed,var(--bg-base);color:var(--text);min-height:100vh}
 .login-page{display:flex;align-items:center;justify-content:center;min-height:100vh}
-.login-box{background:#1e293b;padding:2.5rem;border-radius:12px;width:380px;box-shadow:0 4px 20px rgba(0,0,0,.4)}
-.login-box h1{text-align:center;margin-bottom:1.5rem;color:#60a5fa;font-size:1.5rem}
+.login-box{background:linear-gradient(180deg,var(--bg-elev) 0%,var(--bg-surface) 100%);padding:2.5rem;border-radius:14px;width:400px;box-shadow:0 20px 60px rgba(0,0,0,.55),0 0 0 1px rgba(96,165,250,.12);border:1px solid #26324b}
+.login-box h1{text-align:center;margin-bottom:1.5rem;background:linear-gradient(90deg,#60a5fa 0%,#a78bfa 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:1.6rem;letter-spacing:.02em}
 .app{display:none}
-.sidebar{position:fixed;left:0;top:0;bottom:0;width:220px;background:#1e293b;padding:1rem 0;border-right:1px solid #334155;overflow-y:auto}
-.sidebar h2{padding:0 1rem;margin-bottom:1.5rem;color:#60a5fa;font-size:1.1rem}
-.sidebar a{display:block;padding:.6rem 1rem;color:#94a3b8;text-decoration:none;font-size:.9rem;cursor:pointer;transition:all .15s}
-.sidebar a:hover,.sidebar a.active{background:#334155;color:#f1f5f9}
-.sidebar .lang-switch{padding:.6rem 1rem;margin-top:1rem;border-top:1px solid #334155}
-.sidebar .lang-switch select{width:100%;padding:.3rem .5rem;background:#0f172a;color:#94a3b8;border:1px solid #475569;border-radius:4px;font-size:.8rem}
-.main{margin-left:220px;padding:1.5rem 2rem}
-.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid #334155}
-.topbar h1{font-size:1.3rem;color:#f1f5f9}
-.btn{padding:.5rem 1rem;border:none;border-radius:6px;cursor:pointer;font-size:.85rem;font-weight:500;transition:all .15s}
-.btn-primary{background:#3b82f6;color:#fff}.btn-primary:hover{background:#2563eb}
-.btn-danger{background:#ef4444;color:#fff}.btn-danger:hover{background:#dc2626}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:230px;background:linear-gradient(180deg,#121d34 0%,#0f1930 100%);padding:1rem 0;border-right:1px solid var(--border);overflow-y:auto}
+.sidebar h2{padding:0 1rem;margin-bottom:1.2rem;background:linear-gradient(90deg,#60a5fa 0%,#a78bfa 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-size:1.15rem;letter-spacing:.02em}
+.sidebar .nav-cat{padding:.9rem 1rem .35rem;font-size:.68rem;color:#64748b;text-transform:uppercase;letter-spacing:.12em;font-weight:600;user-select:none}
+.sidebar a{display:flex;align-items:center;gap:.55rem;padding:.5rem 1rem;color:var(--text-dim);text-decoration:none;font-size:.88rem;cursor:pointer;transition:all .15s;border-left:3px solid transparent}
+.sidebar a::before{content:"";width:6px;height:6px;border-radius:50%;background:#475569;flex-shrink:0;transition:all .15s}
+.sidebar a:hover{background:#1a2540;color:#f1f5f9}
+.sidebar a:hover::before{background:var(--accent-primary)}
+.sidebar a.active{background:linear-gradient(90deg,rgba(96,165,250,.18) 0%,transparent 100%);color:#f1f5f9;border-left-color:var(--accent-primary)}
+.sidebar a.active::before{background:var(--accent-primary);box-shadow:0 0 8px var(--accent-primary)}
+/* per-category dot colors */
+.sidebar a[data-section="nes"]::before,.sidebar a[data-section="ne-mapping"]::before,.sidebar a[data-section="ne-profiles"]::before{background:#1d3a52}
+.sidebar a[data-section="nes"].active::before,.sidebar a[data-section="ne-mapping"].active::before,.sidebar a[data-section="ne-profiles"].active::before{background:var(--accent-ne);box-shadow:0 0 8px var(--accent-ne)}
+.sidebar a[data-section="command-defs"]::before,.sidebar a[data-section="command-groups"]::before,.sidebar a[data-section="group-perms"]::before{background:#3d2d0c}
+.sidebar a[data-section="command-defs"].active::before,.sidebar a[data-section="command-groups"].active::before,.sidebar a[data-section="group-perms"].active::before{background:var(--accent-cmd);box-shadow:0 0 8px var(--accent-cmd)}
+.sidebar a[data-section="password-policies"]::before{background:#3b1d2c}
+.sidebar a[data-section="password-policies"].active::before{background:var(--accent-sec);box-shadow:0 0 8px var(--accent-sec)}
+.sidebar a[data-section="mgt-perms"]::before{background:#2a1e47}
+.sidebar a[data-section="mgt-perms"].active::before{background:var(--accent-mgt);box-shadow:0 0 8px var(--accent-mgt)}
+.sidebar .lang-switch{padding:.8rem 1rem;margin-top:1rem;border-top:1px solid var(--border)}
+.sidebar .lang-switch select{width:100%;padding:.35rem .5rem;background:#0f172a;color:var(--text-dim);border:1px solid #3a4a68;border-radius:6px;font-size:.8rem}
+.main{margin-left:230px;padding:1.5rem 2rem}
+.topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;padding-bottom:1rem;border-bottom:1px solid var(--border)}
+.topbar h1{font-size:1.35rem;color:#f1f5f9;letter-spacing:.01em}
+.btn{padding:.5rem 1rem;border:none;border-radius:7px;cursor:pointer;font-size:.85rem;font-weight:500;transition:all .15s;display:inline-flex;align-items:center;gap:.35rem}
+.btn-primary{background:linear-gradient(135deg,#3b82f6 0%,#6366f1 100%);color:#fff;box-shadow:0 2px 10px rgba(59,130,246,.3)}
+.btn-primary:hover{filter:brightness(1.1);box-shadow:0 4px 14px rgba(59,130,246,.4);transform:translateY(-1px)}
+.btn-danger{background:linear-gradient(135deg,#ef4444 0%,#db2777 100%);color:#fff;box-shadow:0 2px 10px rgba(239,68,68,.25)}
+.btn-danger:hover{filter:brightness(1.1);transform:translateY(-1px)}
 .btn-sm{padding:.35rem .7rem;font-size:.8rem}
-.btn-outline{background:transparent;border:1px solid #475569;color:#94a3b8}.btn-outline:hover{border-color:#60a5fa;color:#60a5fa}
-.card{background:#1e293b;border-radius:10px;padding:1.5rem;margin-bottom:1rem;border:1px solid #334155}
+.btn-outline{background:transparent;border:1px solid #3a4a68;color:var(--text-dim)}
+.btn-outline:hover{border-color:var(--accent-primary);color:var(--accent-primary);background:rgba(96,165,250,.08)}
+.card{background:var(--bg-surface);border-radius:12px;padding:1.4rem 1.5rem;margin-bottom:1rem;border:1px solid var(--border);position:relative;overflow:hidden;transition:border-color .15s}
+.card:hover{border-color:#3a4a68}
+.card h3{color:#f1f5f9;font-weight:600}
+/* section-specific accent bar on the left of every card in a section */
+#sec-nes .card,#sec-ne-mapping .card,#sec-ne-profiles .card{border-left:3px solid var(--accent-ne)}
+#sec-command-defs .card,#sec-command-groups .card,#sec-group-perms .card{border-left:3px solid var(--accent-cmd)}
+#sec-password-policies .card{border-left:3px solid var(--accent-sec)}
+#sec-mgt-perms .card{border-left:3px solid var(--accent-mgt)}
+#sec-users .card,#sec-groups .card{border-left:3px solid var(--accent-primary)}
 .form-group{margin-bottom:1rem}
-.form-group label{display:block;margin-bottom:.4rem;font-size:.85rem;color:#94a3b8}
-.form-group input,.form-group select{width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem;outline:none}
-.form-group input:focus,.form-group select:focus{border-color:#3b82f6}
-.form-row{display:flex;gap:1rem}.form-row .form-group{flex:1}
-table{width:100%;border-collapse:collapse;font-size:.88rem}
-th{text-align:left;padding:.6rem .75rem;background:#334155;color:#94a3b8;font-weight:500;font-size:.8rem;text-transform:uppercase;letter-spacing:.05em}
-td{padding:.6rem .75rem;border-bottom:1px solid #1e293b}
-tr:hover td{background:#1e293b80}
-.badge{display:inline-block;padding:.15rem .5rem;border-radius:4px;font-size:.75rem;font-weight:500}
-.badge-blue{background:#1e3a5f;color:#60a5fa}
-.badge-green{background:#14532d;color:#4ade80}
-.badge-red{background:#7f1d1d;color:#fca5a5}
-.toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.85rem;z-index:9999;animation:slideIn .3s ease;max-width:480px;word-break:break-word;line-height:1.4;white-space:pre-wrap;cursor:pointer}
-.toast-success{background:#065f46;color:#6ee7b7;border:1px solid #059669}
-.toast-error{background:#7f1d1d;color:#fca5a5;border:1px solid #dc2626}
+.form-group label{display:block;margin-bottom:.4rem;font-size:.85rem;color:var(--text-dim)}
+.form-group input,.form-group select,.form-group textarea{width:100%;padding:.55rem .75rem;border:1px solid #3a4a68;border-radius:7px;background:#0f172a;color:var(--text);font-size:.9rem;outline:none;transition:border-color .15s,box-shadow .15s}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent-primary);box-shadow:0 0 0 3px rgba(96,165,250,.15)}
+.form-row{display:flex;gap:1rem;flex-wrap:wrap}.form-row .form-group{flex:1;min-width:180px}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:.88rem}
+th{text-align:left;padding:.65rem .8rem;background:linear-gradient(180deg,#1e2a45 0%,#1a253d 100%);color:var(--text-dim);font-weight:600;font-size:.76rem;text-transform:uppercase;letter-spacing:.08em;border-bottom:1px solid var(--border)}
+th:first-child{border-top-left-radius:8px}th:last-child{border-top-right-radius:8px}
+td{padding:.65rem .8rem;border-bottom:1px solid #1e293b}
+tr:hover td{background:#1a2540}
+tr:last-child td{border-bottom:none}
+.badge{display:inline-block;padding:.18rem .55rem;border-radius:5px;font-size:.75rem;font-weight:600;letter-spacing:.02em}
+.badge-blue{background:rgba(96,165,250,.15);color:#93c5fd;border:1px solid rgba(96,165,250,.3)}
+.badge-green{background:rgba(52,211,153,.15);color:#6ee7b7;border:1px solid rgba(52,211,153,.3)}
+.badge-red{background:rgba(248,113,113,.15);color:#fca5a5;border:1px solid rgba(248,113,113,.3)}
+.badge-amber{background:rgba(245,158,11,.15);color:#fcd34d;border:1px solid rgba(245,158,11,.3)}
+.badge-violet{background:rgba(167,139,250,.15);color:#c4b5fd;border:1px solid rgba(167,139,250,.3)}
+.badge-cyan{background:rgba(34,211,238,.15);color:#67e8f9;border:1px solid rgba(34,211,238,.3)}
+.badge-pink{background:rgba(244,114,182,.15);color:#f9a8d4;border:1px solid rgba(244,114,182,.3)}
+.toast{position:fixed;top:1rem;right:1rem;padding:.75rem 1.25rem;border-radius:8px;font-size:.85rem;z-index:9999;animation:slideIn .3s ease;max-width:480px;word-break:break-word;line-height:1.4;white-space:pre-wrap;cursor:pointer;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+.toast-success{background:linear-gradient(135deg,#065f46 0%,#047857 100%);color:#a7f3d0;border:1px solid #10b981}
+.toast-error{background:linear-gradient(135deg,#7f1d1d 0%,#991b1b 100%);color:#fca5a5;border:1px solid #ef4444}
 @keyframes slideIn{from{transform:translateX(100%);opacity:0}to{transform:translateX(0);opacity:1}}
-.section{display:none}.section.active{display:block}
-.empty{text-align:center;padding:2rem;color:#64748b}
+.section{display:none}.section.active{display:block;animation:fadeIn .2s ease}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+.empty{text-align:center;padding:2rem;color:var(--text-faint);font-style:italic}
 .actions{display:flex;gap:.5rem;flex-wrap:wrap}
 .stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:1.5rem}
-.stat-card{background:#1e293b;border:1px solid #334155;border-radius:10px;padding:1.2rem}
-.stat-card .num{font-size:1.8rem;font-weight:700;color:#60a5fa}
-.stat-card .label{font-size:.8rem;color:#64748b;margin-top:.25rem}
-.loading{text-align:center;padding:2rem;color:#64748b}
+.stat-card{background:var(--bg-surface);border:1px solid var(--border);border-radius:12px;padding:1.2rem;position:relative;overflow:hidden;transition:transform .15s}
+.stat-card:hover{transform:translateY(-2px);border-color:#3a4a68}
+.stat-card::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent-primary) 0%,var(--accent-mgt) 100%)}
+.stat-card:nth-child(2)::before{background:linear-gradient(90deg,var(--accent-ne) 0%,#0891b2 100%)}
+.stat-card:nth-child(3)::before{background:linear-gradient(90deg,var(--accent-cmd) 0%,#d97706 100%)}
+.stat-card:nth-child(4)::before{background:linear-gradient(90deg,var(--accent-sec) 0%,#db2777 100%)}
+.stat-card .num{font-size:1.9rem;font-weight:700;color:var(--accent-primary);line-height:1.1}
+.stat-card:nth-child(2) .num{color:var(--accent-ne)}
+.stat-card:nth-child(3) .num{color:var(--accent-cmd)}
+.stat-card:nth-child(4) .num{color:var(--accent-sec)}
+.stat-card .label{font-size:.78rem;color:var(--text-faint);margin-top:.25rem;text-transform:uppercase;letter-spacing:.08em}
+.loading{text-align:center;padding:2rem;color:var(--text-faint)}
 .ac-wrap{position:relative}
 .ac-wrap input{width:100%;padding:.55rem .75rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.9rem;outline:none}
 .ac-wrap input:focus{border-color:#3b82f6}
@@ -106,17 +162,22 @@ body.role-user .admin-only{display:none !important}
 <div class="sidebar">
   <h2>MGT Service</h2>
   <a onclick="showSection('dashboard')" class="active" data-section="dashboard" data-i18n="nav_dashboard">Dashboard</a>
+  <div class="nav-cat" data-i18n="navcat_identity">Identity</div>
   <a onclick="showSection('users')" data-section="users" data-i18n="nav_users">Users</a>
+  <a onclick="showSection('groups')" data-section="groups" data-i18n="nav_groups">Groups</a>
+  <div class="nav-cat" data-i18n="navcat_network">Network</div>
   <a onclick="showSection('nes')" data-section="nes" data-i18n="nav_nes">Network Elements</a>
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
-  <a onclick="showSection('groups')" data-section="groups" data-i18n="nav_groups">Groups</a>
-  <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
   <a onclick="showSection('ne-profiles')" data-section="ne-profiles" data-i18n="nav_ne_profiles" class="admin-only">NE Profiles</a>
+  <div class="nav-cat admin-only" data-i18n="navcat_rbac">RBAC / Commands</div>
   <a onclick="showSection('command-defs')" data-section="command-defs" data-i18n="nav_command_defs" class="admin-only">Command Defs</a>
   <a onclick="showSection('command-groups')" data-section="command-groups" data-i18n="nav_command_groups" class="admin-only">Command Groups</a>
   <a onclick="showSection('group-perms')" data-section="group-perms" data-i18n="nav_group_perms" class="admin-only">Group Permissions</a>
+  <div class="nav-cat admin-only" data-i18n="navcat_security">Security</div>
   <a onclick="showSection('password-policies')" data-section="password-policies" data-i18n="nav_password_policies" class="admin-only">Password Policies</a>
   <a onclick="showSection('mgt-perms')" data-section="mgt-perms" data-i18n="nav_mgt_perms" class="admin-only">Mgt Permissions</a>
+  <div class="nav-cat" data-i18n="navcat_audit">Audit &amp; Tools</div>
+  <a onclick="showSection('history')" data-section="history" data-i18n="nav_history">History</a>
   <a onclick="showSection('import')" data-section="import" data-i18n="nav_import" class="admin-only">Import</a>
   <a onclick="showSection('guide')" data-section="guide" data-i18n="nav_guide">Guide</a>
   <div class="lang-switch">
@@ -563,6 +624,7 @@ const I18N = {
     nav_ne_mapping:'NE Mapping', nav_groups:'Groups', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
     nav_ne_profiles:'NE Profiles', nav_command_defs:'Command Defs', nav_command_groups:'Command Groups', nav_group_perms:'Group Permissions',
     nav_password_policies:'Password Policies', nav_mgt_perms:'Mgt Permissions',
+    navcat_identity:'Identity', navcat_network:'Network', navcat_rbac:'RBAC / Commands', navcat_security:'Security', navcat_audit:'Audit & Tools',
     create_password_policy:'Create Password Policy', all_password_policies:'All Password Policies', no_password_policies:'No password policies',
     password_policy_created:'Password policy created', password_policy_updated:'Password policy updated', password_policy_deleted:'Password policy deleted',
     assign_policy_to_group:'Assign Policy to Group', policy:'Policy', assign:'Assign', unassign:'Unassign',
@@ -672,6 +734,7 @@ const I18N = {
     nav_ne_mapping:'Gán NE', nav_groups:'Nhóm', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
     nav_ne_profiles:'NE Profiles', nav_command_defs:'Định nghĩa lệnh', nav_command_groups:'Nhóm lệnh', nav_group_perms:'Phân quyền nhóm',
     nav_password_policies:'Chính sách mật khẩu', nav_mgt_perms:'Quyền quản trị',
+    navcat_identity:'Danh tính', navcat_network:'Mạng', navcat_rbac:'RBAC / Lệnh', navcat_security:'Bảo mật', navcat_audit:'Audit & Công cụ',
     create_password_policy:'Tạo chính sách mật khẩu', all_password_policies:'Tất cả chính sách mật khẩu', no_password_policies:'Chưa có chính sách mật khẩu',
     password_policy_created:'Đã tạo chính sách mật khẩu', password_policy_updated:'Đã cập nhật chính sách mật khẩu', password_policy_deleted:'Đã xoá chính sách mật khẩu',
     assign_policy_to_group:'Gán chính sách cho nhóm', policy:'Chính sách', assign:'Gán', unassign:'Bỏ gán',
@@ -1592,7 +1655,9 @@ async function loadNeProfiles(){
   if (!data.length) { document.getElementById('neProfilesTable').innerHTML = '<div class="empty">'+t('no_ne_profiles')+'</div>'; return; }
   let html = '<table><thead><tr><th>ID</th><th>'+t('name')+'</th><th>'+t('description')+'</th><th class="admin-only">Actions</th></tr></thead><tbody>';
   data.forEach(p => {
-    html += '<tr><td>'+p.id+'</td><td><b>'+esc(p.name)+'</b></td><td>'+esc(p.description||'-')+'</td>'
+    html += '<tr><td>'+p.id+'</td>'
+      +'<td><span class="badge badge-cyan">'+esc(p.name)+'</span></td>'
+      +'<td>'+esc(p.description||'-')+'</td>'
       +'<td class="actions admin-only">'
       +'<button class="btn btn-outline btn-sm" onclick="openEditNeProfileModal('+p.id+')">'+t('edit')+'</button>'
       +'<button class="btn btn-danger btn-sm" onclick="deleteNeProfile('+p.id+',\''+esc(p.name)+'\')">'+t('delete_btn')+'</button>'
@@ -1660,13 +1725,18 @@ async function loadCommandDefs(){
   if (!data.length) { document.getElementById('commandDefsTable').innerHTML = '<div class="empty">'+t('no_command_defs')+'</div>'; return; }
   let html = '<table><thead><tr><th>ID</th><th>Service</th><th>Profile</th><th>Pattern</th><th>Category</th><th>Risk</th><th>Description</th><th class="admin-only">Actions</th></tr></thead><tbody>';
   data.forEach(d => {
+    const catBadge = d.category === 'monitoring' ? 'badge-green'
+      : d.category === 'configuration' ? 'badge-cyan'
+      : d.category === 'admin' ? 'badge-amber'
+      : 'badge-violet';
+    const riskBadge = d.risk_level >= 2 ? 'badge-red' : d.risk_level === 1 ? 'badge-amber' : 'badge-green';
     html += '<tr>'
       +'<td>'+d.id+'</td>'
       +'<td><span class="badge badge-blue">'+esc(d.service)+'</span></td>'
-      +'<td>'+esc(d.ne_profile||'*')+'</td>'
-      +'<td><code style="font-size:.85em">'+esc(d.pattern)+'</code></td>'
-      +'<td>'+esc(d.category)+'</td>'
-      +'<td>'+(d.risk_level>=2?'<span class="badge badge-red">'+d.risk_level+'</span>':d.risk_level)+'</td>'
+      +'<td><span class="badge badge-cyan">'+esc(d.ne_profile||'*')+'</span></td>'
+      +'<td><code style="font-size:.85em;color:#f1f5f9">'+esc(d.pattern)+'</code></td>'
+      +'<td><span class="badge '+catBadge+'">'+esc(d.category)+'</span></td>'
+      +'<td><span class="badge '+riskBadge+'">'+d.risk_level+'</span></td>'
       +'<td style="font-size:.82rem;color:#94a3b8">'+esc(d.description||'-')+'</td>'
       +'<td class="actions admin-only">'
       +'<button class="btn btn-outline btn-sm" onclick="openEditCommandDefModal('+d.id+')">'+t('edit')+'</button>'
@@ -1846,9 +1916,9 @@ async function loadCommandGroups(){
   data.forEach(g => {
     html += '<tr>'
       +'<td>'+g.id+'</td>'
-      +'<td><b>'+esc(g.name)+'</b></td>'
-      +'<td>'+esc(g.service||'*')+'</td>'
-      +'<td>'+esc(g.ne_profile||'*')+'</td>'
+      +'<td><b style="color:#f1f5f9">'+esc(g.name)+'</b></td>'
+      +'<td><span class="badge badge-blue">'+esc(g.service||'*')+'</span></td>'
+      +'<td><span class="badge badge-cyan">'+esc(g.ne_profile||'*')+'</span></td>'
       +'<td style="font-size:.82rem;color:#94a3b8">'+esc(g.description||'-')+'</td>'
       +'<td class="actions admin-only">'
       +'<button class="btn btn-outline btn-sm" onclick="openManageCommandGroupModal('+g.id+')">'+t('manage_commands')+'</button>'
@@ -1977,15 +2047,17 @@ async function loadGroupPermissions(){
   let html = '<table><thead><tr><th>ID</th><th>Effect</th><th>Service</th><th>NE Scope</th><th>Grant Type</th><th>Grant Value</th><th class="admin-only">Actions</th></tr></thead><tbody>';
   data.forEach(p => {
     const effectBadge = p.effect === 'allow'
-      ? '<span class="badge badge-green">allow</span>'
-      : '<span class="badge badge-red">deny</span>';
+      ? '<span class="badge badge-green">ALLOW</span>'
+      : '<span class="badge badge-red">DENY</span>';
+    const grantBadge = p.grant_type === 'command_group' ? 'badge-violet'
+      : p.grant_type === 'category' ? 'badge-amber' : 'badge-cyan';
     html += '<tr>'
       +'<td>'+p.id+'</td>'
       +'<td>'+effectBadge+'</td>'
-      +'<td>'+esc(p.service||'*')+'</td>'
-      +'<td><code style="font-size:.85em">'+esc(p.ne_scope||'*')+'</code></td>'
-      +'<td>'+esc(p.grant_type)+'</td>'
-      +'<td><code style="font-size:.85em">'+esc(p.grant_value)+'</code></td>'
+      +'<td><span class="badge badge-blue">'+esc(p.service||'*')+'</span></td>'
+      +'<td><code style="font-size:.85em;color:#93c5fd">'+esc(p.ne_scope||'*')+'</code></td>'
+      +'<td><span class="badge '+grantBadge+'">'+esc(p.grant_type)+'</span></td>'
+      +'<td><code style="font-size:.85em;color:#f1f5f9">'+esc(p.grant_value)+'</code></td>'
       +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="revokePermission('+gid+','+p.id+')">'+t('revoke')+'</button></td>'
       +'</tr>';
   });
@@ -2032,19 +2104,15 @@ async function loadPasswordPolicies(){
   if (!data.length) { document.getElementById('passwordPoliciesTable').innerHTML = '<div class="empty">'+t('no_password_policies')+'</div>'; return; }
   let html = '<table><thead><tr><th>ID</th><th>'+t('name')+'</th><th>Min Len</th><th>Age (d)</th><th>History</th><th>Max Fail</th><th>Lockout (min)</th><th>Required</th><th class="admin-only">Actions</th></tr></thead><tbody>';
   data.forEach(p => {
-    const flags = [
-      p.require_uppercase ? 'U' : '-',
-      p.require_lowercase ? 'L' : '-',
-      p.require_digit ? 'D' : '-',
-      p.require_special ? 'S' : '-',
-    ].join('');
-    html += '<tr><td>'+p.id+'</td><td><b>'+esc(p.name)+'</b></td>'
-      +'<td>'+p.min_length+'</td>'
-      +'<td>'+(p.max_age_days||'-')+'</td>'
-      +'<td>'+(p.history_count||'-')+'</td>'
-      +'<td>'+(p.max_login_failure||'-')+'</td>'
-      +'<td>'+(p.lockout_minutes||'-')+'</td>'
-      +'<td><code>'+flags+'</code></td>'
+    const flag = (ok, label) => ok ? '<span class="badge badge-pink" style="padding:.1rem .35rem;margin-right:.2rem">'+label+'</span>' : '<span style="color:#475569;margin-right:.2rem">'+label+'</span>';
+    const flags = flag(p.require_uppercase,'U') + flag(p.require_lowercase,'L') + flag(p.require_digit,'D') + flag(p.require_special,'S');
+    html += '<tr><td>'+p.id+'</td><td><b style="color:#f1f5f9">'+esc(p.name)+'</b></td>'
+      +'<td><span class="badge badge-blue">'+p.min_length+'</span></td>'
+      +'<td>'+(p.max_age_days?'<span class="badge badge-amber">'+p.max_age_days+'d</span>':'<span style="color:#475569">∞</span>')+'</td>'
+      +'<td>'+(p.history_count?'<span class="badge badge-violet">'+p.history_count+'</span>':'<span style="color:#475569">-</span>')+'</td>'
+      +'<td>'+(p.max_login_failure?'<span class="badge badge-red">'+p.max_login_failure+'</span>':'<span style="color:#475569">-</span>')+'</td>'
+      +'<td>'+(p.lockout_minutes?'<span class="badge badge-amber">'+p.lockout_minutes+'m</span>':'<span style="color:#475569">-</span>')+'</td>'
+      +'<td>'+flags+'</td>'
       +'<td class="actions admin-only">'
       +'<button class="btn btn-outline btn-sm" onclick="openEditPolicyModal('+p.id+')">'+t('edit')+'</button>'
       +'<button class="btn btn-danger btn-sm" onclick="deletePasswordPolicy('+p.id+',\''+esc(p.name)+'\')">'+t('delete_btn')+'</button>'
@@ -2165,8 +2233,8 @@ async function loadMgtPermissions(){
   data.forEach(p => {
     html += '<tr>'
       +'<td>'+p.id+'</td>'
-      +'<td><code>'+esc(p.resource)+'</code></td>'
-      +'<td><code>'+esc(p.action)+'</code></td>'
+      +'<td><span class="badge badge-violet">'+esc(p.resource)+'</span></td>'
+      +'<td><span class="badge badge-cyan">'+esc(p.action)+'</span></td>'
       +'<td class="actions admin-only"><button class="btn btn-danger btn-sm" onclick="deleteMgtPermission('+gid+','+p.id+')">'+t('delete_btn')+'</button></td>'
       +'</tr>';
   });
