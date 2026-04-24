@@ -142,6 +142,19 @@ public final class MgtServiceClient {
         return postAuth(token, "/aa/authenticate/user/delete", toJson(map("account_name", accountName)));
     }
 
+    /**
+     * POST /aa/authenticate/user/purge — HARD-delete.
+     *
+     * Removes the tbl_account row + all user-group / user-ne mappings +
+     * password history. Irreversible. SuperAdmin accounts are refused with
+     * 403. Use this instead of {@link #disableUser} only when you really
+     * mean to remove the record — disable leaves the row so the user can be
+     * re-enabled later.
+     */
+    public static Response purgeUser(String token, String accountName) throws Exception {
+        return postAuth(token, "/aa/authenticate/user/purge", toJson(map("account_name", accountName)));
+    }
+
     public static Response showUsers(String token) throws Exception {
         return getAuth(token, "/aa/authenticate/user/show");
     }
