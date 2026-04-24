@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"sync/atomic"
 
 	"golang.org/x/term"
 )
@@ -18,9 +19,29 @@ func RunConfigMode(sess io.ReadWriter, client *MgtClient, sr *SessionRunner) err
 	const mainPrompt = "cli-config> "
 	t := term.NewTerminal(sess, "")
 	t.SetPrompt(mainPrompt)
-	t.AutoCompleteCallback = makeAutoComplete(sess)
+
+	// termWidth is read by the autocomplete callback to skip the hint line
+	// when the current input would wrap to a second screen row — the DECSC
+	// trick that draws the hint assumes the cursor shares the prompt row,
+	// which isn't true once x/term wraps long lines across multiple rows.
+	var termWidth atomic.Int32
+	termWidth.Store(80)
+	widthFn := func() int {
+		v := termWidth.Load()
+		if v < 1 {
+			return 80
+		}
+		return int(v)
+	}
+
+	t.AutoCompleteCallback = makeAutoComplete(sess, len(mainPrompt), widthFn)
 	if sr != nil {
-		sr.SetResizeSink(func(w, h uint32) { applyTermSize(t, w, h) })
+		sr.SetResizeSink(func(w, h uint32) {
+			applyTermSize(t, w, h)
+			if w >= 1 {
+				termWidth.Store(int32(w))
+			}
+		})
 		defer sr.SetResizeSink(nil)
 	}
 	// Confirm prompt for destructive ops (delete). Temporarily disables the
@@ -83,15 +104,18 @@ func RunConfigMode(sess io.ReadWriter, client *MgtClient, sr *SessionRunner) err
 // if the next Tab fires with the same line/pos, the user hasn't typed
 // anything and we advance the index. Otherwise we start a fresh cycle.
 //
-// The candidate list is drawn on the line below the prompt. To avoid the
-// known bug where the prompt sits at the terminal's bottom row and `\r\n`
-// scrolls the screen — which would invalidate the DECSC-saved position and
-// cause the prompt to be overwritten by the hint — we first emit IND+CUU
-// (`\x1bD\x1b[A`). IND scrolls once if we're at the bottom, and CUU puts
-// the cursor back on the prompt row (row N-1 after a scroll, or unchanged
-// otherwise). From that point, DECSC/`\r\n`/DECRC is safe because the row
-// below the prompt is guaranteed to exist.
-func makeAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (string, int, bool) {
+// The candidate list is drawn on the line below the prompt via DECSC/DECRC.
+// The trick assumes the cursor shares the prompt row — which breaks once
+// the input wraps to a second screen row. To keep the terminal sane on
+// long commands we pass the prompt length + a width probe, and skip the
+// hint whenever `prompt + line + 2` would reach the terminal width (the
+// "+2" leaves room for x/term's own cursor marker and the deferred char
+// it sometimes reserves at the right margin). Tab cycling still works —
+// only the visual hint is suppressed.
+//
+// promptLen = number of printable columns the prompt consumes (e.g. 12 for
+// "cli-config> "); widthFn returns the latest known terminal width (>=1).
+func makeAutoComplete(hintW io.Writer, promptLen int, widthFn func() int) func(line string, pos int, key rune) (string, int, bool) {
 	var st struct {
 		list      []string
 		idx       int
@@ -101,6 +125,22 @@ func makeAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (str
 		active    bool
 		hintShown bool
 	}
+	safeWidth := func() int {
+		if widthFn == nil {
+			return 80
+		}
+		w := widthFn()
+		if w < 1 {
+			return 80
+		}
+		return w
+	}
+	// wouldWrap reports whether the current (prompt + line) reaches or
+	// exceeds the terminal width — which would force x/term to wrap the
+	// input display across multiple rows, invalidating our hint geometry.
+	wouldWrap := func(line string) bool {
+		return promptLen+len(line)+2 >= safeWidth()
+	}
 	eraseHint := func() {
 		if !st.hintShown || hintW == nil {
 			return
@@ -108,8 +148,15 @@ func makeAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (str
 		fmt.Fprint(hintW, "\x1bD\x1b[A\x1b7\r\n\x1b[2K\x1b8")
 		st.hintShown = false
 	}
-	showHint := func(opts []string) {
+	showHint := func(opts []string, line string) {
 		if hintW == nil || len(opts) <= 1 {
+			return
+		}
+		if wouldWrap(line) {
+			// Skip the hint entirely on a wrapping line — attempting the
+			// DECSC/DECRC dance with a multi-row cursor overwrites the
+			// wrapped input. Tab cycling still works; user just won't see
+			// the candidate list preview.
 			return
 		}
 		fmt.Fprintf(hintW, "\x1bD\x1b[A\x1b7\r\n\x1b[2K%s\x1b8", strings.Join(opts, "  "))
@@ -136,7 +183,7 @@ func makeAutoComplete(hintW io.Writer) func(line string, pos int, key rune) (str
 			st.idx = 0
 			st.start = start
 			st.active = true
-			showHint(list)
+			showHint(list, line)
 		}
 		cand := st.list[st.idx]
 		newLine := line[:st.start] + cand + line[pos:]

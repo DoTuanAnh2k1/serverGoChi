@@ -1,7 +1,9 @@
 package sshcli
 
 import (
+	"bytes"
 	"sort"
+	"strings"
 	"testing"
 )
 
@@ -182,7 +184,7 @@ func TestCycleState_NoCandidates(t *testing.T) {
 // and the next Tab is fired with that updated line. The previous implementation
 // forgot about this and only ever returned the first candidate.
 func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
-	cb := makeAutoComplete(nil)
+	cb := makeAutoComplete(nil, 12, nil)
 	line, pos := "show ", 5
 	seen := map[string]bool{}
 	var seq []string
@@ -204,8 +206,50 @@ func TestAutoCompleteCallback_CyclesThroughEntities(t *testing.T) {
 	}
 }
 
+// When the combined prompt + input would wrap past the terminal's width, the
+// DECSC/DECRC dance used for the hint breaks (it assumes the cursor shares
+// the prompt row). The callback must keep cycling through candidates but
+// SKIP the hint write so the terminal display doesn't get corrupted.
+func TestAutoCompleteCallback_SkipsHintWhenLineWraps(t *testing.T) {
+	var hint bytes.Buffer
+	// Tight terminal: width 40, prompt width 12. A 60-char input plus the
+	// prompt is well past wrap.
+	cb := makeAutoComplete(&hint, 12, func() int { return 40 })
+	line := "show " + strings.Repeat("x", 60)
+	pos := len(line)
+	_, _, ok := cb(line, pos, '\t')
+	// No candidates for a gibberish 2nd token, so the callback returns !ok —
+	// but that's not what we're testing. Force Tab on "show " then append.
+	_ = ok
+	shortLine := "show "
+	if _, _, ok := cb(shortLine, len(shortLine), '\t'); !ok {
+		t.Fatal("prep: expected candidates for 'show '")
+	}
+	hint.Reset()
+	// Retry on a long line that wraps — still 'show <long>' at position 5.
+	cb2 := makeAutoComplete(&hint, 12, func() int { return 40 })
+	wrapLine := "show " + strings.Repeat("x", 30) // 35 chars; 12+35+2=49 > 40
+	if _, _, ok := cb2(wrapLine, 5, '\t'); !ok {
+		t.Fatal("expected candidates on 'show <wrap>'")
+	}
+	if hint.Len() != 0 {
+		t.Errorf("hint must be suppressed when line wraps, got %q", hint.String())
+	}
+}
+
+func TestAutoCompleteCallback_EmitsHintWhenRoomAvailable(t *testing.T) {
+	var hint bytes.Buffer
+	cb := makeAutoComplete(&hint, 12, func() int { return 200 })
+	if _, _, ok := cb("show ", 5, '\t'); !ok {
+		t.Fatal("expected candidates")
+	}
+	if hint.Len() == 0 {
+		t.Errorf("hint must be emitted when the line fits in the terminal")
+	}
+}
+
 func TestAutoCompleteCallback_ResetOnNonTab(t *testing.T) {
-	cb := makeAutoComplete(nil)
+	cb := makeAutoComplete(nil, 12, nil)
 	line, pos := "show ", 5
 	nl, np, ok := cb(line, pos, '\t')
 	if !ok {
