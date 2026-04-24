@@ -47,6 +47,13 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	logger.Logger.WithField("host", p.Host+":"+p.Port).WithField("db", p.Name).Info("postgres: connected")
 	c.Db = db
 
+	// Same two-phase migration as the mysql driver — drop v1 first, then
+	// create / alter v2 via GORM. See pkg/repository/mysql/client.go for
+	// the full rationale.
+	if err := dropLegacyTables(db); err != nil {
+		logger.Logger.Errorf("postgres: drop legacy: %v", err)
+		return err
+	}
 	if err := c.autoMigrate(); err != nil {
 		logger.Logger.Errorf("postgres: auto-migrate: %v", err)
 		return err

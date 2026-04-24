@@ -112,6 +112,19 @@ func (m *MockStore) UpdateUser(u *db_models.User) error {
 }
 func (m *MockStore) DeleteUserByID(id int64) error {
 	delete(m.users, id)
+	for gid := range m.nagUser {
+		delete(m.nagUser[gid], id)
+	}
+	for gid := range m.cegUser {
+		delete(m.cegUser[gid], id)
+	}
+	kept := m.pwHistory[:0]
+	for _, h := range m.pwHistory {
+		if h.UserID != id {
+			kept = append(kept, h)
+		}
+	}
+	m.pwHistory = kept
 	return nil
 }
 
@@ -151,6 +164,14 @@ func (m *MockStore) UpdateNE(n *db_models.NE) error {
 }
 func (m *MockStore) DeleteNEByID(id int64) error {
 	delete(m.nes, id)
+	for cid, c := range m.commands {
+		if c.NeID == id {
+			_ = m.DeleteCommandByID(cid)
+		}
+	}
+	for gid := range m.nagNe {
+		delete(m.nagNe[gid], id)
+	}
 	return nil
 }
 
@@ -198,6 +219,9 @@ func (m *MockStore) UpdateCommand(c *db_models.Command) error {
 }
 func (m *MockStore) DeleteCommandByID(id int64) error {
 	delete(m.commands, id)
+	for gid := range m.cegCmd {
+		delete(m.cegCmd[gid], id)
+	}
 	return nil
 }
 

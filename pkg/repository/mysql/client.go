@@ -45,6 +45,14 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	logger.Logger.WithField("host", DbHost+":"+DbPort).WithField("db", DbName).Info("mysql: connected")
 	c.Db = db
 
+	// Two-phase migration: drop any surviving v1 tables first, then let
+	// GORM create / alter the v2 schema. The drop is idempotent so fresh
+	// installs pay nothing; upgrades from v1 end up with a clean namespace
+	// (data loss is explicit — v2 doesn't preserve v1 data).
+	if err := dropLegacyTables(db); err != nil {
+		logger.Logger.Errorf("mysql: drop legacy: %v", err)
+		return err
+	}
 	if err := c.autoMigrate(); err != nil {
 		logger.Logger.Errorf("mysql: auto-migrate: %v", err)
 		return err

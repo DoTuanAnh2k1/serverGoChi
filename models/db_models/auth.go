@@ -55,11 +55,14 @@ const (
 //   - if any whitelist entry exists for the same match_type, the user must
 //     match at least one of them → otherwise DENY login
 //   - whitelist with zero entries means "allow all" (no restriction)
+//
+// (list_type, match_type, pattern) is unique so the same rule can't be
+// inserted twice.
 type UserAccessList struct {
 	ID        int64     `gorm:"column:id;primaryKey;autoIncrement" json:"id"`
-	ListType  string    `gorm:"column:list_type;type:varchar(16);index" json:"list_type"`
-	MatchType string    `gorm:"column:match_type;type:varchar(16)" json:"match_type"`
-	Pattern   string    `gorm:"column:pattern;type:varchar(255)" json:"pattern"`
+	ListType  string    `gorm:"column:list_type;type:varchar(16);index;uniqueIndex:uq_acl_sig" json:"list_type"`
+	MatchType string    `gorm:"column:match_type;type:varchar(16);uniqueIndex:uq_acl_sig" json:"match_type"`
+	Pattern   string    `gorm:"column:pattern;type:varchar(255);uniqueIndex:uq_acl_sig" json:"pattern"`
 	Reason    string    `gorm:"column:reason;type:varchar(255)" json:"reason"`
 	CreatedAt time.Time `gorm:"column:created_at;autoCreateTime" json:"created_at"`
 }

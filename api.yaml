@@ -1,17 +1,26 @@
 openapi: 3.0.3
 info:
   title: cli-mgt-svc
-  version: "2.4"
+  version: "2.0"
   description: |
-    REST API for user management, Network Element (NE) management,
-    NE connection config, NETCONF config backup, command history, and bulk import.
+    Management API for the 5G CLI platform (v2).
 
-    **Permission model:** Users have a single permission derived from `account_type`:
-    `0` (SuperAdmin) and `1` (Admin) → `admin`; `2` (Normal) → `user`.
-    Only `admin` users may call management APIs.
+    v2 collapses v1's role hierarchy, NE profiles, command-def patterns,
+    AWS-IAM evaluator and mgt-permissions into a single authorization
+    question:
 
-    **Authentication:** Most endpoints require `Authorization: Basic <jwt_token>`.
-    Token obtained from `POST /aa/authenticate` — the `response_data` field already includes the `Basic ` prefix, paste it as-is.
+    > **Can user `X` execute command `Y` on NE `Z`?**
+
+    Allowed ⇔ `X` enabled + not locked + not blacklisted (and matches any
+    whitelist if present) AND command `Y` is registered on NE `Z`
+    (`command.ne_id == Z.id`) AND `X ∈` some `ne_access_group` containing `Z`
+    AND `X ∈` some `cmd_exec_group` containing `Y`.
+
+    **Auth:** Most endpoints require `Authorization: Basic <jwt>`.
+    The token returned by `POST /aa/authenticate` already includes the
+    `Basic ` prefix — pass it back verbatim. There is no `role` / `aud`
+    claim; authorization is evaluated in the service layer against group
+    memberships via `POST /aa/authorize/check`.
 
 servers:
   - url: http://localhost:3000
@@ -22,2298 +31,686 @@ security: []
 tags:
   - name: System
     description: Health check, metrics, docs
-  - name: Authentication
-    description: Login, token validation, account management
-  - name: User Authorization
-    description: Set user permission (admin/user) via account_type
-  - name: Network Element
-    description: NE CRUD and user-NE assignment
-  - name: NE Config
-    description: NE connection config (IP, port, protocol, credentials)
-  - name: Config Backup
-    description: NETCONF commit config backup (XML on disk + metadata in DB)
+  - name: Auth
+    description: Login, token validation, password change
+  - name: Users
+    description: User CRUD + admin password reset
+  - name: NEs
+    description: Network Element CRUD
+  - name: Commands
+    description: Command registry — exact text per (NE, service)
+  - name: NE Access Groups
+    description: M:N user ↔ NE — "who can reach which boxes"
+  - name: Cmd Exec Groups
+    description: M:N user ↔ command — "who can run which commands"
+  - name: Password Policy
+    description: Singleton global password policy
+  - name: Access List
+    description: Blacklist / whitelist gating login
+  - name: Authorize
+    description: The one-question evaluator
   - name: History
-    description: Command / audit history
-  - name: Admin
-    description: Frontend admin APIs — full user / NE data (no password)
-  - name: Import
-    description: Bulk data import
-  - name: Subscribers
-    description: TCP subscriber file viewer
-  - name: Group
-    description: Groups of users; a group maps to multiple NEs, a user may belong to multiple groups
+    description: Audit log + cli-gate audit push
+  - name: Config Backup
+    description: NETCONF XML backup storage
 
-# ─────────────────────────────────────────────────────────────────────────────
 paths:
-
-  # ── System ──────────────────────────────────────────────────────────────────
+  # ── System ─────────────────────────────────────────────────────────
   /health:
     get:
       tags: [System]
-      summary: Health check (HTTP + DB ping)
-      operationId: healthCheck
-      security: []
+      summary: Ping the DB
       responses:
-        "200":
-          description: Service healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /docs:
-    get:
-      tags: [System]
-      summary: Swagger UI
-      operationId: swaggerUI
-      security: []
-      responses:
-        "200":
-          description: HTML page
-
-  /docs/openapi.yaml:
-    get:
-      tags: [System]
-      summary: OpenAPI spec (YAML)
-      operationId: openAPISpec
-      security: []
-      responses:
-        "200":
-          description: YAML file
-          content:
-            application/yaml:
-              schema:
-                type: string
-
+        "200": { description: DB still alive }
+        "500": { description: DB unreachable }
   /metrics:
     get:
       tags: [System]
-      summary: Runtime metrics (goroutines, memory, GC)
-      operationId: metrics
-      security: []
-      responses:
-        "200":
-          description: Metrics JSON
+      summary: Runtime metrics (Go + app-level counters)
+      responses: { "200": { description: JSON metrics } }
 
-  /aa/heath-check-db:
-    get:
-      tags: [System]
-      summary: Health check (DB ping) — /aa alias
-      description: Same as `GET /health` but mounted under the `/aa` prefix for compatibility with internal callers.
-      operationId: heathCheckDb
-      security: []
-      responses:
-        "200":
-          description: Service healthy
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Authentication ───────────────────────────────────────────────────────────
+  # ── Auth ───────────────────────────────────────────────────────────
   /aa/authenticate:
     post:
-      tags: [Authentication]
-      summary: Login — get JWT
-      operationId: authenticate
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/LoginRequest"
-            example:
-              username: anhdt195
-              password: "123"
-      responses:
-        "200":
-          description: Login successful
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/TokenResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/validate-token:
-    post:
-      tags: [Authentication]
-      summary: Validate token
-      operationId: validateToken
-      security: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ValidateTokenRequest"
-      responses:
-        "200":
-          description: Token valid
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ValidateTokenResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-
-  /aa/change-password/:
-    post:
-      tags: [Authentication]
-      summary: Change own password (requires old password)
+      tags: [Auth]
+      summary: Log in → JWT
       description: |
-        Any authenticated user (including Normal role) may call this endpoint to
-        change their own password. The `username` in the body must match the
-        authenticated user — otherwise the request returns 401.
-      operationId: changePassword
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ChangePasswordRequest"
-      responses:
-        "200":
-          description: Password changed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: Wrong old password
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authenticate/user/set:
-    post:
-      tags: [Authentication]
-      summary: Create or re-enable user
-      operationId: userSet
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserSetRequest"
-      responses:
-        "201":
-          description: Created / re-enabled
-        "304":
-          description: User already active
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authenticate/user/delete:
-    post:
-      tags: [Authentication]
-      summary: Disable user (soft delete)
-      description: Sets `is_enable=false`. SuperAdmin accounts (`account_type=0`) cannot be disabled — returns 403.
-      operationId: userDelete
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UsernameRequest"
-      responses:
-        "200":
-          description: Disabled
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: Target is a SuperAdmin account — cannot be disabled
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authenticate/user/show:
-    get:
-      tags: [Authentication]
-      summary: List all users with NEs and roles
-      operationId: userShow
-      security:
-        - bearerAuth: []
-      responses:
-        "302":
-          description: User list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserShowItem"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authenticate/user/reset-password:
-    post:
-      tags: [Authentication]
-      summary: Admin reset any user's password (no old password required)
-      description: SuperAdmin accounts (`account_type=0`) cannot have their password reset — returns 403.
-      operationId: adminResetPassword
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AdminResetPasswordRequest"
-      responses:
-        "200":
-          description: Password reset
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: Target is a SuperAdmin account — cannot reset password
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── User Authorization ───────────────────────────────────────────────────────
-  /aa/authorize/user/set:
-    post:
-      tags: [User Authorization]
-      summary: Set user permission (updates account_type — "admin"→1, "user"→2)
-      description: SuperAdmin accounts (`account_type=0`) cannot have their permission changed — returns 403.
-      operationId: authorizeUserSet
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserPermissionRequest"
-      responses:
-        "200":
-          description: Permission updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          description: Invalid permission value (must be "admin" or "user")
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: Target is a SuperAdmin account — cannot change permission
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/user/delete:
-    post:
-      tags: [User Authorization]
-      summary: Reset user permission to "user" (sets account_type=2)
-      description: SuperAdmin accounts (`account_type=0`) cannot have their permission reset — returns 403.
-      operationId: authorizeUserDelete
-      security:
-        - bearerAuth: []
+        Rate-limited. Runs the full login gate: access-list (blacklist /
+        whitelist) → account state (disabled / locked) → password-expiry →
+        bcrypt → lockout counter. Returns the token prefixed with
+        `Basic `; pass it back verbatim in the `Authorization` header.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [username]
+              required: [username, password]
               properties:
-                username:
-                  type: string
+                username: { type: string, example: admin }
+                password: { type: string, example: admin }
       responses:
         "200":
-          description: Permission reset to user
+          description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: Target is a SuperAdmin account — cannot reset permission
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/user/show:
-    get:
-      tags: [User Authorization]
-      summary: List all users and their permission (derived from account_type)
-      operationId: authorizeUserShow
-      security:
-        - bearerAuth: []
-      responses:
-        "302":
-          description: List
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/UserPermissionItem"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Network Element ──────────────────────────────────────────────────────────
-  /aa/authorize/ne/show:
-    get:
-      tags: [Network Element]
-      summary: List all NEs (system_type=5GC)
-      operationId: neShow
-      security:
-        - bearerAuth: []
-      responses:
-        "302":
-          description: NE list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/NeShowItem"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/create:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  token:  { type: string, example: "Basic eyJhbGciOi…" }
+        "401": { description: Invalid credentials }
+        "403": { description: Account locked, disabled, access-list-denied, or password expired }
+  /aa/validate-token:
     post:
-      tags: [Network Element]
+      tags: [Auth]
+      summary: Decode a token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [token], properties: { token: { type: string } } }
+      responses:
+        "200":
+          description: Valid
+          content: { application/json: { schema: { type: object, properties: { status: { type: string }, username: { type: string } } } } }
+        "401": { description: Invalid / expired }
+  /aa/change-password:
+    post:
+      tags: [Auth]
+      summary: Change own password (authenticated)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [old_password, new_password]
+              properties:
+                old_password: { type: string }
+                new_password: { type: string }
+      responses:
+        "200": { description: OK }
+        "400": { description: Policy violation, wrong old password, or reuse-history match }
+        "401": { description: Unauthenticated }
+
+  # ── Users ──────────────────────────────────────────────────────────
+  /aa/users:
+    get:
+      tags: [Users]
+      summary: List users
+      security: [ { BasicJWT: [] } ]
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/User" } } } }
+    post:
+      tags: [Users]
+      summary: Create a user (runs the password policy)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username:  { type: string }
+                password:  { type: string }
+                email:     { type: string }
+                full_name: { type: string }
+                phone:     { type: string }
+      responses:
+        "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
+        "400": { description: Policy violation / username already taken }
+  /aa/users/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [Users]
+      summary: Get a user
+      security: [ { BasicJWT: [] } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }, "404": { description: Not found } }
+    put:
+      tags: [Users]
+      summary: Patch user profile (email / full_name / phone / is_enabled)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                email:      { type: string }
+                full_name:  { type: string }
+                phone:      { type: string }
+                is_enabled: { type: boolean }
+      responses: { "200": { description: OK } }
+    delete:
+      tags: [Users]
+      summary: Delete a user — cascades to group pivots + password history; audit log is preserved
+      security: [ { BasicJWT: [] } ]
+      responses: { "200": { description: OK } }
+  /aa/users/{id}/reset-password:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    post:
+      tags: [Users]
+      summary: Admin reset (skips old-password check, still runs policy + history)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { type: object, required: [new_password], properties: { new_password: { type: string } } }
+      responses: { "200": { description: OK } }
+
+  # ── NEs ────────────────────────────────────────────────────────────
+  /aa/nes:
+    get:
+      tags: [NEs]
+      summary: List NEs
+      security: [ { BasicJWT: [] } ]
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/NE" } } } } } }
+    post:
+      tags: [NEs]
       summary: Create NE
-      operationId: neCreate
-      security:
-        - bearerAuth: []
+      security: [ { BasicJWT: [] } ]
       requestBody:
         required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/NeCreateRequest"
-            example:
-              ne_name: HTSMF01
-              site_name: HCM
-              namespace: hcm-5gc
-              conf_master_ip: 10.10.1.1
-              conf_port_master_ssh: 22
-              conf_mode: SSH
-              conf_username: admin
-              conf_password: secret
-              description: HCM SMF Node 01
+        content: { application/json: { schema: { $ref: "#/components/schemas/NE" } } }
       responses:
-        "201":
-          description: Created
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/update:
-    post:
-      tags: [Network Element]
-      summary: Update NE fields (site, IP, port, namespace, description)
-      operationId: neUpdate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/NeUpdateRequest"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/remove:
-    post:
-      tags: [Network Element]
-      summary: Delete NE (cascade — removes all mappings, configs, backups)
-      operationId: neRemove
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/IdRequest"
-      responses:
-        "200":
-          description: Deleted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/set:
-    post:
-      tags: [Network Element]
-      summary: Assign NE to user
-      operationId: neSet
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserNeRequest"
-      responses:
-        "200":
-          description: Assigned
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "304":
-          description: NE already assigned to this user
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/delete:
-    post:
-      tags: [Network Element]
-      summary: Remove NE from user
-      operationId: neDelete
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UserNeRequest"
-      responses:
-        "200":
-          description: Removed
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "304":
-          description: User-NE relationship not found
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/list/ne:
+        "201": { description: Created }
+        "400": { description: Namespace already taken }
+  /aa/nes/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
     get:
-      tags: [Network Element]
-      summary: NEs accessible to the logged-in user
+      tags: [NEs]
+      security: [ { BasicJWT: [] } ]
+      summary: Get NE
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/NE" } } } } }
+    put:
+      tags: [NEs]
+      security: [ { BasicJWT: [] } ]
+      summary: Update NE
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/NE" } } } }
+      responses: { "200": { description: OK } }
+    delete:
+      tags: [NEs]
+      security: [ { BasicJWT: [] } ]
+      summary: Delete NE — cascades to commands on this NE and group pivots
+      responses: { "200": { description: OK } }
+
+  # ── Commands ───────────────────────────────────────────────────────
+  /aa/commands:
+    get:
+      tags: [Commands]
+      summary: List commands
+      security: [ { BasicJWT: [] } ]
+      parameters:
+        - { name: ne_id,   in: query, schema: { type: integer, format: int64 } }
+        - { name: service, in: query, schema: { type: string, enum: [ne-config, ne-command] } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Command" } } } } } }
+    post:
+      tags: [Commands]
+      summary: Register a command — exact text, unique per (ne_id, service, cmd_text)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: "#/components/schemas/Command" } } }
+      responses:
+        "201": { description: Created }
+        "400": { description: Invalid service or duplicate (ne_id, service, cmd_text) }
+  /aa/commands/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [Commands]
+      security: [ { BasicJWT: [] } ]
+      summary: Update command
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Command" } } } }
+      responses: { "200": { description: OK } }
+    delete:
+      tags: [Commands]
+      security: [ { BasicJWT: [] } ]
+      summary: Delete command — cascades to cmd_exec_group pivots
+      responses: { "200": { description: OK } }
+
+  # ── NE Access Groups ───────────────────────────────────────────────
+  /aa/ne-access-groups:
+    get:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: List groups
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Group" } } } } } }
+    post:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Create group
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Group" } } } }
+      responses: { "201": { description: Created } }
+  /aa/ne-access-groups/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Update group
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Group" } } } }
+      responses: { "200": { description: OK } }
+    delete:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Delete group — cascades to user + NE pivot rows
+      responses: { "200": { description: OK } }
+  /aa/ne-access-groups/{id}/users:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: List user IDs in this group
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { type: integer, format: int64 } } } } } }
+    post:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Add a user to the group
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [user_id], properties: { user_id: { type: integer, format: int64 } } } } } }
+      responses: { "200": { description: OK } }
+  /aa/ne-access-groups/{id}/users/{user_id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: user_id, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Remove a user from the group
+      responses: { "200": { description: OK } }
+  /aa/ne-access-groups/{id}/nes:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: List NE IDs in this group
+      responses: { "200": { description: OK } }
+    post:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Add an NE to the group
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [ne_id], properties: { ne_id: { type: integer, format: int64 } } } } } }
+      responses: { "200": { description: OK } }
+  /aa/ne-access-groups/{id}/nes/{ne_id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: ne_id, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [NE Access Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Remove an NE from the group
+      responses: { "200": { description: OK } }
+
+  # ── Cmd Exec Groups ────────────────────────────────────────────────
+  /aa/cmd-exec-groups:
+    get:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: List groups
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Group" } } } } } }
+    post:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Create group
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Group" } } } }
+      responses: { "201": { description: Created } }
+  /aa/cmd-exec-groups/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    put:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Update group
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/Group" } } } }
+      responses: { "200": { description: OK } }
+    delete:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Delete group — cascades to user + command pivot rows
+      responses: { "200": { description: OK } }
+  /aa/cmd-exec-groups/{id}/users:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: List user IDs in this group
+      responses: { "200": { description: OK } }
+    post:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Add a user to the group
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [user_id], properties: { user_id: { type: integer, format: int64 } } } } } }
+      responses: { "200": { description: OK } }
+  /aa/cmd-exec-groups/{id}/users/{user_id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: user_id, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Remove a user from the group
+      responses: { "200": { description: OK } }
+  /aa/cmd-exec-groups/{id}/commands:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: List command IDs in this group
+      responses: { "200": { description: OK } }
+    post:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Add a command to the group
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [command_id], properties: { command_id: { type: integer, format: int64 } } } } } }
+      responses: { "200": { description: OK } }
+  /aa/cmd-exec-groups/{id}/commands/{command_id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+      - { name: command_id, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [Cmd Exec Groups]
+      security: [ { BasicJWT: [] } ]
+      summary: Remove a command from the group
+      responses: { "200": { description: OK } }
+
+  # ── Password Policy ────────────────────────────────────────────────
+  /aa/password-policy:
+    get:
+      tags: [Password Policy]
+      security: [ { BasicJWT: [] } ]
+      summary: Get the singleton policy
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PasswordPolicy" } } } } }
+    put:
+      tags: [Password Policy]
+      security: [ { BasicJWT: [] } ]
+      summary: Upsert the singleton policy — full replace
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/PasswordPolicy" } } } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/PasswordPolicy" } } } } }
+
+  # ── Access List ────────────────────────────────────────────────────
+  /aa/access-list:
+    get:
+      tags: [Access List]
+      security: [ { BasicJWT: [] } ]
+      summary: List ACL entries
+      parameters:
+        - { name: list_type, in: query, schema: { type: string, enum: [blacklist, whitelist] } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/AccessListEntry" } } } } } }
+    post:
+      tags: [Access List]
+      security: [ { BasicJWT: [] } ]
+      summary: Create ACL entry
+      requestBody: { required: true, content: { application/json: { schema: { $ref: "#/components/schemas/AccessListEntry" } } } }
+      responses: { "201": { description: Created } }
+  /aa/access-list/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    delete:
+      tags: [Access List]
+      security: [ { BasicJWT: [] } ]
+      summary: Delete ACL entry
+      responses: { "200": { description: OK } }
+
+  # ── Authorize ──────────────────────────────────────────────────────
+  /aa/authorize/check:
+    post:
+      tags: [Authorize]
+      security: [ { BasicJWT: [] } ]
+      summary: Answer "can user X execute command Y on NE Z?"
       description: |
-        Returns every NE the user can reach, deduplicated — the union of:
-          1. direct assignments via `cli_user_ne_mapping` (authorize/ne/set), and
-          2. indirect assignments through any group the user belongs to
-             (group/user/assign + group/ne/assign).
-      operationId: listNe
-      security:
-        - bearerAuth: []
-      responses:
-        "302":
-          description: NE list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/NeListResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/list/ne/monitor:
-    get:
-      tags: [Network Element]
-      summary: NE monitor URLs for logged-in user
-      operationId: listNeMonitor
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: NE monitor list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/NeMonitorItem"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── NE Config ────────────────────────────────────────────────────────────────
-  /aa/authorize/ne/config/create:
-    post:
-      tags: [NE Config]
-      summary: Add connection config entry for a NE
-      operationId: neConfigCreate
-      security:
-        - bearerAuth: []
+        Evaluates the flat v2 rule and returns a typed decision plus a
+        trace of which specific step tripped on deny. Used by
+        downstream proxies (cli-gate, ne-config, ne-command) before
+        running a command, and by the admin frontend's Authorize Test tab.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/NeConfigCreateRequest"
-            example:
-              ne_id: 1
-              ip_address: 10.10.1.1
-              port: 830
-              username: netconf
-              password: netconf123
-              protocol: NETCONF
-              description: Primary NETCONF interface
-      responses:
-        "201":
-          description: Created
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/config/list:
-    get:
-      tags: [NE Config]
-      summary: List config entries for a NE (includes ne_name and password)
-      operationId: neConfigList
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: ne_id
-          in: query
-          required: true
-          schema:
-            type: integer
-            format: int64
-          description: NE ID
+              type: object
+              required: [username, ne_id, command_id]
+              properties:
+                username:   { type: string }
+                ne_id:      { type: integer, format: int64 }
+                command_id: { type: integer, format: int64 }
       responses:
         "200":
-          description: Config list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/NeConfigItem"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+          description: Decision
+          content: { application/json: { schema: { $ref: "#/components/schemas/AuthorizeDecision" } } }
 
-  /aa/authorize/ne/config/update:
-    post:
-      tags: [NE Config]
-      summary: Update a config entry (identified by id)
-      operationId: neConfigUpdate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/NeConfigUpdateRequest"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/authorize/ne/config/delete:
-    post:
-      tags: [NE Config]
-      summary: Delete a config entry by ID
-      operationId: neConfigDelete
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/IdRequest"
-      responses:
-        "200":
-          description: Deleted
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Config Backup ────────────────────────────────────────────────────────────
-  /aa/config-backup/save:
-    post:
-      tags: [Config Backup]
-      summary: Save a NETCONF commit config backup (XML content + metadata)
-      description: |
-        Called by `cli-netconf-svc` after each NETCONF commit.
-        XML content is stored on disk; metadata (ne_name, ne_ip, size, timestamp) in DB.
-      operationId: configBackupSave
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/ConfigBackupSaveRequest"
-      responses:
-        "201":
-          description: Saved
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConfigBackupSaveResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/config-backup/list:
-    get:
-      tags: [Config Backup]
-      summary: List config backup metadata for a NE
-      operationId: configBackupList
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: ne_name
-          in: query
-          required: false
-          schema:
-            type: string
-          description: Filter by NE name (omit for all NEs)
-      responses:
-        "200":
-          description: Backup list
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConfigBackupListResponse"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/config-backup/{id}:
-    get:
-      tags: [Config Backup]
-      summary: Get backup metadata + XML content by ID
-      operationId: configBackupGet
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: integer
-            format: int64
-      responses:
-        "200":
-          description: Backup with XML content
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/ConfigBackupGetResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── History ──────────────────────────────────────────────────────────────────
-  /aa/history/list:
+  # ── History ────────────────────────────────────────────────────────
+  /aa/history:
     get:
       tags: [History]
-      summary: List recent command history
-      operationId: historyList
-      security:
-        - bearerAuth: []
+      security: [ { BasicJWT: [] } ]
+      summary: List audit entries (filtered, descending by created_date)
       parameters:
-        - name: limit
-          in: query
-          schema:
-            type: integer
-            default: 100
-          description: Max records to return
-        - name: scope
-          in: query
-          schema:
-            type: string
-            enum: [cli-config, ne-command, ne-config]
-          description: Filter by scope
-        - name: ne_name
-          in: query
-          schema:
-            type: string
-          description: Filter by NE name
-        - name: account
-          in: query
-          schema:
-            type: string
-          description: Filter by account username
-      responses:
-        "200":
-          description: History list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CliOperationHistory"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
+        - { name: limit,        in: query, schema: { type: integer, minimum: 1, maximum: 500, default: 100 } }
+        - { name: scope,        in: query, schema: { type: string, enum: [ne-config, ne-command, mgt] } }
+        - { name: ne_namespace, in: query, schema: { type: string } }
+        - { name: account,      in: query, schema: { type: string } }
+      responses: { "200": { description: OK, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/OperationHistory" } } } } } }
   /aa/history/save:
     post:
       tags: [History]
-      summary: Save a command history record (called by SSH_SERVER / cli-netconf-svc)
-      operationId: historySave
-      security:
-        - bearerAuth: []
+      summary: Unauthenticated audit push (used by cli-gate / proxies)
+      description: |
+        Deliberately unauthenticated so proxies can push audit events
+        without forwarding the operator's JWT. The `account` field is
+        supplied by the caller; when the caller has a JWT the handler
+        prefers the token's `sub` over the body value.
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: "#/components/schemas/HistorySaveRequest"
+              type: object
+              required: [cmd_text]
+              properties:
+                account:      { type: string }
+                cmd_text:     { type: string }
+                ne_namespace: { type: string }
+                ne_ip:        { type: string }
+                scope:        { type: string, enum: [ne-config, ne-command, mgt] }
+                result:       { type: string }
+      responses:
+        "201": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/OperationHistory" } } } }
+        "400": { description: cmd_text missing }
+
+  # ── Config Backup ──────────────────────────────────────────────────
+  /aa/config-backup/save:
+    post:
+      tags: [Config Backup]
+      security: [ { BasicJWT: [] } ]
+      summary: Save a NETCONF XML config backup
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ne_name, config_xml]
+              properties:
+                ne_name:    { type: string }
+                ne_ip:      { type: string }
+                config_xml: { type: string }
       responses:
         "201":
           description: Saved
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CliOperationHistory"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Import ───────────────────────────────────────────────────────────────────
-  /aa/import/:
-    post:
-      tags: [Import]
-      summary: Bulk import users, NEs, roles, mappings and NE configs from plain text
-      operationId: bulkImport
-      description: |
-        Body is plain text in section format:
-
-        ```
-        [users]
-        username,password,email
-        admin,admin123,admin@vht.com
-
-        [nes]
-        ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
-        HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
-
-        [user_roles]
-        username,permission
-        operator1,admin
-        viewer1,user
-
-        [user_nes]
-        username,ne_name
-        operator1,HTSMF01
-        ```
-
-        Existing users are skipped (idempotent). `[user_roles]` sets account_type (admin=1, user=2).
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          text/plain:
-            schema:
-              type: string
-      responses:
-        "200":
-          description: Import results (one entry per row)
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/ImportResult"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Admin (Frontend API) ─────────────────────────────────────────────────────
-  /aa/admin/user/list:
+          content: { application/json: { schema: { type: object, properties: { status: { type: string }, id: { type: integer, format: int64 } } } } }
+  /aa/config-backup/list:
     get:
-      tags: [Admin]
-      summary: List all users with full fields (no password) — for frontend admin panel
-      operationId: adminUserList
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: User list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AdminUserItem"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/admin/user/full:
-    get:
-      tags: [Admin]
-      summary: List all users with role and the NEs they can connect to (union of direct and group paths)
-      description: |
-        Same base fields as `/aa/admin/user/list` plus `role` ("admin" or "user") and `nes` — the
-        deduplicated union of NEs reachable directly and via group membership.
-        SuperAdmin accounts are excluded server-side.
-      operationId: adminUserFullList
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: Users with role and effective NEs
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/AdminUserFullItem"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/admin/user/update:
-    post:
-      tags: [Admin]
-      summary: Update user metadata — for frontend admin panel
-      description: |
-        Updates `full_name`, `email`, `phone_number`, `address`, `description`, `account_type`.
-        SuperAdmin accounts (`account_type=0`) cannot be edited.
-        Cannot elevate a user to SuperAdmin (`account_type=0`) via this endpoint.
-      operationId: adminUserUpdate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/AdminUserUpdateRequest"
-            example:
-              account_name: bob
-              full_name: Robert Smith
-              email: bob@example.com
-              phone_number: "0912345678"
-              address: Ha Noi
-              description: Operator team
-              account_type: 1
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "403":
-          description: Target is a SuperAdmin account, or account_type=0 requested
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/admin/ne/list:
-    get:
-      tags: [Admin]
-      summary: List all NEs with full fields (all cli_ne columns) — for frontend admin panel
-      operationId: adminNeList
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: NE list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/CliNe"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/admin/ne/create:
-    post:
-      tags: [Admin]
-      summary: Create NE with full fields — for frontend admin panel
-      operationId: adminNeCreate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CliNe"
-            example:
-              ne_name: HTSMF01
-              site_name: HCM
-              namespace: hcm-5gc
-              command_url: http://10.10.1.1:8080
-              conf_mode: SSH
-              conf_master_ip: 10.10.1.1
-              conf_port_master_ssh: 22
-              conf_username: admin
-              conf_password: secret
-              description: HCM SMF Node 01
-      responses:
-        "201":
-          description: Created — returns the new NE object
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/CliNe"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/admin/ne/update:
-    post:
-      tags: [Admin]
-      summary: Update NE with full fields (id required) — for frontend admin panel
-      operationId: adminNeUpdate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CliNe"
-      responses:
-        "200":
-          description: Updated
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/MessageResponse"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Subscribers ──────────────────────────────────────────────────────────────
-  /aa/subscribers/files:
-    get:
-      tags: [Subscribers]
-      summary: List saved TCP subscriber files
-      operationId: subscriberFileList
-      security:
-        - bearerAuth: []
-      responses:
-        "200":
-          description: File list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/SubscriberFileInfo"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  /aa/subscribers/files/{index}:
-    get:
-      tags: [Subscribers]
-      summary: View subscriber file by index
-      operationId: subscriberFileView
-      security:
-        - bearerAuth: []
+      tags: [Config Backup]
+      security: [ { BasicJWT: [] } ]
+      summary: List backup metadata (XML contents omitted)
       parameters:
-        - name: index
-          in: path
-          required: true
-          schema:
-            type: integer
-            minimum: 0
-          example: 0
+        - { name: ne_name, in: query, schema: { type: string } }
       responses:
         "200":
-          description: File content
+          description: OK
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/SubscriberFileContent"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "404":
-          $ref: "#/components/responses/NotFound"
-        "500":
-          $ref: "#/components/responses/InternalError"
-
-  # ── Groups ─────────────────────────────────────────────────────────────────
-  /aa/group/list:
+                type: object
+                properties:
+                  status:  { type: string }
+                  backups:
+                    type: array
+                    items: { $ref: "#/components/schemas/ConfigBackup" }
+  /aa/config-backup/{id}:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
     get:
-      tags: [Group]
-      summary: List all groups
-      operationId: groupList
-      security:
-        - bearerAuth: []
+      tags: [Config Backup]
+      security: [ { BasicJWT: [] } ]
+      summary: Get a backup — metadata + XML contents
       responses:
         "200":
-          description: Group list
+          description: OK
           content:
             application/json:
               schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Group"
-        "401":
-          $ref: "#/components/responses/Unauthorized"
-        "500":
-          $ref: "#/components/responses/InternalError"
+                type: object
+                properties:
+                  status:     { type: string }
+                  id:         { type: integer, format: int64 }
+                  ne_name:    { type: string }
+                  ne_ip:      { type: string }
+                  created_at: { type: string, format: date-time }
+                  size:       { type: integer, format: int64 }
+                  config_xml: { type: string }
+        "404": { description: Not found }
 
-  /aa/group/show:
-    post:
-      tags: [Group]
-      summary: Show a single group with its users and NE ids
-      operationId: groupShow
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [id]
-              properties:
-                id: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Group details
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/GroupDetail"
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /aa/group/create:
-    post:
-      tags: [Group]
-      summary: Create a new group (admin only)
-      operationId: groupCreate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [name]
-              properties:
-                name:        { type: string }
-                description: { type: string }
-      responses:
-        "201":
-          description: Created
-        "400":
-          $ref: "#/components/responses/BadRequest"
-        "409":
-          description: Group name already exists
-
-  /aa/group/update:
-    post:
-      tags: [Group]
-      summary: Update group name/description (admin only)
-      operationId: groupUpdate
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [id]
-              properties:
-                id:          { type: integer, format: int64 }
-                name:        { type: string }
-                description: { type: string }
-      responses:
-        "200":
-          description: Updated
-        "404":
-          $ref: "#/components/responses/NotFound"
-
-  /aa/group/delete:
-    post:
-      tags: [Group]
-      summary: Delete a group (admin only; cascades mappings)
-      operationId: groupDelete
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [id]
-              properties:
-                id: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Deleted
-
-  /aa/group/user:
-    get:
-      tags: [Group]
-      summary: List the groups a user belongs to
-      operationId: userGroupList
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: username
-          in: query
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: Group list
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  $ref: "#/components/schemas/Group"
-
-  /aa/group/user/assign:
-    post:
-      tags: [Group]
-      summary: Assign a user to a group (admin only)
-      operationId: userGroupAssign
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [username, group_id]
-              properties:
-                username: { type: string }
-                group_id: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Assigned
-
-  /aa/group/user/unassign:
-    post:
-      tags: [Group]
-      summary: Unassign a user from a group (admin only)
-      operationId: userGroupUnassign
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [username, group_id]
-              properties:
-                username: { type: string }
-                group_id: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Unassigned
-
-  /aa/group/ne:
-    get:
-      tags: [Group]
-      summary: List the NE ids belonging to a group
-      operationId: groupNeList
-      security:
-        - bearerAuth: []
-      parameters:
-        - name: group_id
-          in: query
-          required: true
-          schema: { type: integer, format: int64 }
-      responses:
-        "200":
-          description: NE id list
-          content:
-            application/json:
-              schema:
-                type: array
-                items: { type: integer, format: int64 }
-
-  /aa/group/ne/assign:
-    post:
-      tags: [Group]
-      summary: Assign an NE to a group (admin only)
-      operationId: groupNeAssign
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [group_id, ne_id]
-              properties:
-                group_id: { type: integer, format: int64 }
-                ne_id:    { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Assigned
-
-  /aa/group/ne/unassign:
-    post:
-      tags: [Group]
-      summary: Unassign an NE from a group (admin only)
-      operationId: groupNeUnassign
-      security:
-        - bearerAuth: []
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [group_id, ne_id]
-              properties:
-                group_id: { type: integer, format: int64 }
-                ne_id:    { type: integer, format: int64 }
-      responses:
-        "200":
-          description: Unassigned
-
-# ─────────────────────────────────────────────────────────────────────────────
 components:
-
   securitySchemes:
-    bearerAuth:
+    BasicJWT:
       type: apiKey
       in: header
       name: Authorization
       description: |
-        Paste the `response_data` value from `POST /aa/authenticate` directly.
-        The token already contains the `Basic ` prefix — paste it as-is.
-        Example: `Basic eyJhbGciOiJIUzI1NiJ9...`
+        Paste the `token` value from `/aa/authenticate` — it's already
+        prefixed with `Basic `.
 
-  # ── Reusable responses ───────────────────────────────────────────────────────
-  responses:
-    BadRequest:
-      description: Invalid request body / params
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/MessageResponse"
-    Unauthorized:
-      description: Missing or invalid token
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/MessageResponse"
-    NotFound:
-      description: Resource not found
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/MessageResponse"
-    InternalError:
-      description: Server error
-      content:
-        application/json:
-          schema:
-            $ref: "#/components/schemas/MessageResponse"
-
-  # ── Schemas ──────────────────────────────────────────────────────────────────
   schemas:
-
-    MessageResponse:
+    User:
       type: object
       properties:
-        message:
-          type: string
+        id:                    { type: integer, format: int64 }
+        username:              { type: string }
+        email:                 { type: string }
+        full_name:             { type: string }
+        phone:                 { type: string }
+        is_enabled:            { type: boolean }
+        password_expires_at:   { type: string, format: date-time, nullable: true }
+        login_failure_count:   { type: integer, format: int32 }
+        locked_at:             { type: string, format: date-time, nullable: true }
+        last_login_at:         { type: string, format: date-time, nullable: true }
+        created_at:            { type: string, format: date-time }
+        updated_at:            { type: string, format: date-time }
 
-    IdRequest:
-      type: object
-      required: [id]
-      properties:
-        id:
-          type: integer
-          format: int64
-
-    # ── Auth ──────────────────────────────────────────────────────────────────
-    LoginRequest:
-      type: object
-      required: [username, password]
-      properties:
-        username:
-          type: string
-        password:
-          type: string
-
-    TokenResponse:
+    NE:
       type: object
       properties:
-        status:
-          type: string
-          example: success
-        response_data:
-          type: string
-          description: "Token string including 'Basic ' prefix (e.g. 'Basic eyJ...'). Use this value directly as the Authorization header."
-          example: "Basic eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
-        response_code:
-          type: string
-          example: "200"
-        system_type:
-          type: string
-          example: 5GC
+        id:           { type: integer, format: int64 }
+        namespace:    { type: string, description: "unique id (e.g. htsmf01)" }
+        ne_type:      { type: string, description: "category label (SMF / AMF / UPF / ...)" }
+        site_name:    { type: string }
+        description:  { type: string }
+        master_ip:    { type: string }
+        master_port:  { type: integer, format: int32 }
+        ssh_username: { type: string }
+        ssh_password: { type: string, writeOnly: true }
+        command_url:  { type: string }
+        conf_mode:    { type: string, enum: [SSH, TELNET, NETCONF, RESTCONF] }
 
-    ValidateTokenRequest:
-      type: object
-      required: [token]
-      properties:
-        token:
-          type: string
-          description: "The value of response_data from /aa/authenticate (already includes 'Basic ' prefix)"
-
-    ValidateTokenResponse:
+    Command:
       type: object
       properties:
-        username:
-          type: string
-        roles:
-          type: string
-          description: Permission derived from account_type — "admin" (type 0/1) or "user" (type 2)
-
-    ChangePasswordRequest:
-      type: object
-      required: [username, old_password, new_password]
-      properties:
-        username:
-          type: string
-        old_password:
-          type: string
-        new_password:
-          type: string
-
-    AdminResetPasswordRequest:
-      type: object
-      required: [username, new_password]
-      properties:
-        username:
-          type: string
-        new_password:
-          type: string
-
-    UsernameRequest:
-      type: object
-      required: [account_name]
-      properties:
-        account_name:
-          type: string
-
-    UserSetRequest:
-      description: |
-        Khớp với db_models.TblAccount — các trường thường dùng khi tạo user.
-        Handler decode trực tiếp vào TblAccount nên tên field là json tag của struct.
-      type: object
-      required: [account_name, password]
-      properties:
-        account_name:
-          type: string
-        password:
-          type: string
-          description: Plaintext — server tự hash bcrypt
-        full_name:
-          type: string
-        email:
-          type: string
-        address:
-          type: string
-        phone_number:
-          type: string
-        avatar:
-          type: string
-        description:
-          type: string
-        account_type:
-          type: integer
-          format: int32
-          description: "0=SuperAdmin, 1=Admin, 2=Normal (mặc định 2)"
-          default: 2
-        only_ad:
-          type: boolean
-          description: "true = chỉ đăng nhập qua Active Directory"
-          default: false
-
-    UserShowItem:
-      type: object
-      properties:
-        username:
-          type: string
-        tblNes:
-          type: array
-          items:
-            $ref: "#/components/schemas/NeRef"
-        role:
-          type: string
-
-    NeRef:
-      type: object
-      properties:
-        ne:
-          type: string
-        site:
-          type: string
-
-    # ── User Permission ───────────────────────────────────────────────────────
-    UserPermissionRequest:
-      type: object
-      required: [username, permission]
-      properties:
-        username:
-          type: string
-        permission:
-          type: string
-          enum: [admin, user]
-          description: '"admin" sets account_type=1; "user" sets account_type=2'
-
-    UserPermissionItem:
-      type: object
-      properties:
-        username:
-          type: string
-        permission:
-          type: string
-          enum: [admin, user]
-          description: Derived from account_type (0/1 → admin, 2 → user)
-
-    # ── Network Element ───────────────────────────────────────────────────────
-    NeCreateRequest:
-      description: |
-        Maps directly to db_models.CliNe — field names are the json tags (snake_case).
-        Connection details (IP / port / credential / protocol) sit in conf_* columns.
-      type: object
-      required: [ne_name]
-      properties:
-        ne_name:
-          type: string
-          description: Tên NE (bắt buộc)
-        namespace:
-          type: string
-        site_name:
-          type: string
-        system_type:
-          type: string
-          default: 5GC
-          description: Mặc định "5GC" nếu bỏ trống
-        description:
-          type: string
-        command_url:
-          type: string
-          description: URL monitor / command (mode ne-command)
-        conf_mode:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-          description: Giao thức kết nối chính
-        conf_master_ip:
-          type: string
-          description: IP master
-        conf_slave_ip:
-          type: string
-          description: IP slave (tuỳ chọn)
-        conf_port_master_ssh:
-          type: integer
-          format: int32
-          default: 22
-        conf_port_slave_ssh:
-          type: integer
-          format: int32
-        conf_port_master_tcp:
-          type: integer
-          format: int32
-        conf_port_slave_tcp:
-          type: integer
-          format: int32
-        conf_username:
-          type: string
-        conf_password:
-          type: string
-
-    NeUpdateRequest:
-      description: |
-        Maps directly to db_models.CliNe — chỉ cần id, các trường còn lại tuỳ chọn.
-        Chỉ các trường được gửi mới bị cập nhật (GORM Save).
-      type: object
-      required: [id]
-      properties:
-        id:
-          type: integer
-          format: int64
-        ne_name:
-          type: string
-        namespace:
-          type: string
-        site_name:
-          type: string
-        system_type:
-          type: string
-        description:
-          type: string
-        command_url:
-          type: string
-        conf_mode:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-        conf_master_ip:
-          type: string
-        conf_slave_ip:
-          type: string
-        conf_port_master_ssh:
-          type: integer
-          format: int32
-        conf_port_slave_ssh:
-          type: integer
-          format: int32
-        conf_port_master_tcp:
-          type: integer
-          format: int32
-        conf_port_slave_tcp:
-          type: integer
-          format: int32
-        conf_username:
-          type: string
-        conf_password:
-          type: string
-
-    UserNeRequest:
-      type: object
-      required: [username, neid]
-      properties:
-        username:
-          type: string
-        neid:
-          type: string
-          description: NE ID as string
-
-    NeShowItem:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        name:
-          type: string
-        site_name:
-          type: string
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-        namespace:
-          type: string
-        description:
-          type: string
-
-    NeListResponse:
-      type: object
-      properties:
-        status:
-          type: string
-        code:
-          type: string
-        message:
-          type: string
-        neDataList:
-          type: array
-          items:
-            $ref: "#/components/schemas/NeDataItem"
-
-    NeDataItem:
-      type: object
-      properties:
-        site:
-          type: string
-        ne:
-          type: string
-        ip:
-          type: string
-          description: Same as conf_master_ip
-        description:
-          type: string
-        namespace:
-          type: string
-        port:
-          type: integer
-          format: int32
-          description: Same as conf_port_master_ssh
-        command_url:
-          type: string
-          description: URL for ne-command mode
-        conf_mode:
-          type: string
-          description: "Connection protocol: SSH, TELNET, NETCONF, RESTCONF"
-        conf_master_ip:
-          type: string
-        conf_slave_ip:
-          type: string
-        conf_port_master_ssh:
-          type: integer
-          format: int32
-        conf_port_slave_ssh:
-          type: integer
-          format: int32
-        conf_port_master_tcp:
-          type: integer
-          format: int32
-          description: ConfD IPC / NETCONF TCP port
-        conf_port_slave_tcp:
-          type: integer
-          format: int32
-        conf_username:
-          type: string
-        conf_password:
-          type: string
-        urlList:
-          type: array
-          nullable: true
-          items:
-            type: object
-            properties:
-              ipAddress:
-                type: string
-              port:
-                type: integer
-
-    NeMonitorItem:
-      type: object
-      properties:
-        site:
-          type: string
-        ne:
-          type: string
-        ip:
-          type: string
-        description:
-          type: string
-        namespace:
-          type: string
-        port:
-          type: integer
-          format: int32
-        ne_monitor_url:
-          type: string
-
-    # ── NE Config ─────────────────────────────────────────────────────────────
-    CliNeConfig:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-          readOnly: true
-        ne_id:
-          type: integer
-          format: int64
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-        username:
-          type: string
-        password:
-          type: string
-          description: Plaintext password as stored
-        protocol:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-        description:
-          type: string
-
-    NeConfigItem:
-      description: NE config entry with resolved ne_name — returned by GET /aa/authorize/ne/config/list
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        ne_id:
-          type: integer
-          format: int64
-        ne_name:
-          type: string
-          description: Name of the parent NE
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-        username:
-          type: string
-        password:
-          type: string
-          description: Plaintext password as stored
-        protocol:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-        description:
-          type: string
-
-    NeConfigGroupEntry:
-      description: Config entries grouped by NE — returned by GET /aa/list/ne/config
-      type: object
-      properties:
-        ne_name:
-          type: string
-        ne_ip:
-          type: string
-        site_name:
-          type: string
-        config_list:
-          type: array
-          items:
-            $ref: "#/components/schemas/CliNeConfig"
-
-    NeConfigCreateRequest:
-      type: object
-      required: [ne_id, ip_address]
-      properties:
-        ne_id:
-          type: integer
-          format: int64
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-          default: 22
-        username:
-          type: string
-        password:
-          type: string
-        protocol:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-          default: SSH
-        description:
-          type: string
-
-    NeConfigUpdateRequest:
-      type: object
-      required: [id]
-      properties:
-        id:
-          type: integer
-          format: int64
-        ip_address:
-          type: string
-        port:
-          type: integer
-          format: int32
-        username:
-          type: string
-        password:
-          type: string
-          description: Omit to keep existing password
-        protocol:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-        description:
-          type: string
-
-    # ── Config Backup ─────────────────────────────────────────────────────────
-    ConfigBackupSaveRequest:
-      type: object
-      required: [ne_name, config_xml]
-      properties:
-        ne_name:
-          type: string
-          description: NE name (used as directory name on disk)
-        ne_ip:
-          type: string
-        config_xml:
-          type: string
-          description: Full XML content from NETCONF commit
-
-    ConfigBackupSaveResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          example: ok
-        id:
-          type: integer
-          format: int64
-
-    CliConfigBackup:
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-        ne_name:
-          type: string
-        ne_ip:
-          type: string
-        size:
-          type: integer
-          format: int64
-          description: File size in bytes
-        created_at:
-          type: string
-          format: date-time
-
-    ConfigBackupListResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          example: ok
-        backups:
-          type: array
-          items:
-            $ref: "#/components/schemas/CliConfigBackup"
-
-    ConfigBackupGetResponse:
-      type: object
-      properties:
-        status:
-          type: string
-          example: ok
-        id:
-          type: integer
-          format: int64
-        ne_name:
-          type: string
-        ne_ip:
-          type: string
-        size:
-          type: integer
-          format: int64
-        created_at:
-          type: string
-          format: date-time
-          description: UTC timestamp in RFC3339 format
-        config_xml:
-          type: string
-          description: XML file content
-
-    # ── History ───────────────────────────────────────────────────────────────
-    HistorySaveRequest:
-      description: |
-        Khớp với saveHistoryReq struct — chỉ 5 trường.
-        account được lấy tự động từ JWT context, không truyền qua body.
-      type: object
-      required: [cmd_name, ne_name]
-      properties:
-        cmd_name:
-          type: string
-          description: Tên lệnh đã thực thi
-        ne_name:
-          type: string
-          description: Tên NE thực thi lệnh
-        ne_ip:
-          type: string
-          description: IP của NE
-        scope:
-          type: string
-          enum: [cli-config, ne-command, ne-config]
-          description: Nguồn phát sinh lịch sử
-        result:
-          type: string
-          enum: [success, failure]
-
-    CliOperationHistory:
-      description: Khớp với db_models.CliOperationHistory — tất cả các trường của model.
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int32
-        account:
-          type: string
-          description: Username của người thực hiện lệnh
-        cmd_name:
-          type: string
-        ne_name:
-          type: string
-        ne_ip:
-          type: string
-        ip_address:
-          type: string
-          description: IP của client gọi API
-        scope:
-          type: string
-          enum: [cli-config, ne-command, ne-config]
-        result:
-          type: string
-          enum: [success, failure]
-        created_date:
-          type: string
-          format: date-time
-        executed_time:
-          type: string
-          format: date-time
-
-    # ── Admin ─────────────────────────────────────────────────────────────────
-    AdminUserUpdateRequest:
-      description: |
-        Update user metadata. Password changes must use `POST /aa/authenticate/user/reset-password`.
-        SuperAdmin accounts (`account_type=0`) cannot be targeted. Cannot set `account_type` to 0.
-      type: object
-      required: [account_name]
-      properties:
-        account_name:
-          type: string
-        full_name:
-          type: string
-        email:
-          type: string
-          format: email
-        phone_number:
-          type: string
-        address:
-          type: string
-        description:
-          type: string
-        account_type:
-          type: integer
-          format: int32
-          enum: [1, 2]
-          description: "1=Admin, 2=Normal (cannot set to 0=SuperAdmin via this endpoint)"
-
-    AdminUserItem:
-      description: TblAccount without password — returned by GET /aa/admin/user/list
-      type: object
-      properties:
-        account_id:
-          type: integer
-          format: int64
-        account_name:
-          type: string
-        full_name:
-          type: string
-        email:
-          type: string
-        address:
-          type: string
-        phone_number:
-          type: string
-        account_type:
-          type: integer
-          format: int32
-          description: "0=SuperAdmin, 1=Admin, 2=Normal"
-        description:
-          type: string
-        is_enable:
-          type: boolean
-        status:
-          type: boolean
-        created_by:
-          type: string
-        login_failure_count:
-          type: integer
-          format: int32
-
-    AdminUserFullItem:
-      description: |
-        AdminUserItem plus `role` and the deduplicated union of NEs the user
-        can reach — directly via cli_user_ne_mapping and indirectly via group
-        membership. Returned by GET /aa/admin/user/full.
-      allOf:
-        - $ref: "#/components/schemas/AdminUserItem"
-        - type: object
-          properties:
-            role:
-              type: string
-              enum: [admin, user]
-            nes:
-              type: array
-              items:
-                type: object
-                properties:
-                  id:
-                    type: integer
-                    format: int64
-                  ne_name:
-                    type: string
-                  site_name:
-                    type: string
-                  namespace:
-                    type: string
-
-    CliNe:
-      description: |
-        Full CliNe model (all columns of table cli_ne).
-        Used by Admin create/update/list endpoints.
-      type: object
-      properties:
-        id:
-          type: integer
-          format: int64
-          readOnly: true
-        ne_name:
-          type: string
-          description: Tên NE (bắt buộc khi tạo mới)
-        namespace:
-          type: string
-        site_name:
-          type: string
-        system_type:
-          type: string
-          default: 5GC
-        description:
-          type: string
-        command_url:
-          type: string
-          description: URL monitor / command (mode ne-command)
-        conf_mode:
-          type: string
-          enum: [SSH, TELNET, NETCONF, RESTCONF]
-        conf_master_ip:
-          type: string
-        conf_slave_ip:
-          type: string
-        conf_port_master_ssh:
-          type: integer
-          format: int32
-        conf_port_slave_ssh:
-          type: integer
-          format: int32
-        conf_port_master_tcp:
-          type: integer
-          format: int32
-        conf_port_slave_tcp:
-          type: integer
-          format: int32
-        conf_username:
-          type: string
-        conf_password:
-          type: string
-
-    # ── Import ────────────────────────────────────────────────────────────────
-    ImportResult:
-      type: object
-      properties:
-        type:
-          type: string
-          description: "Section type: user, ne, role, user_role, user_ne, ne_config"
-          example: user
-        name:
-          type: string
-          description: Identifier of the imported row
-          example: admin
-        status:
-          type: string
-          enum: [ok, skip, error]
-        detail:
-          type: string
-          description: Additional info (reason for skip/error)
-
-    # ── Subscribers ───────────────────────────────────────────────────────────
-    SubscriberFileInfo:
-      type: object
-      properties:
-        name:
-          type: string
-          example: list_subscribers_results.0
-        index:
-          type: integer
-          example: 0
-        size_bytes:
-          type: integer
-          format: int64
-          example: 1024
-
-    SubscriberFileContent:
-      type: object
-      properties:
-        name:
-          type: string
-          example: list_subscribers_results.0
-        index:
-          type: integer
-          example: 0
-        lines:
-          type: array
-          items:
-            type: string
-        total:
-          type: integer
-          description: Total line count
-          example: 42
+        id:          { type: integer, format: int64 }
+        ne_id:       { type: integer, format: int64 }
+        service:     { type: string, enum: [ne-config, ne-command] }
+        cmd_text:    { type: string }
+        description: { type: string }
 
     Group:
       type: object
       properties:
-        id:          { type: integer, format: int64, example: 1 }
-        name:        { type: string,  example: ops }
-        description: { type: string,  example: Operations team }
+        id:          { type: integer, format: int64 }
+        name:        { type: string }
+        description: { type: string }
 
-    GroupDetail:
+    PasswordPolicy:
+      type: object
+      description: Singleton at id=1.
+      properties:
+        id:                 { type: integer, format: int64, example: 1 }
+        min_length:         { type: integer, format: int32 }
+        max_age_days:       { type: integer, format: int32, description: "0 = no expiry" }
+        require_uppercase:  { type: boolean }
+        require_lowercase:  { type: boolean }
+        require_digit:      { type: boolean }
+        require_special:    { type: boolean }
+        history_count:      { type: integer, format: int32, description: "0 = no reuse check" }
+        max_login_failure:  { type: integer, format: int32, description: "0 = no lockout" }
+        lockout_minutes:    { type: integer, format: int32 }
+
+    AccessListEntry:
+      type: object
+      required: [list_type, match_type, pattern]
+      properties:
+        id:         { type: integer, format: int64 }
+        list_type:  { type: string, enum: [blacklist, whitelist] }
+        match_type: { type: string, enum: [username, ip_cidr, email_domain] }
+        pattern:    { type: string }
+        reason:     { type: string }
+        created_at: { type: string, format: date-time }
+
+    AuthorizeDecision:
       type: object
       properties:
-        id:          { type: integer, format: int64, example: 1 }
-        name:        { type: string,  example: ops }
-        description: { type: string,  example: Operations team }
-        users:
-          type: array
-          items: { type: string, example: alice }
-        ne_ids:
-          type: array
-          items: { type: integer, format: int64, example: 42 }
+        allowed:              { type: boolean }
+        reason:               { type: string, description: "Human-readable explanation on deny" }
+        user_exists:          { type: boolean }
+        user_enabled:         { type: boolean }
+        ne_reachable:         { type: boolean, description: "via some ne_access_group" }
+        command_on_ne:        { type: boolean, description: "command.ne_id == target NE" }
+        command_exec_allowed: { type: boolean, description: "via some cmd_exec_group" }
+
+    OperationHistory:
+      type: object
+      properties:
+        id:            { type: integer, format: int32 }
+        account:       { type: string }
+        cmd_text:      { type: string }
+        ne_namespace:  { type: string }
+        ne_ip:         { type: string }
+        ip_address:    { type: string }
+        scope:         { type: string, enum: [ne-config, ne-command, mgt] }
+        result:        { type: string }
+        created_date:  { type: string, format: date-time }
+        executed_time: { type: string, format: date-time }
+
+    ConfigBackup:
+      type: object
+      properties:
+        id:         { type: integer, format: int64 }
+        ne_name:    { type: string }
+        ne_ip:      { type: string }
+        file_path:  { type: string }
+        size:       { type: integer, format: int64 }
+        created_at: { type: string, format: date-time }

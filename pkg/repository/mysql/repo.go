@@ -53,7 +53,20 @@ func (c *Client) ListUsers() ([]*db_models.User, error) {
 
 func (c *Client) UpdateUser(u *db_models.User) error { return c.Db.Save(u).Error }
 
+// DeleteUserByID cascades to all membership pivots + password history.
+// operation_history + login_history are intentionally NOT deleted — the audit
+// trail must survive account deletion (the `account` column is a bare string,
+// not an FK, so queries keep working after the user row goes away).
 func (c *Client) DeleteUserByID(id int64) error {
+	if err := c.Db.Where("user_id = ?", id).Delete(&db_models.NeAccessGroupUser{}).Error; err != nil {
+		return err
+	}
+	if err := c.Db.Where("user_id = ?", id).Delete(&db_models.CmdExecGroupUser{}).Error; err != nil {
+		return err
+	}
+	if err := c.Db.Where("user_id = ?", id).Delete(&db_models.PasswordHistory{}).Error; err != nil {
+		return err
+	}
 	return c.Db.Delete(&db_models.User{}, id).Error
 }
 
@@ -92,7 +105,22 @@ func (c *Client) ListNEs() ([]*db_models.NE, error) {
 
 func (c *Client) UpdateNE(n *db_models.NE) error { return c.Db.Save(n).Error }
 
+// DeleteNEByID cascades to every command on the NE (which then recurses
+// through DeleteCommandByID for each command's pivot rows) and to the NE
+// membership pivot.
 func (c *Client) DeleteNEByID(id int64) error {
+	var cmdIDs []int64
+	if err := c.Db.Model(&db_models.Command{}).Where("ne_id = ?", id).Pluck("id", &cmdIDs).Error; err != nil {
+		return err
+	}
+	for _, cid := range cmdIDs {
+		if err := c.DeleteCommandByID(cid); err != nil {
+			return err
+		}
+	}
+	if err := c.Db.Where("ne_id = ?", id).Delete(&db_models.NeAccessGroupNe{}).Error; err != nil {
+		return err
+	}
 	return c.Db.Delete(&db_models.NE{}, id).Error
 }
 
@@ -138,7 +166,12 @@ func (c *Client) ListCommands(neID int64, service string) ([]*db_models.Command,
 
 func (c *Client) UpdateCommand(cmd *db_models.Command) error { return c.Db.Save(cmd).Error }
 
+// DeleteCommandByID clears the pivot that maps command into cmd_exec_groups
+// before removing the row itself.
 func (c *Client) DeleteCommandByID(id int64) error {
+	if err := c.Db.Where("command_id = ?", id).Delete(&db_models.CmdExecGroupCommand{}).Error; err != nil {
+		return err
+	}
 	return c.Db.Delete(&db_models.Command{}, id).Error
 }
 
@@ -179,7 +212,17 @@ func (c *Client) UpdateNeAccessGroup(g *db_models.NeAccessGroup) error {
 	return c.Db.Save(g).Error
 }
 
+// DeleteNeAccessGroupByID cascades to the two pivot tables. GORM's
+// AutoMigrate does not emit FOREIGN KEY ... ON DELETE CASCADE for standalone
+// pivot structs, so we tear the membership down in the app layer to keep all
+// three drivers consistent.
 func (c *Client) DeleteNeAccessGroupByID(id int64) error {
+	if err := c.Db.Where("group_id = ?", id).Delete(&db_models.NeAccessGroupUser{}).Error; err != nil {
+		return err
+	}
+	if err := c.Db.Where("group_id = ?", id).Delete(&db_models.NeAccessGroupNe{}).Error; err != nil {
+		return err
+	}
 	return c.Db.Delete(&db_models.NeAccessGroup{}, id).Error
 }
 
@@ -264,7 +307,14 @@ func (c *Client) ListCmdExecGroups() ([]*db_models.CmdExecGroup, error) {
 
 func (c *Client) UpdateCmdExecGroup(g *db_models.CmdExecGroup) error { return c.Db.Save(g).Error }
 
+// DeleteCmdExecGroupByID cascades to pivots; see DeleteNeAccessGroupByID.
 func (c *Client) DeleteCmdExecGroupByID(id int64) error {
+	if err := c.Db.Where("group_id = ?", id).Delete(&db_models.CmdExecGroupUser{}).Error; err != nil {
+		return err
+	}
+	if err := c.Db.Where("group_id = ?", id).Delete(&db_models.CmdExecGroupCommand{}).Error; err != nil {
+		return err
+	}
 	return c.Db.Delete(&db_models.CmdExecGroup{}, id).Error
 }
 
