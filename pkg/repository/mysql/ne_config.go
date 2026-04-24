@@ -125,6 +125,15 @@ func (c *Client) DeleteAllUserNeMappingByNeId(neId int64) error {
 	return tx.Error
 }
 
+// DeleteAllUserNeMappingByUserId is the user-side counterpart, used by
+// PurgeUser when a user is hard-deleted.
+func (c *Client) DeleteAllUserNeMappingByUserId(userId int64) error {
+	if c.Db == nil {
+		return errors.New("no database connection")
+	}
+	return c.Db.Where("user_id = ?", userId).Delete(&db_models.CliUserNeMapping{}).Error
+}
+
 // DeleteNeMonitorByNeId is a no-op: monitor data is derived from CliNe, no table to delete.
 func (c *Client) DeleteNeMonitorByNeId(neId int64) error {
 	return nil

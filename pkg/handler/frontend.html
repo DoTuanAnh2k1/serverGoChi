@@ -657,6 +657,13 @@ const I18N = {
     user_required_fields:'Username, email, password and confirm password are required',
     login:'Login', logout:'Logout', create:'Create', edit:'Edit', update:'Update', cancel:'Cancel', save:'Save', assign:'Assign',
     refresh:'Refresh', delete_btn:'Delete', disable:'Disable', description:'Description', ne_name:'Name', ne:'Network Element',
+    purge:'Purge', purge_tooltip:'Hard-delete: remove row + mappings + password history. Irreversible.',
+    purge_warn_1:'Permanently DELETE user "{u}"? This removes the account, all mappings, and password history. Cannot be undone.',
+    purge_warn_2:'This is a HARD DELETE — not a disable.',
+    purge_warn_3:'The row in tbl_account is gone after this. cli_operation_history is kept so the audit trail survives.',
+    purge_type_username:'Type {u} to confirm:',
+    purge_mismatch:'Username did not match — nothing was deleted.',
+    user_purged:'User "{u}" purged.',
     nes_multi:'Network Elements (select multiple)', select_user_and_nes:'Select a user and at least one NE',
     groups_multi:'Groups (select multiple)', select_user_and_group:'Select a user and at least one group',
     map_target:'Target', target_ne:'NE', target_group:'Group',
@@ -690,8 +697,9 @@ const I18N = {
       <h4>Lifecycle</h4>
       <ul>
         <li><b>Create</b> — Users tab → fill username + password + optional email/full_name/phone + account_type (1 Admin / 2 Normal) + one or more groups. Admin users must supply full_name + phone + ≥1 group.</li>
-        <li><b>Disable</b> — soft-delete (sets <code>is_enable=false</code>). Disabled users cannot log in; their email is treated as free for reuse.</li>
+        <li><b>Disable</b> — soft-delete (sets <code>is_enable=false</code>). Disabled users cannot log in; their email is treated as free for reuse. The row stays in the DB.</li>
         <li><b>Re-enable</b> — re-run <b>Create</b> with the same username. Non-empty fields in the request override the stored values (omitted fields keep their previous values); password is always refreshed.</li>
+        <li><b>Purge (hard-delete)</b> — removes the <code>tbl_account</code> row + all user-group / user-ne mappings + password history. <span class="badge badge-red">Irreversible</span>. SuperAdmin is refused. The UI requires typing the username to confirm; the CLI uses <code>purge user &lt;name&gt;</code> with y/N. <code>cli_operation_history</code> is kept so the audit trail still survives after purge.</li>
         <li><b>Change password</b> — top-right "Change Password". Server resolves the user's effective policy → enforces min_length + require_{U,L,D,S} + history_count (cannot reuse last N hashes). <code>password_expires_at</code> is set to <code>now + max_age_days</code> when the policy defines aging.</li>
         <li><b>Admin reset</b> — Users tab action. Bypasses the old-password check but still validates against policy + history.</li>
         <li><b>Lockout</b> — if the effective policy sets <code>max_login_failure</code> + <code>lockout_minutes</code>, N consecutive bad passwords freeze the account for M minutes. The login endpoint returns <code>403 {locked_until, retry_in_seconds}</code>. A successful login resets the counter.</li>
@@ -789,6 +797,13 @@ const I18N = {
     user_required_fields:'Tên đăng nhập, email, mật khẩu và nhập lại mật khẩu là bắt buộc',
     login:'Đăng nhập', logout:'Đăng xuất', create:'Tạo', edit:'Sửa', update:'Cập nhật', cancel:'Hủy', save:'Lưu', assign:'Gán',
     refresh:'Làm mới', delete_btn:'Xóa', disable:'Vô hiệu hóa', description:'Mô tả', ne_name:'Tên', ne:'Phần tử mạng',
+    purge:'Xoá vĩnh viễn', purge_tooltip:'Xoá hẳn: xoá cả row + mapping + password history. KHÔNG khôi phục được.',
+    purge_warn_1:'XOÁ VĨNH VIỄN user "{u}"? Bản ghi tbl_account + mọi mapping + password history sẽ bị xoá. Không khôi phục được.',
+    purge_warn_2:'Đây là XOÁ HẲN — không phải disable.',
+    purge_warn_3:'Row trong tbl_account bị xoá hẳn. cli_operation_history được giữ lại để vẫn có audit trail.',
+    purge_type_username:'Gõ {u} để xác nhận:',
+    purge_mismatch:'Tên đăng nhập không khớp — chưa xoá gì.',
+    user_purged:'Đã xoá vĩnh viễn user "{u}".',
     nes_multi:'Phần tử mạng (chọn nhiều)', select_user_and_nes:'Hãy chọn user và ít nhất một NE',
     groups_multi:'Nhóm (chọn nhiều)', select_user_and_group:'Hãy chọn user và ít nhất một nhóm',
     map_target:'Đối tượng', target_ne:'NE', target_group:'Nhóm',
@@ -820,8 +835,9 @@ const I18N = {
       <h4>Vòng đời tài khoản</h4>
       <ul>
         <li><b>Tạo</b> — tab Users → điền username + password + email/full_name/phone tuỳ chọn + account_type (1 Admin / 2 Normal) + 1..N nhóm. Admin bắt buộc có full_name + phone + ≥1 nhóm.</li>
-        <li><b>Vô hiệu hoá</b> — soft-delete (<code>is_enable=false</code>). User bị disable không login được; email của họ được coi là "free" để dùng lại.</li>
+        <li><b>Vô hiệu hoá</b> — soft-delete (<code>is_enable=false</code>). User bị disable không login được; email của họ được coi là "free" để dùng lại. Row vẫn còn trong DB.</li>
         <li><b>Kích hoạt lại</b> — gọi lại <b>Tạo</b> với cùng username. Field có giá trị mới sẽ override; field bỏ trống giữ nguyên; password luôn refresh.</li>
+        <li><b>Xoá vĩnh viễn (purge)</b> — xoá hẳn row <code>tbl_account</code> + mọi mapping (user↔group, user↔NE) + password history. <span class="badge badge-red">Không khôi phục được</span>. SuperAdmin bị refuse. UI bắt gõ lại username để xác nhận; CLI dùng <code>purge user &lt;tên&gt;</code> với y/N. <code>cli_operation_history</code> được giữ lại để audit trail vẫn sống sau khi xoá.</li>
         <li><b>Đổi mật khẩu</b> — nút "Change Password" góc trên. Server resolve effective policy → enforce min_length + require_{U,L,D,S} + history_count (không được dùng lại N hash gần nhất). <code>password_expires_at = now + max_age_days</code> nếu policy có max_age.</li>
         <li><b>Admin reset</b> — action ở tab Users. Bỏ qua bước check old-password nhưng vẫn validate theo policy + history.</li>
         <li><b>Lockout</b> — nếu effective policy có <code>max_login_failure</code> + <code>lockout_minutes</code>, sai N lần sẽ khoá account M phút. Login endpoint trả <code>403 {locked_until, retry_in_seconds}</code>. Login thành công reset counter.</li>
@@ -1160,7 +1176,8 @@ async function loadUsers() {
       +'<td class="actions admin-only">'
       +(u.account_type===0?'':'<button class="btn btn-outline btn-sm" onclick="openEditUserModal(\''+esc(u.account_name)+'\')">'+t('edit')+'</button>')
       +(u.account_type===0?'':'<button class="btn btn-outline btn-sm" onclick="openResetPasswordModal(\''+esc(u.account_name)+'\')">'+t('reset_password')+'</button>')
-      +'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button>'
+      +(u.account_type===0?'':'<button class="btn btn-danger btn-sm" onclick="deleteUser(\''+esc(u.account_name)+'\')">'+t('disable')+'</button>')
+      +(u.account_type===0?'':'<button class="btn btn-danger btn-sm" style="background:linear-gradient(135deg,#991b1b 0%,#7f1d1d 100%)" onclick="purgeUser(\''+esc(u.account_name)+'\')" title="'+t('purge_tooltip')+'">'+t('purge')+'</button>')
       +'</td></tr>';
   });
   html+='</tbody></table>';
@@ -1189,6 +1206,29 @@ async function createUser(){
   else toast(failMsg(res),'error');
 }
 async function deleteUser(username){if(!confirm(t('disable')+' '+username+'?'))return;const res=await api('POST','/authenticate/user/delete',{account_name:username});if(res.status===200){toast('User disabled');await refreshCaches();loadUsers();}else toast(failMsg(res),'error');}
+
+// purgeUser hard-deletes the user row + all mappings + password history.
+// Requires the admin to TYPE the username (not just click OK) so this
+// can't happen on autopilot. Two layers of confirm:
+//   1. browser confirm() with a scary message
+//   2. modal that requires typing the username verbatim
+async function purgeUser(username){
+  if(!confirm(t('purge_warn_1').replace('{u}',username))) return;
+  const body = '<p style="color:#fca5a5;font-weight:600">'+t('purge_warn_2')+'</p>'
+    +'<p style="color:#94a3b8;font-size:.85rem;margin:.75rem 0">'+t('purge_warn_3')+'</p>'
+    +'<div class="form-group"><label>'+t('purge_type_username').replace('{u}','<code>'+esc(username)+'</code>')+'</label>'
+    +'<input id="purgeConfirmInput" autocomplete="off" autofocus></div>';
+  openModal(t('purge')+' '+username, body, async () => {
+    const typed = document.getElementById('purgeConfirmInput').value.trim();
+    if(typed !== username){ toast(t('purge_mismatch'),'error'); return; }
+    const res = await api('POST','/authenticate/user/purge',{account_name:username});
+    if(res.status !== 200){ toast(failMsg(res),'error'); return; }
+    closeModal();
+    toast(t('user_purged').replace('{u}',username));
+    await refreshCaches();
+    loadUsers();
+  }, t('purge'));
+}
 
 function openChangePasswordModal(){
   const body =

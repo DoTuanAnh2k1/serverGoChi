@@ -65,6 +65,7 @@ func Init() {
 				g.Use(middleware.CheckRole)
 				g.Post("/set", HandlerAuthenticateUserSet)
 				g.Post("/delete", HandlerAuthenticateUserDelete)
+				g.Post("/purge", HandlerAuthenticateUserPurge)
 				g.Post("/reset-password", HandlerAdminResetPassword)
 			})
 		})

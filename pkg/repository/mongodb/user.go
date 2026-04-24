@@ -65,6 +65,28 @@ func (c *Client) UpdateUser(user *db_models.TblAccount) error {
 	return err
 }
 
+// DeleteUserById hard-deletes the account document. Callers fan out the
+// cascade (user-group / user-ne mappings, password history) first; the
+// repo only touches the tbl_account collection.
+func (c *Client) DeleteUserById(id int64) error {
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colAccounts).DeleteOne(ctx, bson.M{"account_id": id})
+	if err == mongo.ErrNoDocuments {
+		return nil
+	}
+	return err
+}
+
+// DeleteAllUserNeMappingByUserId is the user-side companion to the NE-side
+// existing method, used by PurgeUser.
+func (c *Client) DeleteAllUserNeMappingByUserId(userId int64) error {
+	ctx, cancel := c.opCtx()
+	defer cancel()
+	_, err := c.col(colUserNeMapping).DeleteMany(ctx, bson.M{"user_id": userId})
+	return err
+}
+
 func (c *Client) UpdateLoginHistory(username, ipAddress string, timeLogin time.Time) error {
 	ctx, cancel := c.opCtx()
 	defer cancel()

@@ -180,6 +180,14 @@ func (c *MgtClient) DeleteUser(accountName string) error {
 	return err
 }
 
+// PurgeUser hard-deletes a user (tbl_account + all mappings + password history).
+// Different from DeleteUser which only soft-deletes (is_enable=false).
+// Refused server-side for SuperAdmin accounts.
+func (c *MgtClient) PurgeUser(accountName string) error {
+	_, _, err := c.do(http.MethodPost, "/aa/authenticate/user/purge", map[string]string{"account_name": accountName})
+	return err
+}
+
 func (c *MgtClient) ResetUserPassword(username, newPassword string) error {
 	_, _, err := c.do(http.MethodPost, "/aa/authenticate/user/reset-password", map[string]string{
 		"username":     username,

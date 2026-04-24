@@ -51,6 +51,10 @@ type DatabaseStore interface {
 	GetUserByUserName(string) (*db_models.TblAccount, error)
 	UpdateUser(account *db_models.TblAccount) error
 	AddUser(*db_models.TblAccount) error
+	// DeleteUserById removes the tbl_account row permanently. The caller is
+	// responsible for cascading mapping + history rows first; the repo layer
+	// does NOT fan-out.
+	DeleteUserById(id int64) error
 	Ping() error
 	UpdateLoginHistory(string, string, time.Time) error
 	SaveHistoryCommand(db_models.CliOperationHistory) error
@@ -64,6 +68,7 @@ type DatabaseStore interface {
 	CreateUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteUserNeMapping(*db_models.CliUserNeMapping) error
 	DeleteAllUserNeMappingByNeId(neId int64) error
+	DeleteAllUserNeMappingByUserId(userId int64) error
 	GetNeMonitorById(int64) (*db_models.CliNeMonitor, error)
 	DeleteNeMonitorByNeId(neId int64) error
 	GetAllNeOfUserByUserId(int64) ([]*db_models.CliUserNeMapping, error)

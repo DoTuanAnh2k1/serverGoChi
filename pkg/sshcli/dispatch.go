@@ -58,6 +58,8 @@ func (d *Dispatcher) Run(c *Command) error {
 		return d.handleGrant(c, "deny")
 	case "revoke":
 		return d.handleRevoke(c)
+	case "purge":
+		return d.handlePurge(c)
 	}
 	return fmt.Errorf("unhandled verb %q", c.Verb)
 }
@@ -444,6 +446,25 @@ func (d *Dispatcher) handleDelete(c *Command) error {
 	return nil
 }
 
+// handlePurge hard-deletes the user (tbl_account row + all mappings +
+// password history). Distinct from handleDelete which soft-deletes via
+// is_enable=false. The confirm prompt uses a stronger "PURGE" label so
+// the operator can't mistake this for a reversible disable.
+func (d *Dispatcher) handlePurge(c *Command) error {
+	if c.Entity != "user" {
+		return fmt.Errorf("purge only supports user, got %q", c.Entity)
+	}
+	if !d.confirmDelete("PURGE user", c.Target) {
+		fmt.Fprintln(d.Out, "aborted")
+		return nil
+	}
+	if err := d.Client.PurgeUser(c.Target); err != nil {
+		return err
+	}
+	fmt.Fprintln(d.Out, "OK: user purged (row + mappings + password history removed)")
+	return nil
+}
+
 func (d *Dispatcher) handleMap(c *Command, attach bool) error {
 	if c.Entity == "command-group" && c.Relation == "command" {
 		return d.mapCommandGroup(c, attach)
@@ -591,7 +612,8 @@ const helpGeneral = `Available commands (type 'help <command>' or append '--help
   show user|ne|group|ne-profile|command-def|command-group [<field> <value> | <name|id>]
   set   <entity> <field> <value> [<field> <value> ...]
   update <entity> <name|id> <field> <value> [...]
-  delete <entity> <name|id>
+  delete <entity> <name|id>          # soft-delete (is_enable=false for user)
+  purge  user <account_name>         # HARD-delete user + all mappings + history
   map user <name> ne <ne_name|id>
   map user <name> group <group_name|id>
   map group <group_name|id> ne <ne_name|id>
@@ -727,7 +749,9 @@ Delete the target record.
   ne     target: ne_name or id        (cascades user↔NE mappings)
   group  target: name or id
 `,
-	"delete user":  "delete user <account_name>\n\nDeletes the user. SuperAdmin cannot be deleted.\n",
+	"delete user":  "delete user <account_name>\n\nSoft-delete: sets is_enable=false. The row stays in the DB and can be reactivated with `set user name <same> password <...>`. SuperAdmin cannot be disabled. For an irreversible removal use `purge user`.\n",
+	"purge":        "purge user <account_name>\n\nHARD-DELETE: removes tbl_account row + all user-group / user-ne mappings + password history. Irreversible. SuperAdmin cannot be purged. Use `delete user` instead when you want a reversible disable.\n",
+	"purge user":   "purge user <account_name>\n\nHARD-DELETE: removes tbl_account row + all user-group / user-ne mappings + password history. Irreversible. SuperAdmin cannot be purged.\n",
 	"delete ne":    "delete ne <ne_name|id>\n\nDeletes the NE and cascades user↔NE and group↔NE mappings.\n",
 	"delete group": "delete group <name|id>\n\nDeletes the group and its user↔group and group↔NE mappings.\n",
 	"show": `show <entity> [<field> <value> | <name|id>]

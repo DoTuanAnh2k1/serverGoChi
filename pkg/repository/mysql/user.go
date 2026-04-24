@@ -58,6 +58,16 @@ func (c *Client) UpdateUser(user *db_models.TblAccount) error {
 	return nil
 }
 
+// DeleteUserById hard-deletes the tbl_account row. Callers are expected to
+// fan out the cascade (user-group / user-ne mappings, password history)
+// before hitting this — the repo layer only touches tbl_account.
+func (c *Client) DeleteUserById(id int64) error {
+	if c.Db == nil {
+		return errors.New("no database connection")
+	}
+	return c.Db.Delete(&db_models.TblAccount{}, id).Error
+}
+
 func (c *Client) UpdateLoginHistory(username, ipAddress string, timeLogin time.Time) error {
 	cond := &db_models.CliLoginHistory{
 		UserName:  username,

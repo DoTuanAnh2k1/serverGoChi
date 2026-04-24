@@ -17,6 +17,7 @@ type MockStore struct {
 	GetUserByUserNameFn           func(name string) (*db_models.TblAccount, error)
 	UpdateUserFn                  func(account *db_models.TblAccount) error
 	AddUserFn                     func(account *db_models.TblAccount) error
+	DeleteUserByIdFn              func(id int64) error
 	PingFn                        func() error
 	UpdateLoginHistoryFn          func(username, ip string, t time.Time) error
 	SaveHistoryCommandFn          func(h db_models.CliOperationHistory) error
@@ -30,6 +31,7 @@ type MockStore struct {
 	CreateUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
 	DeleteUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
 	DeleteAllUserNeMappingByNeIdFn   func(neId int64) error
+	DeleteAllUserNeMappingByUserIdFn func(userId int64) error
 	GetNeMonitorByIdFn               func(id int64) (*db_models.CliNeMonitor, error)
 	DeleteNeMonitorByNeIdFn          func(neId int64) error
 	GetAllNeOfUserByUserIdFn         func(userID int64) ([]*db_models.CliUserNeMapping, error)
@@ -149,6 +151,20 @@ func (m *MockStore) UpdateUser(account *db_models.TblAccount) error {
 func (m *MockStore) AddUser(account *db_models.TblAccount) error {
 	if m.AddUserFn != nil {
 		return m.AddUserFn(account)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteUserById(id int64) error {
+	if m.DeleteUserByIdFn != nil {
+		return m.DeleteUserByIdFn(id)
+	}
+	return nil
+}
+
+func (m *MockStore) DeleteAllUserNeMappingByUserId(userId int64) error {
+	if m.DeleteAllUserNeMappingByUserIdFn != nil {
+		return m.DeleteAllUserNeMappingByUserIdFn(userId)
 	}
 	return nil
 }

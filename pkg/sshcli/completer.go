@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	topVerbs = []string{"show", "set", "update", "delete", "map", "unmap", "allow", "deny", "revoke", "help", "exit"}
+	topVerbs = []string{"show", "set", "update", "delete", "purge", "map", "unmap", "allow", "deny", "revoke", "help", "exit"}
 	entities = []string{"user", "ne", "group", "ne-profile", "command-def", "command-group"}
 )
 
@@ -77,6 +77,8 @@ func candidatesAt(prev []string, index int) []string {
 		switch verb {
 		case "show", "set", "update", "delete", "map", "unmap":
 			return entities
+		case "purge":
+			return []string{"user"}
 		case "allow", "deny", "revoke":
 			// verb <group_name> ... — nothing to complete at the group-name slot.
 			return nil

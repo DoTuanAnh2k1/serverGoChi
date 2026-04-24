@@ -382,6 +382,70 @@ func HandlerAuthenticateUserDelete(w http.ResponseWriter, r *http.Request) {
 	response.Write(w, http.StatusNotFound, "user not found")
 }
 
+// HandlerAuthenticateUserPurge hard-deletes a user and all related rows.
+// Different from /delete which only sets is_enable=false. This is
+// DESTRUCTIVE and irreversible — intended for admins cleaning up test
+// accounts or revoked credentials where the audit trail can be rebuilt
+// from cli_operation_history.
+//
+// Input : POST body JSON { "account_name": string }
+// Output: 200 "user purged" on success
+//         403 if target is SuperAdmin (refused)
+//         404 if user not found
+//         500 on DB error
+// Flow  : decode body → get actor from context → PurgeUser (cascade mappings
+//         + password history + tbl_account row) → saveHistory
+func HandlerAuthenticateUserPurge(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		response.Write(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+	var body db_models.TblAccount
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		response.Write(w, http.StatusBadRequest, "invalid request body")
+		return
+	}
+	if strings.TrimSpace(body.AccountName) == "" {
+		response.Write(w, http.StatusBadRequest, "account_name is required")
+		return
+	}
+	actor, ok := r.Context().Value(middleware.UserContextKey).(*middleware.User)
+	if !ok {
+		response.InternalError(w, "Internal Server Error")
+		return
+	}
+	log := logger.Logger.WithField("actor", actor.Username).WithField("target", body.AccountName)
+
+	opHistory := db_models.CliOperationHistory{
+		CmdName:     fmt.Sprintf("authenticate-user PURGE username %v", body.AccountName),
+		CreatedDate: time.Now(),
+		Scope:       "cli-config",
+		Account:     actor.Username,
+	}
+
+	if err := service.PurgeUser(body.AccountName); err != nil {
+		msg := err.Error()
+		switch {
+		case strings.Contains(msg, "SuperAdmin"):
+			log.Warn("authenticate/user/purge: SuperAdmin refused")
+			saveHistory(opHistory, "failure")
+			response.Write(w, http.StatusForbidden, msg)
+		case strings.Contains(msg, "not found"):
+			log.Warn("authenticate/user/purge: target not found")
+			saveHistory(opHistory, "failure")
+			response.Write(w, http.StatusNotFound, msg)
+		default:
+			log.Errorf("authenticate/user/purge: %v", err)
+			saveHistory(opHistory, "failure")
+			response.InternalError(w, "failed to purge user")
+		}
+		return
+	}
+	log.Info("authenticate/user/purge: user hard-deleted")
+	saveHistory(opHistory, "success")
+	response.Success(w, "user purged")
+}
+
 // HandlerAuthenticateUserShow liệt kê tất cả user cùng NE và role tương ứng.
 //
 // Input : GET (không có body/query params)

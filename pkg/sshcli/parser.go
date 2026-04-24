@@ -86,7 +86,7 @@ func Parse(line string) (*Command, error) {
 		}
 		c.Target = strings.Join(parts, " ")
 		return c, nil
-	case "show", "set", "update", "delete", "map", "unmap":
+	case "show", "set", "update", "delete", "purge", "map", "unmap":
 	case "allow", "deny":
 		return parseGrant(verb, tokens, c)
 	case "revoke":
@@ -125,6 +125,16 @@ func Parse(line string) (*Command, error) {
 	case "delete":
 		if len(rest) != 1 {
 			return nil, fmt.Errorf("delete %s requires exactly one target (name or id)", c.Entity)
+		}
+		c.Target = rest[0]
+	case "purge":
+		// Hard-delete. Currently only `purge user <name>` is supported —
+		// NE/group/RBAC entities use plain `delete`.
+		if c.Entity != "user" {
+			return nil, fmt.Errorf("purge is only supported for user; use `delete %s` for other entities", c.Entity)
+		}
+		if len(rest) != 1 {
+			return nil, fmt.Errorf("purge user requires exactly one target (account_name)")
 		}
 		c.Target = rest[0]
 	case "set":
