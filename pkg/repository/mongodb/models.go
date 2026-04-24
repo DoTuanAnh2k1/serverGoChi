@@ -6,116 +6,189 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// mAccount mirrors db_models.TblAccount with bson tags.
-type mAccount struct {
-	AccountID         int64     `bson:"account_id"`
-	AccountName       string    `bson:"account_name"`
-	Password          string    `bson:"password"`
-	FullName          string    `bson:"full_name"`
-	Email             string    `bson:"email"`
-	Address           string    `bson:"address"`
-	PhoneNumber       string    `bson:"phone_number"`
-	LoginFailureCount int32     `bson:"login_failure_count"`
-	ForceChangePass   bool      `bson:"force_change_pass"`
-	CreatedDate       time.Time `bson:"created_date"`
-	UpdatedDate       time.Time `bson:"updated_date"`
-	LastLoginTime     time.Time `bson:"last_login_time"`
-	LastChangePass    time.Time `bson:"last_change_pass"`
-	Avatar            string    `bson:"avatar"`
-	Status            bool      `bson:"status"`
-	DefaultDashboard  int32     `bson:"default_dashboard"`
-	AccountType       int32     `bson:"account_type"`
-	AutoPassword      bool      `bson:"auto_password"`
-	Description       string    `bson:"description"`
-	IsEnable          bool      `bson:"is_enable"`
-	CreatedBy         string    `bson:"created_by"`
-	UpdatedBy         string    `bson:"updated_by"`
-	LockedTime        time.Time `bson:"locked_time"`
-	OnlyAD            bool      `bson:"onlyAD"`
+// Mongo documents — one struct per collection, bson-tagged in snake_case so
+// the shape matches db.sql column names. The native driver has no ORM, so
+// converters below handle the db_models ↔ document mapping explicitly.
+
+type mUser struct {
+	ID                int64      `bson:"id"`
+	Username          string     `bson:"username"`
+	PasswordHash      string     `bson:"password_hash"`
+	Email             string     `bson:"email"`
+	FullName          string     `bson:"full_name"`
+	Phone             string     `bson:"phone"`
+	IsEnabled         bool       `bson:"is_enabled"`
+	PasswordExpiresAt *time.Time `bson:"password_expires_at,omitempty"`
+	LoginFailureCount int32      `bson:"login_failure_count"`
+	LockedAt          *time.Time `bson:"locked_at,omitempty"`
+	LastLoginAt       *time.Time `bson:"last_login_at,omitempty"`
+	CreatedAt         time.Time  `bson:"created_at"`
+	UpdatedAt         time.Time  `bson:"updated_at"`
 }
 
-func toMAccount(a *db_models.TblAccount) *mAccount {
-	return &mAccount{
-		AccountID: a.AccountID, AccountName: a.AccountName, Password: a.Password,
-		FullName: a.FullName, Email: a.Email, Address: a.Address, PhoneNumber: a.PhoneNumber,
-		LoginFailureCount: a.LoginFailureCount, ForceChangePass: a.ForceChangePass,
-		CreatedDate: a.CreatedDate, UpdatedDate: a.UpdatedDate, LastLoginTime: a.LastLoginTime,
-		LastChangePass: a.LastChangePass, Avatar: a.Avatar, Status: a.Status,
-		DefaultDashboard: a.DefaultDashboard, AccountType: a.AccountType, AutoPassword: a.AutoPassword,
-		Description: a.Description, IsEnable: a.IsEnable, CreatedBy: a.CreatedBy, UpdatedBy: a.UpdatedBy,
-		LockedTime: a.LockedTime, OnlyAD: a.OnlyAD,
+func toMUser(u *db_models.User) mUser {
+	return mUser{
+		ID: u.ID, Username: u.Username, PasswordHash: u.PasswordHash,
+		Email: u.Email, FullName: u.FullName, Phone: u.Phone,
+		IsEnabled: u.IsEnabled, PasswordExpiresAt: u.PasswordExpiresAt,
+		LoginFailureCount: u.LoginFailureCount, LockedAt: u.LockedAt,
+		LastLoginAt: u.LastLoginAt, CreatedAt: u.CreatedAt, UpdatedAt: u.UpdatedAt,
 	}
 }
 
-func fromMAccount(m *mAccount) *db_models.TblAccount {
-	return &db_models.TblAccount{
-		AccountID: m.AccountID, AccountName: m.AccountName, Password: m.Password,
-		FullName: m.FullName, Email: m.Email, Address: m.Address, PhoneNumber: m.PhoneNumber,
-		LoginFailureCount: m.LoginFailureCount, ForceChangePass: m.ForceChangePass,
-		CreatedDate: m.CreatedDate, UpdatedDate: m.UpdatedDate, LastLoginTime: m.LastLoginTime,
-		LastChangePass: m.LastChangePass, Avatar: m.Avatar, Status: m.Status,
-		DefaultDashboard: m.DefaultDashboard, AccountType: m.AccountType, AutoPassword: m.AutoPassword,
-		Description: m.Description, IsEnable: m.IsEnable, CreatedBy: m.CreatedBy, UpdatedBy: m.UpdatedBy,
-		LockedTime: m.LockedTime, OnlyAD: m.OnlyAD,
+func fromMUser(m *mUser) *db_models.User {
+	return &db_models.User{
+		ID: m.ID, Username: m.Username, PasswordHash: m.PasswordHash,
+		Email: m.Email, FullName: m.FullName, Phone: m.Phone,
+		IsEnabled: m.IsEnabled, PasswordExpiresAt: m.PasswordExpiresAt,
+		LoginFailureCount: m.LoginFailureCount, LockedAt: m.LockedAt,
+		LastLoginAt: m.LastLoginAt, CreatedAt: m.CreatedAt, UpdatedAt: m.UpdatedAt,
 	}
 }
 
-// mNe mirrors db_models.CliNe with new conf_* fields.
-type mNe struct {
-	ID                int64  `bson:"id"`
-	NeName            string `bson:"ne_name"`
-	Namespace         string `bson:"namespace"`
-	SiteName          string `bson:"site_name"`
-	SystemType        string `bson:"system_type"`
-	Description       string `bson:"description"`
-	CommandURL        string `bson:"command_url"`
-	ConfMode          string `bson:"conf_mode"`
-	ConfMasterIP      string `bson:"conf_master_ip"`
-	ConfSlaveIP       string `bson:"conf_slave_ip"`
-	ConfPortMasterSSH int32  `bson:"conf_port_master_ssh"`
-	ConfPortSlaveSSH  int32  `bson:"conf_port_slave_ssh"`
-	ConfPortMasterTCP int32  `bson:"conf_port_master_tcp"`
-	ConfPortSlaveTCP  int32  `bson:"conf_port_slave_tcp"`
-	ConfUsername      string `bson:"conf_username"`
-	ConfPassword      string `bson:"conf_password"`
-	NeProfileID       *int64 `bson:"ne_profile_id,omitempty"`
+type mNE struct {
+	ID          int64  `bson:"id"`
+	Namespace   string `bson:"namespace"`
+	NeType      string `bson:"ne_type"`
+	SiteName    string `bson:"site_name"`
+	Description string `bson:"description"`
+	MasterIP    string `bson:"master_ip"`
+	MasterPort  int32  `bson:"master_port"`
+	SSHUsername string `bson:"ssh_username"`
+	SSHPassword string `bson:"ssh_password"`
+	CommandURL  string `bson:"command_url"`
+	ConfMode    string `bson:"conf_mode"`
 }
 
-func toMNe(n *db_models.CliNe) *mNe {
-	return &mNe{
-		ID: n.ID, NeName: n.NeName, Namespace: n.Namespace, SiteName: n.SiteName,
-		SystemType: n.SystemType, Description: n.Description, CommandURL: n.CommandURL,
-		ConfMode: n.ConfMode, ConfMasterIP: n.ConfMasterIP, ConfSlaveIP: n.ConfSlaveIP,
-		ConfPortMasterSSH: n.ConfPortMasterSSH, ConfPortSlaveSSH: n.ConfPortSlaveSSH,
-		ConfPortMasterTCP: n.ConfPortMasterTCP, ConfPortSlaveTCP: n.ConfPortSlaveTCP,
-		ConfUsername: n.ConfUsername, ConfPassword: n.ConfPassword,
-		NeProfileID: n.NeProfileID,
+func toMNE(n *db_models.NE) mNE {
+	return mNE{
+		ID: n.ID, Namespace: n.Namespace, NeType: n.NeType,
+		SiteName: n.SiteName, Description: n.Description,
+		MasterIP: n.MasterIP, MasterPort: n.MasterPort,
+		SSHUsername: n.SSHUsername, SSHPassword: n.SSHPassword,
+		CommandURL: n.CommandURL, ConfMode: n.ConfMode,
 	}
 }
 
-func fromMNe(m *mNe) *db_models.CliNe {
-	return &db_models.CliNe{
-		ID: m.ID, NeName: m.NeName, Namespace: m.Namespace, SiteName: m.SiteName,
-		SystemType: m.SystemType, Description: m.Description, CommandURL: m.CommandURL,
-		ConfMode: m.ConfMode, ConfMasterIP: m.ConfMasterIP, ConfSlaveIP: m.ConfSlaveIP,
-		ConfPortMasterSSH: m.ConfPortMasterSSH, ConfPortSlaveSSH: m.ConfPortSlaveSSH,
-		ConfPortMasterTCP: m.ConfPortMasterTCP, ConfPortSlaveTCP: m.ConfPortSlaveTCP,
-		ConfUsername: m.ConfUsername, ConfPassword: m.ConfPassword,
-		NeProfileID: m.NeProfileID,
+func fromMNE(m *mNE) *db_models.NE {
+	return &db_models.NE{
+		ID: m.ID, Namespace: m.Namespace, NeType: m.NeType,
+		SiteName: m.SiteName, Description: m.Description,
+		MasterIP: m.MasterIP, MasterPort: m.MasterPort,
+		SSHUsername: m.SSHUsername, SSHPassword: m.SSHPassword,
+		CommandURL: m.CommandURL, ConfMode: m.ConfMode,
 	}
 }
 
-// mUserNeMapping mirrors db_models.CliUserNeMapping.
-type mUserNeMapping struct {
-	UserID  int64 `bson:"user_id"`
-	TblNeID int64 `bson:"tbl_ne_id"`
+type mCommand struct {
+	ID          int64  `bson:"id"`
+	NeID        int64  `bson:"ne_id"`
+	Service     string `bson:"service"`
+	CmdText     string `bson:"cmd_text"`
+	Description string `bson:"description"`
 }
 
-func fromMUserNeMapping(m *mUserNeMapping) *db_models.CliUserNeMapping {
-	return &db_models.CliUserNeMapping{UserID: m.UserID, TblNeID: m.TblNeID}
+func toMCommand(c *db_models.Command) mCommand {
+	return mCommand{ID: c.ID, NeID: c.NeID, Service: c.Service, CmdText: c.CmdText, Description: c.Description}
 }
 
-// mConfigBackup mirrors db_models.CliConfigBackup.
+func fromMCommand(m *mCommand) *db_models.Command {
+	return &db_models.Command{ID: m.ID, NeID: m.NeID, Service: m.Service, CmdText: m.CmdText, Description: m.Description}
+}
+
+type mGroup struct {
+	ID          int64  `bson:"id"`
+	Name        string `bson:"name"`
+	Description string `bson:"description"`
+}
+
+type mPasswordPolicy struct {
+	ID                int64 `bson:"id"`
+	MinLength         int32 `bson:"min_length"`
+	MaxAgeDays        int32 `bson:"max_age_days"`
+	RequireUppercase  bool  `bson:"require_uppercase"`
+	RequireLowercase  bool  `bson:"require_lowercase"`
+	RequireDigit      bool  `bson:"require_digit"`
+	RequireSpecial    bool  `bson:"require_special"`
+	HistoryCount      int32 `bson:"history_count"`
+	MaxLoginFailure   int32 `bson:"max_login_failure"`
+	LockoutMinutes    int32 `bson:"lockout_minutes"`
+}
+
+func toMPasswordPolicy(p *db_models.PasswordPolicy) mPasswordPolicy {
+	return mPasswordPolicy{
+		ID: p.ID, MinLength: p.MinLength, MaxAgeDays: p.MaxAgeDays,
+		RequireUppercase: p.RequireUppercase, RequireLowercase: p.RequireLowercase,
+		RequireDigit: p.RequireDigit, RequireSpecial: p.RequireSpecial,
+		HistoryCount: p.HistoryCount, MaxLoginFailure: p.MaxLoginFailure,
+		LockoutMinutes: p.LockoutMinutes,
+	}
+}
+
+func fromMPasswordPolicy(m *mPasswordPolicy) *db_models.PasswordPolicy {
+	return &db_models.PasswordPolicy{
+		ID: m.ID, MinLength: m.MinLength, MaxAgeDays: m.MaxAgeDays,
+		RequireUppercase: m.RequireUppercase, RequireLowercase: m.RequireLowercase,
+		RequireDigit: m.RequireDigit, RequireSpecial: m.RequireSpecial,
+		HistoryCount: m.HistoryCount, MaxLoginFailure: m.MaxLoginFailure,
+		LockoutMinutes: m.LockoutMinutes,
+	}
+}
+
+type mPasswordHistory struct {
+	ID           int64     `bson:"id"`
+	UserID       int64     `bson:"user_id"`
+	PasswordHash string    `bson:"password_hash"`
+	ChangedAt    time.Time `bson:"changed_at"`
+}
+
+type mUserAccessList struct {
+	ID        int64     `bson:"id"`
+	ListType  string    `bson:"list_type"`
+	MatchType string    `bson:"match_type"`
+	Pattern   string    `bson:"pattern"`
+	Reason    string    `bson:"reason"`
+	CreatedAt time.Time `bson:"created_at"`
+}
+
+type mOperationHistory struct {
+	ID           int32     `bson:"id"`
+	Account      string    `bson:"account"`
+	CmdText      string    `bson:"cmd_text"`
+	NeNamespace  string    `bson:"ne_namespace"`
+	NeIP         string    `bson:"ne_ip"`
+	IPAddress    string    `bson:"ip_address"`
+	Scope        string    `bson:"scope"`
+	Result       string    `bson:"result"`
+	CreatedDate  time.Time `bson:"created_date"`
+	ExecutedTime time.Time `bson:"executed_time"`
+}
+
+func toMOperationHistory(h db_models.OperationHistory) mOperationHistory {
+	return mOperationHistory{
+		ID: h.ID, Account: h.Account, CmdText: h.CmdText,
+		NeNamespace: h.NeNamespace, NeIP: h.NeIP, IPAddress: h.IPAddress,
+		Scope: h.Scope, Result: h.Result,
+		CreatedDate: h.CreatedDate, ExecutedTime: h.ExecutedTime,
+	}
+}
+
+func fromMOperationHistory(m *mOperationHistory) db_models.OperationHistory {
+	return db_models.OperationHistory{
+		ID: m.ID, Account: m.Account, CmdText: m.CmdText,
+		NeNamespace: m.NeNamespace, NeIP: m.NeIP, IPAddress: m.IPAddress,
+		Scope: m.Scope, Result: m.Result,
+		CreatedDate: m.CreatedDate, ExecutedTime: m.ExecutedTime,
+	}
+}
+
+type mLoginHistory struct {
+	ID        int32     `bson:"id"`
+	Username  string    `bson:"username"`
+	IPAddress string    `bson:"ip_address"`
+	TimeLogin time.Time `bson:"time_login"`
+}
+
 type mConfigBackup struct {
 	ID        int64     `bson:"id"`
 	NeName    string    `bson:"ne_name"`
@@ -125,48 +198,16 @@ type mConfigBackup struct {
 	CreatedAt time.Time `bson:"created_at"`
 }
 
-func toMConfigBackup(b *db_models.CliConfigBackup) *mConfigBackup {
-	return &mConfigBackup{
+func toMConfigBackup(b *db_models.ConfigBackup) mConfigBackup {
+	return mConfigBackup{
 		ID: b.ID, NeName: b.NeName, NeIP: b.NeIP,
 		FilePath: b.FilePath, Size: b.Size, CreatedAt: b.CreatedAt,
 	}
 }
 
-func fromMConfigBackup(m *mConfigBackup) *db_models.CliConfigBackup {
-	return &db_models.CliConfigBackup{
+func fromMConfigBackup(m *mConfigBackup) *db_models.ConfigBackup {
+	return &db_models.ConfigBackup{
 		ID: m.ID, NeName: m.NeName, NeIP: m.NeIP,
 		FilePath: m.FilePath, Size: m.Size, CreatedAt: m.CreatedAt,
-	}
-}
-
-// mOperationHistory mirrors db_models.CliOperationHistory (simplified fields).
-type mOperationHistory struct {
-	ID           int32     `bson:"id"`
-	Account      string    `bson:"account"`
-	CmdName      string    `bson:"cmd_name"`
-	NeName       string    `bson:"ne_name"`
-	NeIP         string    `bson:"ne_ip"`
-	IPAddress    string    `bson:"ip_address"`
-	Scope        string    `bson:"scope"`
-	Result       string    `bson:"result"`
-	CreatedDate  time.Time `bson:"created_date"`
-	ExecutedTime time.Time `bson:"executed_time"`
-}
-
-func toMOperationHistory(h db_models.CliOperationHistory) *mOperationHistory {
-	return &mOperationHistory{
-		ID: h.ID, Account: h.Account, CmdName: h.CmdName,
-		NeName: h.NeName, NeIP: h.NeIP, IPAddress: h.IPAddress,
-		Scope: h.Scope, Result: h.Result,
-		CreatedDate: h.CreatedDate, ExecutedTime: h.ExecutedTime,
-	}
-}
-
-func fromMOperationHistory(m *mOperationHistory) db_models.CliOperationHistory {
-	return db_models.CliOperationHistory{
-		ID: m.ID, Account: m.Account, CmdName: m.CmdName,
-		NeName: m.NeName, NeIP: m.NeIP, IPAddress: m.IPAddress,
-		Scope: m.Scope, Result: m.Result,
-		CreatedDate: m.CreatedDate, ExecutedTime: m.ExecutedTime,
 	}
 }

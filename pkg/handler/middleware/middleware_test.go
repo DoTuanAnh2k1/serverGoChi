@@ -1,22 +1,23 @@
 package middleware_test
 
 import (
-	"context"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 
+	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/config"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/handler/middleware"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/testutil"
-	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 )
 
 func TestMain(m *testing.M) {
 	testutil.InitTestLogger()
-	config.Init(&config_models.Config{})
+	config.Init(&config_models.Config{
+		Token: config_models.TokenConfig{SecretKey: "test-secret", ExpiryHours: 1},
+	})
 	os.Exit(m.Run())
 }
 
@@ -56,7 +57,6 @@ func TestRateLimit_BlocksOverLimit(t *testing.T) {
 		}
 	}
 
-	// 4th request should be blocked
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, req)
 	if w.Code != http.StatusTooManyRequests {
@@ -70,7 +70,6 @@ func TestRateLimit_DifferentIPsAreIndependent(t *testing.T) {
 		w.WriteHeader(http.StatusOK)
 	}))
 
-	// Exhaust limit for IP A
 	for i := 0; i < 2; i++ {
 		req := httptest.NewRequest(http.MethodGet, "/", nil)
 		req.RemoteAddr = "10.0.0.1:1"
@@ -78,7 +77,6 @@ func TestRateLimit_DifferentIPsAreIndependent(t *testing.T) {
 		handler.ServeHTTP(w, req)
 	}
 
-	// IP A is now blocked
 	reqA := httptest.NewRequest(http.MethodGet, "/", nil)
 	reqA.RemoteAddr = "10.0.0.1:1"
 	wA := httptest.NewRecorder()
@@ -87,7 +85,6 @@ func TestRateLimit_DifferentIPsAreIndependent(t *testing.T) {
 		t.Errorf("IP A should be blocked, got %d", wA.Code)
 	}
 
-	// IP B should still be allowed
 	reqB := httptest.NewRequest(http.MethodGet, "/", nil)
 	reqB.RemoteAddr = "10.0.0.2:1"
 	wB := httptest.NewRecorder()
@@ -144,84 +141,5 @@ func TestAuthenticate_InvalidToken(t *testing.T) {
 
 	if w.Code == http.StatusOK {
 		t.Error("invalid token should not pass through")
-	}
-}
-
-// ── CheckRole middleware ──────────────────────────────────────────────────────
-
-func userCtx(r *http.Request, u *middleware.User) *http.Request {
-	ctx := context.WithValue(r.Context(), middleware.UserContextKey, u)
-	return r.WithContext(ctx)
-}
-
-func TestCheckRole_AdminAllowed(t *testing.T) {
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = userCtx(req, &middleware.User{Username: "alice", Permission: "admin"})
-
-	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})).ServeHTTP(w, req)
-
-	if w.Code != http.StatusOK {
-		t.Errorf("admin user: got %d, want 200", w.Code)
-	}
-}
-
-func TestCheckRole_NonAdminForbidden(t *testing.T) {
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = userCtx(req, &middleware.User{Username: "bob", Permission: "user"})
-
-	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})).ServeHTTP(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("non-admin user: got %d, want 403", w.Code)
-	}
-}
-
-func TestCheckRole_AdminCaseInsensitive(t *testing.T) {
-	for _, role := range []string{"Admin", "ADMIN", "admin"} {
-		w := httptest.NewRecorder()
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
-		req = userCtx(req, &middleware.User{Username: "alice", Permission: role})
-
-		middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(http.StatusOK)
-		})).ServeHTTP(w, req)
-
-		if w.Code != http.StatusOK {
-			t.Errorf("role %q: got %d, want 200", role, w.Code)
-		}
-	}
-}
-
-func TestCheckRole_NoUserInContext(t *testing.T) {
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	// no user injected into context
-
-	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})).ServeHTTP(w, req)
-
-	if w.Code != http.StatusInternalServerError {
-		t.Errorf("missing user in context: got %d, want 500", w.Code)
-	}
-}
-
-func TestCheckRole_EmptyRoles(t *testing.T) {
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/", nil)
-	req = userCtx(req, &middleware.User{Username: "alice", Permission: ""})
-
-	middleware.CheckRole(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	})).ServeHTTP(w, req)
-
-	if w.Code != http.StatusForbidden {
-		t.Errorf("empty roles: got %d, want 403", w.Code)
 	}
 }

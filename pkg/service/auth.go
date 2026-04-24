@@ -3,68 +3,69 @@ package service
 import (
 	"time"
 
-	"github.com/DoTuanAnh2k1/serverGoChi/pkg/bcrypt"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
-	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/token"
+	"golang.org/x/crypto/bcrypt"
 )
 
-func UpdateLoginHistory(username, ipAddress string) error {
-	err := store.GetSingleton().UpdateLoginHistory(username, ipAddress, time.Now())
+// Authenticate runs the full login gate and returns a signed JWT on success:
+//  1. access-list blacklist/whitelist (username + client IP + email)
+//  2. user must exist, be enabled, not locked, not past password expiry
+//  3. bcrypt password check — on miss, increment failure count and lock if
+//     the policy threshold was hit
+//  4. reset failure count, bump last_login_at, write a login_history row,
+//     mint the token
+func Authenticate(username, password, clientIP string) (string, error) {
+	u, err := store.GetSingleton().GetUserByUsername(username)
 	if err != nil {
-		logger.Logger.WithField("user", username).Errorf("auth: update login history: %v", err)
-		return err
+		return "", err
 	}
-	return nil
-}
-
-func GetTblIdByUserId(userId int64) (int64, error) {
-	mapping, err := store.GetSingleton().GetCLIUserNeMappingByUserId(userId)
-	if err != nil {
-		logger.Logger.WithField("user_id", userId).Errorf("auth: get user-ne mapping: %v", err)
-		return 0, err
+	email := ""
+	if u != nil {
+		email = u.Email
 	}
-	if mapping == nil {
-		return 0, nil
-	}
-	return mapping.TblNeID, nil
-}
-
-func GetNeListById(id int64) ([]*db_models.CliNe, error) {
-	list, err := store.GetSingleton().GetNeListById(id)
-	if err != nil {
-		logger.Logger.WithField("tbl_ne_id", id).Errorf("auth: get ne list: %v", err)
-		return nil, err
-	}
-	return list, nil
-}
-
-// GetPermissionByUser derives "admin" or "user" from account_type.
-// account_type 0 (SuperAdmin) and 1 (Admin) → "admin"; 2 (Normal) → "user".
-func GetPermissionByUser(u *db_models.TblAccount) string {
-	if u.AccountType <= 1 {
-		return "admin"
-	}
-	return "user"
-}
-
-func Authenticate(username, password string) (bool, error, int64) {
-	u, err := store.GetSingleton().GetUserByUserName(username)
-	if err != nil {
-		logger.Logger.WithField("user", username).Errorf("auth: get user: %v", err)
-		return false, err, -1
+	if ok, reason := EvaluateAccessList(username, clientIP, email); !ok {
+		logger.Logger.WithField("user", username).Warnf("auth: access-list denied: %s", reason)
+		return "", ErrAccessDenied
 	}
 	if u == nil {
-		logger.Logger.WithField("user", username).Warn("auth: user not found")
-		return false, nil, -1
+		return "", ErrInvalidPassword
 	}
-	if !u.IsEnable {
-		logger.Logger.WithField("user", username).Warn("auth: login attempt on disabled account")
-		return false, nil, -1
+	if !u.IsEnabled {
+		return "", ErrAccountDisabled
 	}
-	if !bcrypt.Matches(username+password, u.Password) {
-		logger.Logger.WithField("user", username).Warn("auth: wrong password")
-		return false, nil, -1
+
+	policy, _ := EffectivePasswordPolicy()
+	if u.LockedAt != nil && policy.LockoutMinutes > 0 {
+		unlock := u.LockedAt.Add(time.Duration(policy.LockoutMinutes) * time.Minute)
+		if time.Now().UTC().Before(unlock) {
+			return "", ErrAccountLocked
+		}
+		u.LockedAt = nil
+		u.LoginFailureCount = 0
 	}
-	return true, nil, u.AccountID
+	if u.PasswordExpiresAt != nil && time.Now().UTC().After(*u.PasswordExpiresAt) {
+		return "", ErrPasswordExpired
+	}
+
+	if err := bcrypt.CompareHashAndPassword([]byte(u.PasswordHash), []byte(password)); err != nil {
+		u.LoginFailureCount++
+		if policy.MaxLoginFailure > 0 && u.LoginFailureCount >= policy.MaxLoginFailure {
+			now := time.Now().UTC()
+			u.LockedAt = &now
+		}
+		u.UpdatedAt = time.Now().UTC()
+		_ = store.GetSingleton().UpdateUser(u)
+		return "", ErrInvalidPassword
+	}
+
+	now := time.Now().UTC()
+	u.LoginFailureCount = 0
+	u.LockedAt = nil
+	u.LastLoginAt = &now
+	u.UpdatedAt = now
+	_ = store.GetSingleton().UpdateUser(u)
+	_ = store.GetSingleton().UpdateLoginHistory(u.Username, clientIP, now)
+	return token.CreateToken(u.Username)
 }

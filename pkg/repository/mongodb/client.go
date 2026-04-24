@@ -1,8 +1,11 @@
+// Package mongodb implements DatabaseStore on the native Mongo driver.
+// Collection names mirror db.sql table names. Sequential int64 ids are
+// managed via the counters collection (see counters.go) because Mongo has
+// no native AUTO_INCREMENT.
 package mongodb
 
 import (
 	"context"
-	"strings"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
@@ -13,15 +16,23 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 )
 
+// v2 collection names — 1:1 with db.sql table names.
 const (
-	colAccounts         = "tbl_account"
-	colNe               = "cli_ne"
-	colRole             = "cli_role"
-	colRoleUserMapping  = "cli_role_user_mapping"
-	colUserNeMapping    = "cli_user_ne_mapping"
-	colOperationHistory = "cli_operation_history"
-	colLoginHistory     = "cli_login_history"
-	// colConfigBackup được định nghĩa trong config_backup.go
+	colUser                = "user"
+	colNe                  = "ne"
+	colCommand             = "command"
+	colNeAccessGroup       = "ne_access_group"
+	colNeAccessGroupUser   = "ne_access_group_user"
+	colNeAccessGroupNe     = "ne_access_group_ne"
+	colCmdExecGroup        = "cmd_exec_group"
+	colCmdExecGroupUser    = "cmd_exec_group_user"
+	colCmdExecGroupCommand = "cmd_exec_group_command"
+	colPasswordPolicy      = "password_policy"
+	colPasswordHistory     = "password_history"
+	colUserAccessList      = "user_access_list"
+	colOperationHistory    = "operation_history"
+	colLoginHistory        = "login_history"
+	colConfigBackup        = "config_backup"
 
 	defaultOpTimeout = 10 * time.Second
 )
@@ -44,12 +55,6 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	// ApplyURI first so any options the user sets in the connection string
-	// (readPreference, writeConcern, replicaSet, authSource, tls, ...) win.
-	// Code-level Set* calls below only fill in safe defaults when the URI
-	// is silent. Write concern intentionally has no default here — for a
-	// 2-node replica set `w=majority` deadlocks when one node is down, so
-	// operators must choose w=1 (2-node) or w=majority (3+-node) via URI.
 	opts := options.Client().ApplyURI(cfg.Mongo.URI)
 	if opts.ReadPreference == nil {
 		opts.SetReadPreference(readpref.PrimaryPreferred())
@@ -86,8 +91,7 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 	return nil
 }
 
-// Ping uses PrimaryPreferred so a brief primary election doesn't immediately
-// flip the health probe to failing.
+// Ping uses PrimaryPreferred so a brief primary election doesn't flip the probe.
 func (c *Client) Ping() error {
 	ctx, cancel := c.opCtx()
 	defer cancel()
@@ -98,8 +102,6 @@ func (c *Client) col(name string) *mongo.Collection {
 	return c.Db.Collection(name)
 }
 
-// opCtx returns a bounded context for a single DB operation so callers don't
-// hang indefinitely during primary election or network partition.
 func (c *Client) opCtx() (context.Context, context.CancelFunc) {
 	d := c.opTimeout
 	if d == 0 {
@@ -108,102 +110,75 @@ func (c *Client) opCtx() (context.Context, context.CancelFunc) {
 	return context.WithTimeout(context.Background(), d)
 }
 
-// ensureIndexes creates the unique + performance indexes that MySQL/Postgres
-// get from db.sql. Idempotent — Mongo silently skips already-present indexes.
-// Also drops obsolete indexes from previous schema versions so upgrades work.
+// ensureIndexes mirrors the UNIQUE/INDEX declarations in db.sql. Idempotent.
 func (c *Client) ensureIndexes(ctx context.Context) error {
-	// Obsolete indexes to drop on startup. Keep this list small and use
-	// SetName when creating indexes so upgrades can target them by name.
-	obsolete := map[string][]string{
-		colNe: {"uq_ne_name"}, // replaced by uq_ne_name_namespace
-	}
-	for coll, names := range obsolete {
-		for _, name := range names {
-			if _, err := c.col(coll).Indexes().DropOne(ctx, name); err != nil &&
-				!strings.Contains(err.Error(), "index not found") &&
-				!strings.Contains(err.Error(), "ns not found") {
-				return err
-			}
-		}
-	}
-
 	plan := map[string][]mongo.IndexModel{
-		colAccounts: {
-			{Keys: bson.D{{Key: "account_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_account_id")},
-			{Keys: bson.D{{Key: "account_name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_account_name")},
+		colUser: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_user_id")},
+			{Keys: bson.D{{Key: "username", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_user_username")},
 		},
 		colNe: {
 			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_id")},
-			// Allow same ne_name across different namespaces (e.g. per-tenant NEs).
-			{Keys: bson.D{{Key: "ne_name", Value: 1}, {Key: "namespace", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_name_namespace")},
-			{Keys: bson.D{{Key: "system_type", Value: 1}}, Options: options.Index().SetName("ix_ne_system_type")},
+			{Keys: bson.D{{Key: "namespace", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_namespace")},
+			{Keys: bson.D{{Key: "ne_type", Value: 1}}, Options: options.Index().SetName("ix_ne_type")},
 		},
-		colGroup: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_id")},
-			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_name")},
+		colCommand: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_id")},
+			{Keys: bson.D{{Key: "ne_id", Value: 1}, {Key: "service", Value: 1}, {Key: "cmd_text", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_sig")},
+			{Keys: bson.D{{Key: "ne_id", Value: 1}}, Options: options.Index().SetName("ix_command_ne")},
 		},
-		colUserNeMapping: {
-			{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "tbl_ne_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_user_ne")},
-			{Keys: bson.D{{Key: "tbl_ne_id", Value: 1}}, Options: options.Index().SetName("ix_user_ne_tbl_ne_id")},
+		colNeAccessGroup: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_nag_id")},
+			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_nag_name")},
 		},
-		colUserGroupMapping: {
-			{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "group_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_user_group")},
-			{Keys: bson.D{{Key: "group_id", Value: 1}}, Options: options.Index().SetName("ix_user_group_group_id")},
+		colNeAccessGroupUser: {
+			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_nag_user")},
+			{Keys: bson.D{{Key: "user_id", Value: 1}}, Options: options.Index().SetName("ix_nag_user_uid")},
 		},
-		colGroupNeMapping: {
-			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "tbl_ne_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_ne")},
-			{Keys: bson.D{{Key: "tbl_ne_id", Value: 1}}, Options: options.Index().SetName("ix_group_ne_tbl_ne_id")},
+		colNeAccessGroupNe: {
+			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "ne_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_nag_ne")},
+			{Keys: bson.D{{Key: "ne_id", Value: 1}}, Options: options.Index().SetName("ix_nag_ne_nid")},
+		},
+		colCmdExecGroup: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ceg_id")},
+			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ceg_name")},
+		},
+		colCmdExecGroupUser: {
+			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "user_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ceg_user")},
+			{Keys: bson.D{{Key: "user_id", Value: 1}}, Options: options.Index().SetName("ix_ceg_user_uid")},
+		},
+		colCmdExecGroupCommand: {
+			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "command_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ceg_cmd")},
+			{Keys: bson.D{{Key: "command_id", Value: 1}}, Options: options.Index().SetName("ix_ceg_cmd_cid")},
+		},
+		colPasswordPolicy: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_pwpol_id")},
+		},
+		colPasswordHistory: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_pwh_id")},
+			{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "changed_at", Value: -1}}, Options: options.Index().SetName("ix_pwh_user_changed")},
+		},
+		colUserAccessList: {
+			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_acl_id")},
+			{Keys: bson.D{{Key: "list_type", Value: 1}, {Key: "match_type", Value: 1}, {Key: "pattern", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_acl_sig")},
 		},
 		colOperationHistory: {
-			{Keys: bson.D{{Key: "created_date", Value: -1}}, Options: options.Index().SetName("ix_history_created_date")},
-			{Keys: bson.D{{Key: "ne_name", Value: 1}}, Options: options.Index().SetName("ix_history_ne_name")},
+			{Keys: bson.D{{Key: "created_date", Value: -1}}, Options: options.Index().SetName("ix_history_created")},
 			{Keys: bson.D{{Key: "account", Value: 1}}, Options: options.Index().SetName("ix_history_account")},
+			{Keys: bson.D{{Key: "ne_namespace", Value: 1}}, Options: options.Index().SetName("ix_history_ne")},
 			{Keys: bson.D{{Key: "scope", Value: 1}}, Options: options.Index().SetName("ix_history_scope")},
 		},
 		colLoginHistory: {
-			{Keys: bson.D{{Key: "user_name", Value: 1}}, Options: options.Index().SetName("ix_login_user_name")},
-			{Keys: bson.D{{Key: "time_login", Value: -1}}, Options: options.Index().SetName("ix_login_time_login")},
+			{Keys: bson.D{{Key: "username", Value: 1}}, Options: options.Index().SetName("ix_login_username")},
+			{Keys: bson.D{{Key: "time_login", Value: -1}}, Options: options.Index().SetName("ix_login_time")},
 		},
 		colConfigBackup: {
 			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_cfgbk_id")},
 			{Keys: bson.D{{Key: "ne_name", Value: 1}}, Options: options.Index().SetName("ix_cfgbk_ne_name")},
-			{Keys: bson.D{{Key: "created_at", Value: -1}}, Options: options.Index().SetName("ix_cfgbk_created_at")},
+			{Keys: bson.D{{Key: "created_at", Value: -1}}, Options: options.Index().SetName("ix_cfgbk_created")},
 		},
 		colCounters: {
 			{Keys: bson.D{{Key: "_id", Value: 1}}, Options: options.Index().SetName("ix_counters_id")},
-		},
-		colNeProfile: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_profile_id")},
-			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_ne_profile_name")},
-		},
-		colCommandDef: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_def_id")},
-			{Keys: bson.D{{Key: "service", Value: 1}, {Key: "ne_profile", Value: 1}, {Key: "pattern", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_def_sig")},
-			{Keys: bson.D{{Key: "category", Value: 1}}, Options: options.Index().SetName("ix_command_def_category")},
-		},
-		colCommandGroup: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_group_id")},
-			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_group_name")},
-		},
-		colCommandGroupMapping: {
-			{Keys: bson.D{{Key: "command_group_id", Value: 1}, {Key: "command_def_id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_command_group_mapping")},
-			{Keys: bson.D{{Key: "command_def_id", Value: 1}}, Options: options.Index().SetName("ix_cgm_def_id")},
-		},
-		colGroupCmdPermission: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_cmd_perm_id")},
-			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "service", Value: 1}, {Key: "ne_scope", Value: 1}, {Key: "grant_type", Value: 1}, {Key: "grant_value", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_group_cmd_perm")},
-		},
-		colPasswordPolicy: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_password_policy_id")},
-			{Keys: bson.D{{Key: "name", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_password_policy_name")},
-		},
-		colPasswordHistory: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_password_history_id")},
-			{Keys: bson.D{{Key: "user_id", Value: 1}, {Key: "changed_at", Value: -1}}, Options: options.Index().SetName("ix_password_history_user_changed")},
-		},
-		colMgtPermission: {
-			{Keys: bson.D{{Key: "id", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_mgt_perm_id")},
-			{Keys: bson.D{{Key: "group_id", Value: 1}, {Key: "resource", Value: 1}, {Key: "action", Value: 1}}, Options: options.Index().SetUnique(true).SetName("uq_mgt_perm")},
 		},
 	}
 	for coll, models := range plan {

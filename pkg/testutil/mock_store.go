@@ -1,506 +1,558 @@
-// Package testutil provides helpers for unit tests.
-// Do not import in production code.
+// Package testutil — in-memory DatabaseStore for unit tests. Not threadsafe
+// for concurrent writers, which is fine because individual tests run
+// sequentially. Keep this file in lockstep with store.DatabaseStore; the
+// var-assertion at the bottom breaks the build if a method drifts.
 package testutil
 
 import (
+	"errors"
+	"sort"
+	"strings"
 	"time"
 
 	"github.com/DoTuanAnh2k1/serverGoChi/models/config_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
+	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
 )
 
-// MockStore is a full mock of store.DatabaseStore.
-// Each method has a corresponding function field; returns zero value if unset.
 type MockStore struct {
-	InitFn                        func(cfg config_models.DatabaseConfig) error
-	GetAllUserFn                  func() ([]*db_models.TblAccount, error)
-	GetUserByUserNameFn           func(name string) (*db_models.TblAccount, error)
-	UpdateUserFn                  func(account *db_models.TblAccount) error
-	AddUserFn                     func(account *db_models.TblAccount) error
-	DeleteUserByIdFn              func(id int64) error
-	PingFn                        func() error
-	UpdateLoginHistoryFn          func(username, ip string, t time.Time) error
-	SaveHistoryCommandFn          func(h db_models.CliOperationHistory) error
-	GetCLIUserNeMappingByUserIdFn func(userID int64) (*db_models.CliUserNeMapping, error)
-	GetNeListByIdFn               func(id int64) ([]*db_models.CliNe, error)
-	GetCliNeListBySystemTypeFn    func(systemType string) ([]*db_models.CliNe, error)
-	GetCliNeByNeIdFn              func(id int64) (*db_models.CliNe, error)
-	CreateCliNeFn                 func(ne *db_models.CliNe) error
-	UpdateCliNeFn                 func(ne *db_models.CliNe) error
-	DeleteCliNeByIdFn             func(id int64) error
-	CreateUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
-	DeleteUserNeMappingFn            func(m *db_models.CliUserNeMapping) error
-	DeleteAllUserNeMappingByNeIdFn   func(neId int64) error
-	DeleteAllUserNeMappingByUserIdFn func(userId int64) error
-	GetNeMonitorByIdFn               func(id int64) (*db_models.CliNeMonitor, error)
-	DeleteNeMonitorByNeIdFn          func(neId int64) error
-	GetAllNeOfUserByUserIdFn         func(userID int64) ([]*db_models.CliUserNeMapping, error)
-	DeleteCliNeSlaveByNeIdFn         func(neId int64) error
-	CreateCliNeConfigFn              func(cfg *db_models.CliNeConfig) error
-	GetCliNeConfigByNeIdFn           func(neId int64) ([]*db_models.CliNeConfig, error)
-	GetCliNeConfigByIdFn             func(id int64) (*db_models.CliNeConfig, error)
-	UpdateCliNeConfigFn              func(cfg *db_models.CliNeConfig) error
-	DeleteCliNeConfigByIdFn          func(id int64) error
-	DeleteCliNeConfigByNeIdFn        func(neId int64) error
-	GetRecentHistoryFn               func(limit int) ([]db_models.CliOperationHistory, error)
-	GetRecentHistoryFilteredFn       func(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error)
-	GetDailyOperationHistoryFn       func(date time.Time) ([]db_models.CliOperationHistory, error)
-	DeleteHistoryBeforeFn            func(cutoff time.Time) (int64, error)
-	SaveConfigBackupFn               func(b *db_models.CliConfigBackup) error
-	ListConfigBackupsFn              func(neName string) ([]*db_models.CliConfigBackup, error)
-	GetConfigBackupByIdFn            func(id int64) (*db_models.CliConfigBackup, error)
-	CreateGroupFn                       func(g *db_models.CliGroup) error
-	GetGroupByIdFn                      func(id int64) (*db_models.CliGroup, error)
-	GetGroupByNameFn                    func(name string) (*db_models.CliGroup, error)
-	GetAllGroupsFn                      func() ([]*db_models.CliGroup, error)
-	UpdateGroupFn                       func(g *db_models.CliGroup) error
-	DeleteGroupByIdFn                   func(id int64) error
-	CreateUserGroupMappingFn            func(m *db_models.CliUserGroupMapping) error
-	DeleteUserGroupMappingFn            func(m *db_models.CliUserGroupMapping) error
-	GetAllGroupsOfUserFn                func(userId int64) ([]*db_models.CliUserGroupMapping, error)
-	GetAllUsersOfGroupFn                func(groupId int64) ([]*db_models.CliUserGroupMapping, error)
-	DeleteAllUserGroupMappingByUserIdFn func(userId int64) error
-	DeleteAllUserGroupMappingByGroupIdFn func(groupId int64) error
-	CreateGroupNeMappingFn              func(m *db_models.CliGroupNeMapping) error
-	DeleteGroupNeMappingFn              func(m *db_models.CliGroupNeMapping) error
-	GetAllNesOfGroupFn                  func(groupId int64) ([]*db_models.CliGroupNeMapping, error)
-	GetAllGroupsOfNeFn                  func(neId int64) ([]*db_models.CliGroupNeMapping, error)
-	DeleteAllGroupNeMappingByGroupIdFn  func(groupId int64) error
-	DeleteAllGroupNeMappingByNeIdFn     func(neId int64) error
-
-	// ── RBAC (docs/rbac-design.md) ─────────────────────────────────────
-	CreateNeProfileFn    func(p *db_models.CliNeProfile) error
-	GetNeProfileByIdFn   func(id int64) (*db_models.CliNeProfile, error)
-	GetNeProfileByNameFn func(name string) (*db_models.CliNeProfile, error)
-	ListNeProfilesFn     func() ([]*db_models.CliNeProfile, error)
-	UpdateNeProfileFn    func(p *db_models.CliNeProfile) error
-	DeleteNeProfileByIdFn func(id int64) error
-
-	CreateCommandDefFn   func(d *db_models.CliCommandDef) error
-	GetCommandDefByIdFn  func(id int64) (*db_models.CliCommandDef, error)
-	ListCommandDefsFn    func(service, neProfile, category string) ([]*db_models.CliCommandDef, error)
-	UpdateCommandDefFn   func(d *db_models.CliCommandDef) error
-	DeleteCommandDefByIdFn func(id int64) error
-
-	CreateCommandGroupFn     func(g *db_models.CliCommandGroup) error
-	GetCommandGroupByIdFn    func(id int64) (*db_models.CliCommandGroup, error)
-	GetCommandGroupByNameFn  func(name string) (*db_models.CliCommandGroup, error)
-	ListCommandGroupsFn      func(service, neProfile string) ([]*db_models.CliCommandGroup, error)
-	UpdateCommandGroupFn     func(g *db_models.CliCommandGroup) error
-	DeleteCommandGroupByIdFn func(id int64) error
-
-	AddCommandToGroupFn                       func(x *db_models.CliCommandGroupMapping) error
-	RemoveCommandFromGroupFn                  func(x *db_models.CliCommandGroupMapping) error
-	ListCommandsOfGroupFn                     func(groupId int64) ([]*db_models.CliCommandDef, error)
-	ListGroupsOfCommandFn                     func(commandId int64) ([]*db_models.CliCommandGroup, error)
-	DeleteAllCommandGroupMappingByGroupIdFn   func(groupId int64) error
-	DeleteAllCommandGroupMappingByCommandIdFn func(commandId int64) error
-
-	CreateGroupCmdPermissionFn             func(p *db_models.CliGroupCmdPermission) error
-	GetGroupCmdPermissionByIdFn            func(id int64) (*db_models.CliGroupCmdPermission, error)
-	ListGroupCmdPermissionsFn              func(groupId int64) ([]*db_models.CliGroupCmdPermission, error)
-	DeleteGroupCmdPermissionByIdFn         func(id int64) error
-	DeleteAllGroupCmdPermissionByGroupIdFn func(groupId int64) error
-
-	// Password policy + history + mgt permission.
-	CreatePasswordPolicyFn     func(p *db_models.CliPasswordPolicy) error
-	GetPasswordPolicyByIdFn    func(id int64) (*db_models.CliPasswordPolicy, error)
-	GetPasswordPolicyByNameFn  func(name string) (*db_models.CliPasswordPolicy, error)
-	ListPasswordPoliciesFn     func() ([]*db_models.CliPasswordPolicy, error)
-	UpdatePasswordPolicyFn     func(p *db_models.CliPasswordPolicy) error
-	DeletePasswordPolicyByIdFn func(id int64) error
-
-	AppendPasswordHistoryFn    func(h *db_models.CliPasswordHistory) error
-	GetRecentPasswordHistoryFn func(userID int64, limit int) ([]*db_models.CliPasswordHistory, error)
-	PrunePasswordHistoryFn     func(userID int64, keep int) error
-
-	CreateMgtPermissionFn             func(p *db_models.CliGroupMgtPermission) error
-	ListMgtPermissionsFn              func(groupID int64) ([]*db_models.CliGroupMgtPermission, error)
-	DeleteMgtPermissionByIdFn         func(id int64) error
-	DeleteAllMgtPermissionByGroupIdFn func(groupID int64) error
+	users        map[int64]*db_models.User
+	nes          map[int64]*db_models.NE
+	commands     map[int64]*db_models.Command
+	nags         map[int64]*db_models.NeAccessGroup
+	nagUser      map[int64]map[int64]struct{} // groupID → userIDs
+	nagNe        map[int64]map[int64]struct{} // groupID → neIDs
+	cegs         map[int64]*db_models.CmdExecGroup
+	cegUser      map[int64]map[int64]struct{}
+	cegCmd       map[int64]map[int64]struct{}
+	policy       *db_models.PasswordPolicy
+	pwHistory    []*db_models.PasswordHistory
+	accessList   []*db_models.UserAccessList
+	history      []db_models.OperationHistory
+	logins       []db_models.LoginHistory
+	backups      map[int64]*db_models.ConfigBackup
+	userSeq      int64
+	neSeq        int64
+	cmdSeq       int64
+	nagSeq       int64
+	cegSeq       int64
+	pwhSeq       int64
+	aclSeq       int64
+	opHistorySeq int32
+	backupSeq    int64
 }
 
-func (m *MockStore) Init(cfg config_models.DatabaseConfig) error {
-	if m.InitFn != nil {
-		return m.InitFn(cfg)
+func NewMockStore() *MockStore {
+	return &MockStore{
+		users:    map[int64]*db_models.User{},
+		nes:      map[int64]*db_models.NE{},
+		commands: map[int64]*db_models.Command{},
+		nags:     map[int64]*db_models.NeAccessGroup{},
+		nagUser:  map[int64]map[int64]struct{}{},
+		nagNe:    map[int64]map[int64]struct{}{},
+		cegs:     map[int64]*db_models.CmdExecGroup{},
+		cegUser:  map[int64]map[int64]struct{}{},
+		cegCmd:   map[int64]map[int64]struct{}{},
+		backups:  map[int64]*db_models.ConfigBackup{},
 	}
+}
+
+// InstallMockStore swaps the singleton to the given mock and returns a
+// cleanup function that restores the previous singleton on defer.
+func InstallMockStore(m store.DatabaseStore) func() {
+	prev := store.GetSingleton()
+	store.SetSingleton(m)
+	return func() { store.SetSingleton(prev) }
+}
+
+func (m *MockStore) Init(_ config_models.DatabaseConfig) error { return nil }
+func (m *MockStore) Ping() error                               { return nil }
+
+// ── User ───────────────────────────────────────────────────────────────
+
+func (m *MockStore) CreateUser(u *db_models.User) error {
+	if u.ID == 0 {
+		m.userSeq++
+		u.ID = m.userSeq
+	}
+	m.users[u.ID] = u
 	return nil
 }
-
-func (m *MockStore) GetAllUser() ([]*db_models.TblAccount, error) {
-	if m.GetAllUserFn != nil {
-		return m.GetAllUserFn()
+func (m *MockStore) GetUserByID(id int64) (*db_models.User, error) {
+	return m.users[id], nil
+}
+func (m *MockStore) GetUserByUsername(name string) (*db_models.User, error) {
+	for _, u := range m.users {
+		if u.Username == name {
+			return u, nil
+		}
 	}
 	return nil, nil
 }
+func (m *MockStore) ListUsers() ([]*db_models.User, error) {
+	out := make([]*db_models.User, 0, len(m.users))
+	for _, u := range m.users {
+		out = append(out, u)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+func (m *MockStore) UpdateUser(u *db_models.User) error {
+	if _, ok := m.users[u.ID]; !ok {
+		return errors.New("not found")
+	}
+	m.users[u.ID] = u
+	return nil
+}
+func (m *MockStore) DeleteUserByID(id int64) error {
+	delete(m.users, id)
+	return nil
+}
 
-func (m *MockStore) GetUserByUserName(name string) (*db_models.TblAccount, error) {
-	if m.GetUserByUserNameFn != nil {
-		return m.GetUserByUserNameFn(name)
+// ── NE ─────────────────────────────────────────────────────────────────
+
+func (m *MockStore) CreateNE(n *db_models.NE) error {
+	if n.ID == 0 {
+		m.neSeq++
+		n.ID = m.neSeq
+	}
+	m.nes[n.ID] = n
+	return nil
+}
+func (m *MockStore) GetNEByID(id int64) (*db_models.NE, error) { return m.nes[id], nil }
+func (m *MockStore) GetNEByNamespace(ns string) (*db_models.NE, error) {
+	for _, n := range m.nes {
+		if n.Namespace == ns {
+			return n, nil
+		}
 	}
 	return nil, nil
 }
-
-func (m *MockStore) UpdateUser(account *db_models.TblAccount) error {
-	if m.UpdateUserFn != nil {
-		return m.UpdateUserFn(account)
+func (m *MockStore) ListNEs() ([]*db_models.NE, error) {
+	out := make([]*db_models.NE, 0, len(m.nes))
+	for _, n := range m.nes {
+		out = append(out, n)
 	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+func (m *MockStore) UpdateNE(n *db_models.NE) error {
+	if _, ok := m.nes[n.ID]; !ok {
+		return errors.New("not found")
+	}
+	m.nes[n.ID] = n
+	return nil
+}
+func (m *MockStore) DeleteNEByID(id int64) error {
+	delete(m.nes, id)
 	return nil
 }
 
-func (m *MockStore) AddUser(account *db_models.TblAccount) error {
-	if m.AddUserFn != nil {
-		return m.AddUserFn(account)
+// ── Command ────────────────────────────────────────────────────────────
+
+func (m *MockStore) CreateCommand(c *db_models.Command) error {
+	if c.ID == 0 {
+		m.cmdSeq++
+		c.ID = m.cmdSeq
 	}
+	m.commands[c.ID] = c
 	return nil
 }
-
-func (m *MockStore) DeleteUserById(id int64) error {
-	if m.DeleteUserByIdFn != nil {
-		return m.DeleteUserByIdFn(id)
-	}
-	return nil
+func (m *MockStore) GetCommandByID(id int64) (*db_models.Command, error) {
+	return m.commands[id], nil
 }
-
-func (m *MockStore) DeleteAllUserNeMappingByUserId(userId int64) error {
-	if m.DeleteAllUserNeMappingByUserIdFn != nil {
-		return m.DeleteAllUserNeMappingByUserIdFn(userId)
-	}
-	return nil
-}
-
-func (m *MockStore) Ping() error {
-	if m.PingFn != nil {
-		return m.PingFn()
-	}
-	return nil
-}
-
-func (m *MockStore) UpdateLoginHistory(username, ip string, t time.Time) error {
-	if m.UpdateLoginHistoryFn != nil {
-		return m.UpdateLoginHistoryFn(username, ip, t)
-	}
-	return nil
-}
-
-func (m *MockStore) SaveHistoryCommand(h db_models.CliOperationHistory) error {
-	if m.SaveHistoryCommandFn != nil {
-		return m.SaveHistoryCommandFn(h)
-	}
-	return nil
-}
-
-func (m *MockStore) GetCLIUserNeMappingByUserId(userID int64) (*db_models.CliUserNeMapping, error) {
-	if m.GetCLIUserNeMappingByUserIdFn != nil {
-		return m.GetCLIUserNeMappingByUserIdFn(userID)
+func (m *MockStore) GetCommandByTriple(neID int64, service, cmdText string) (*db_models.Command, error) {
+	for _, c := range m.commands {
+		if c.NeID == neID && c.Service == service && c.CmdText == cmdText {
+			return c, nil
+		}
 	}
 	return nil, nil
 }
+func (m *MockStore) ListCommands(neID int64, service string) ([]*db_models.Command, error) {
+	out := make([]*db_models.Command, 0)
+	for _, c := range m.commands {
+		if neID > 0 && c.NeID != neID {
+			continue
+		}
+		if service != "" && c.Service != service {
+			continue
+		}
+		out = append(out, c)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+func (m *MockStore) UpdateCommand(c *db_models.Command) error {
+	if _, ok := m.commands[c.ID]; !ok {
+		return errors.New("not found")
+	}
+	m.commands[c.ID] = c
+	return nil
+}
+func (m *MockStore) DeleteCommandByID(id int64) error {
+	delete(m.commands, id)
+	return nil
+}
 
-func (m *MockStore) GetNeListById(id int64) ([]*db_models.CliNe, error) {
-	if m.GetNeListByIdFn != nil {
-		return m.GetNeListByIdFn(id)
+// ── NE Access Group ───────────────────────────────────────────────────
+
+func (m *MockStore) CreateNeAccessGroup(g *db_models.NeAccessGroup) error {
+	if g.ID == 0 {
+		m.nagSeq++
+		g.ID = m.nagSeq
+	}
+	m.nags[g.ID] = g
+	return nil
+}
+func (m *MockStore) GetNeAccessGroupByID(id int64) (*db_models.NeAccessGroup, error) {
+	return m.nags[id], nil
+}
+func (m *MockStore) GetNeAccessGroupByName(name string) (*db_models.NeAccessGroup, error) {
+	for _, g := range m.nags {
+		if g.Name == name {
+			return g, nil
+		}
 	}
 	return nil, nil
 }
+func (m *MockStore) ListNeAccessGroups() ([]*db_models.NeAccessGroup, error) {
+	out := make([]*db_models.NeAccessGroup, 0, len(m.nags))
+	for _, g := range m.nags {
+		out = append(out, g)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+func (m *MockStore) UpdateNeAccessGroup(g *db_models.NeAccessGroup) error {
+	if _, ok := m.nags[g.ID]; !ok {
+		return errors.New("not found")
+	}
+	m.nags[g.ID] = g
+	return nil
+}
+func (m *MockStore) DeleteNeAccessGroupByID(id int64) error {
+	delete(m.nags, id)
+	delete(m.nagUser, id)
+	delete(m.nagNe, id)
+	return nil
+}
+func (m *MockStore) AddUserToNeAccessGroup(gid, uid int64) error {
+	addPivot(m.nagUser, gid, uid)
+	return nil
+}
+func (m *MockStore) RemoveUserFromNeAccessGroup(gid, uid int64) error {
+	removePivot(m.nagUser, gid, uid)
+	return nil
+}
+func (m *MockStore) ListUsersInNeAccessGroup(gid int64) ([]int64, error) {
+	return keysOf(m.nagUser[gid]), nil
+}
+func (m *MockStore) ListNeAccessGroupsOfUser(uid int64) ([]int64, error) {
+	return rightLookup(m.nagUser, uid), nil
+}
+func (m *MockStore) AddNeToNeAccessGroup(gid, nid int64) error {
+	addPivot(m.nagNe, gid, nid)
+	return nil
+}
+func (m *MockStore) RemoveNeFromNeAccessGroup(gid, nid int64) error {
+	removePivot(m.nagNe, gid, nid)
+	return nil
+}
+func (m *MockStore) ListNEsInNeAccessGroup(gid int64) ([]int64, error) {
+	return keysOf(m.nagNe[gid]), nil
+}
+func (m *MockStore) ListNeAccessGroupsOfNE(nid int64) ([]int64, error) {
+	return rightLookup(m.nagNe, nid), nil
+}
 
-func (m *MockStore) GetCliNeListBySystemType(systemType string) ([]*db_models.CliNe, error) {
-	if m.GetCliNeListBySystemTypeFn != nil {
-		return m.GetCliNeListBySystemTypeFn(systemType)
+// ── Cmd Exec Group ────────────────────────────────────────────────────
+
+func (m *MockStore) CreateCmdExecGroup(g *db_models.CmdExecGroup) error {
+	if g.ID == 0 {
+		m.cegSeq++
+		g.ID = m.cegSeq
+	}
+	m.cegs[g.ID] = g
+	return nil
+}
+func (m *MockStore) GetCmdExecGroupByID(id int64) (*db_models.CmdExecGroup, error) {
+	return m.cegs[id], nil
+}
+func (m *MockStore) GetCmdExecGroupByName(name string) (*db_models.CmdExecGroup, error) {
+	for _, g := range m.cegs {
+		if g.Name == name {
+			return g, nil
+		}
 	}
 	return nil, nil
 }
-
-func (m *MockStore) GetCliNeByNeId(id int64) (*db_models.CliNe, error) {
-	if m.GetCliNeByNeIdFn != nil {
-		return m.GetCliNeByNeIdFn(id)
+func (m *MockStore) ListCmdExecGroups() ([]*db_models.CmdExecGroup, error) {
+	out := make([]*db_models.CmdExecGroup, 0, len(m.cegs))
+	for _, g := range m.cegs {
+		out = append(out, g)
 	}
-	return nil, nil
+	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	return out, nil
+}
+func (m *MockStore) UpdateCmdExecGroup(g *db_models.CmdExecGroup) error {
+	if _, ok := m.cegs[g.ID]; !ok {
+		return errors.New("not found")
+	}
+	m.cegs[g.ID] = g
+	return nil
+}
+func (m *MockStore) DeleteCmdExecGroupByID(id int64) error {
+	delete(m.cegs, id)
+	delete(m.cegUser, id)
+	delete(m.cegCmd, id)
+	return nil
+}
+func (m *MockStore) AddUserToCmdExecGroup(gid, uid int64) error {
+	addPivot(m.cegUser, gid, uid)
+	return nil
+}
+func (m *MockStore) RemoveUserFromCmdExecGroup(gid, uid int64) error {
+	removePivot(m.cegUser, gid, uid)
+	return nil
+}
+func (m *MockStore) ListUsersInCmdExecGroup(gid int64) ([]int64, error) {
+	return keysOf(m.cegUser[gid]), nil
+}
+func (m *MockStore) ListCmdExecGroupsOfUser(uid int64) ([]int64, error) {
+	return rightLookup(m.cegUser, uid), nil
+}
+func (m *MockStore) AddCommandToCmdExecGroup(gid, cid int64) error {
+	addPivot(m.cegCmd, gid, cid)
+	return nil
+}
+func (m *MockStore) RemoveCommandFromCmdExecGroup(gid, cid int64) error {
+	removePivot(m.cegCmd, gid, cid)
+	return nil
+}
+func (m *MockStore) ListCommandsInCmdExecGroup(gid int64) ([]int64, error) {
+	return keysOf(m.cegCmd[gid]), nil
+}
+func (m *MockStore) ListCmdExecGroupsOfCommand(cid int64) ([]int64, error) {
+	return rightLookup(m.cegCmd, cid), nil
 }
 
-func (m *MockStore) CreateCliNe(ne *db_models.CliNe) error {
-	if m.CreateCliNeFn != nil {
-		return m.CreateCliNeFn(ne)
+// ── Password Policy / History ────────────────────────────────────────
+
+func (m *MockStore) GetPasswordPolicy() (*db_models.PasswordPolicy, error) {
+	if m.policy == nil {
+		return nil, nil
 	}
+	cp := *m.policy
+	return &cp, nil
+}
+func (m *MockStore) UpsertPasswordPolicy(p *db_models.PasswordPolicy) error {
+	p.ID = 1
+	cp := *p
+	m.policy = &cp
+	return nil
+}
+func (m *MockStore) AppendPasswordHistory(h *db_models.PasswordHistory) error {
+	m.pwhSeq++
+	h.ID = m.pwhSeq
+	if h.ChangedAt.IsZero() {
+		h.ChangedAt = time.Now().UTC()
+	}
+	m.pwHistory = append(m.pwHistory, h)
+	return nil
+}
+func (m *MockStore) GetRecentPasswordHistory(userID int64, limit int) ([]*db_models.PasswordHistory, error) {
+	out := make([]*db_models.PasswordHistory, 0)
+	for _, h := range m.pwHistory {
+		if h.UserID == userID {
+			out = append(out, h)
+		}
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].ChangedAt.After(out[j].ChangedAt) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
+	}
+	return out, nil
+}
+func (m *MockStore) PrunePasswordHistory(userID int64, keep int) error {
+	kept := make([]*db_models.PasswordHistory, 0)
+	userEntries := make([]*db_models.PasswordHistory, 0)
+	for _, h := range m.pwHistory {
+		if h.UserID != userID {
+			kept = append(kept, h)
+			continue
+		}
+		userEntries = append(userEntries, h)
+	}
+	sort.Slice(userEntries, func(i, j int) bool { return userEntries[i].ChangedAt.After(userEntries[j].ChangedAt) })
+	if keep > 0 && len(userEntries) > keep {
+		userEntries = userEntries[:keep]
+	}
+	if keep <= 0 {
+		userEntries = nil
+	}
+	m.pwHistory = append(kept, userEntries...)
 	return nil
 }
 
-func (m *MockStore) UpdateCliNe(ne *db_models.CliNe) error {
-	if m.UpdateCliNeFn != nil {
-		return m.UpdateCliNeFn(ne)
+// ── User Access List ─────────────────────────────────────────────────
+
+func (m *MockStore) CreateAccessListEntry(e *db_models.UserAccessList) error {
+	m.aclSeq++
+	e.ID = m.aclSeq
+	if e.CreatedAt.IsZero() {
+		e.CreatedAt = time.Now().UTC()
 	}
+	m.accessList = append(m.accessList, e)
+	return nil
+}
+func (m *MockStore) ListAccessListEntries(listType string) ([]*db_models.UserAccessList, error) {
+	out := make([]*db_models.UserAccessList, 0)
+	for _, e := range m.accessList {
+		if listType != "" && e.ListType != listType {
+			continue
+		}
+		out = append(out, e)
+	}
+	return out, nil
+}
+func (m *MockStore) DeleteAccessListEntryByID(id int64) error {
+	kept := make([]*db_models.UserAccessList, 0, len(m.accessList))
+	for _, e := range m.accessList {
+		if e.ID == id {
+			continue
+		}
+		kept = append(kept, e)
+	}
+	m.accessList = kept
 	return nil
 }
 
-func (m *MockStore) DeleteCliNeById(id int64) error {
-	if m.DeleteCliNeByIdFn != nil {
-		return m.DeleteCliNeByIdFn(id)
+// ── History ──────────────────────────────────────────────────────────
+
+func (m *MockStore) SaveOperationHistory(h db_models.OperationHistory) error {
+	m.opHistorySeq++
+	if h.ID == 0 {
+		h.ID = m.opHistorySeq
 	}
+	if h.CreatedDate.IsZero() {
+		h.CreatedDate = time.Now().UTC()
+	}
+	m.history = append(m.history, h)
 	return nil
 }
-
-func (m *MockStore) CreateUserNeMapping(mapping *db_models.CliUserNeMapping) error {
-	if m.CreateUserNeMappingFn != nil {
-		return m.CreateUserNeMappingFn(mapping)
-	}
-	return nil
+func (m *MockStore) GetRecentHistory(limit int) ([]db_models.OperationHistory, error) {
+	return m.GetRecentHistoryFiltered(limit, "", "", "")
 }
-
-func (m *MockStore) DeleteUserNeMapping(mapping *db_models.CliUserNeMapping) error {
-	if m.DeleteUserNeMappingFn != nil {
-		return m.DeleteUserNeMappingFn(mapping)
+func (m *MockStore) GetRecentHistoryFiltered(limit int, scope, neNamespace, account string) ([]db_models.OperationHistory, error) {
+	out := make([]db_models.OperationHistory, 0, len(m.history))
+	for _, h := range m.history {
+		if scope != "" && h.Scope != scope {
+			continue
+		}
+		if neNamespace != "" && h.NeNamespace != neNamespace {
+			continue
+		}
+		if account != "" && !strings.EqualFold(h.Account, account) {
+			continue
+		}
+		out = append(out, h)
 	}
-	return nil
-}
-
-func (m *MockStore) DeleteAllUserNeMappingByNeId(neId int64) error {
-	if m.DeleteAllUserNeMappingByNeIdFn != nil {
-		return m.DeleteAllUserNeMappingByNeIdFn(neId)
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedDate.After(out[j].CreatedDate) })
+	if limit > 0 && len(out) > limit {
+		out = out[:limit]
 	}
-	return nil
+	return out, nil
 }
-
-func (m *MockStore) GetNeMonitorById(id int64) (*db_models.CliNeMonitor, error) {
-	if m.GetNeMonitorByIdFn != nil {
-		return m.GetNeMonitorByIdFn(id)
+func (m *MockStore) GetDailyOperationHistory(date time.Time) ([]db_models.OperationHistory, error) {
+	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
+	end := start.Add(24 * time.Hour)
+	out := make([]db_models.OperationHistory, 0)
+	for _, h := range m.history {
+		if (h.CreatedDate.Equal(start) || h.CreatedDate.After(start)) && h.CreatedDate.Before(end) {
+			out = append(out, h)
+		}
 	}
-	return nil, nil
+	return out, nil
 }
-
-func (m *MockStore) DeleteNeMonitorByNeId(neId int64) error {
-	if m.DeleteNeMonitorByNeIdFn != nil {
-		return m.DeleteNeMonitorByNeIdFn(neId)
-	}
-	return nil
-}
-
-func (m *MockStore) GetAllNeOfUserByUserId(userID int64) ([]*db_models.CliUserNeMapping, error) {
-	if m.GetAllNeOfUserByUserIdFn != nil {
-		return m.GetAllNeOfUserByUserIdFn(userID)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) DeleteCliNeSlaveByNeId(neId int64) error {
-	if m.DeleteCliNeSlaveByNeIdFn != nil {
-		return m.DeleteCliNeSlaveByNeIdFn(neId)
-	}
-	return nil
-}
-
-func (m *MockStore) CreateCliNeConfig(cfg *db_models.CliNeConfig) error {
-	if m.CreateCliNeConfigFn != nil {
-		return m.CreateCliNeConfigFn(cfg)
-	}
-	return nil
-}
-
-func (m *MockStore) GetCliNeConfigByNeId(neId int64) ([]*db_models.CliNeConfig, error) {
-	if m.GetCliNeConfigByNeIdFn != nil {
-		return m.GetCliNeConfigByNeIdFn(neId)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) GetCliNeConfigById(id int64) (*db_models.CliNeConfig, error) {
-	if m.GetCliNeConfigByIdFn != nil {
-		return m.GetCliNeConfigByIdFn(id)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) UpdateCliNeConfig(cfg *db_models.CliNeConfig) error {
-	if m.UpdateCliNeConfigFn != nil {
-		return m.UpdateCliNeConfigFn(cfg)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteCliNeConfigById(id int64) error {
-	if m.DeleteCliNeConfigByIdFn != nil {
-		return m.DeleteCliNeConfigByIdFn(id)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteCliNeConfigByNeId(neId int64) error {
-	if m.DeleteCliNeConfigByNeIdFn != nil {
-		return m.DeleteCliNeConfigByNeIdFn(neId)
-	}
-	return nil
-}
-
-func (m *MockStore) GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
-	if m.GetRecentHistoryFn != nil {
-		return m.GetRecentHistoryFn(limit)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error) {
-	if m.GetRecentHistoryFilteredFn != nil {
-		return m.GetRecentHistoryFilteredFn(limit, scope, neName, account)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) GetDailyOperationHistory(date time.Time) ([]db_models.CliOperationHistory, error) {
-	if m.GetDailyOperationHistoryFn != nil {
-		return m.GetDailyOperationHistoryFn(date)
-	}
-	return nil, nil
-}
-
 func (m *MockStore) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
-	if m.DeleteHistoryBeforeFn != nil {
-		return m.DeleteHistoryBeforeFn(cutoff)
+	kept := make([]db_models.OperationHistory, 0, len(m.history))
+	removed := int64(0)
+	for _, h := range m.history {
+		if h.CreatedDate.Before(cutoff) {
+			removed++
+			continue
+		}
+		kept = append(kept, h)
 	}
-	return 0, nil
+	m.history = kept
+	return removed, nil
 }
-
-func (m *MockStore) SaveConfigBackup(b *db_models.CliConfigBackup) error {
-	if m.SaveConfigBackupFn != nil {
-		return m.SaveConfigBackupFn(b)
-	}
+func (m *MockStore) UpdateLoginHistory(username, ip string, t time.Time) error {
+	m.logins = append(m.logins, db_models.LoginHistory{Username: username, IPAddress: ip, TimeLogin: t})
 	return nil
 }
 
-func (m *MockStore) ListConfigBackups(neName string) ([]*db_models.CliConfigBackup, error) {
-	if m.ListConfigBackupsFn != nil {
-		return m.ListConfigBackupsFn(neName)
-	}
-	return nil, nil
-}
+// ── Config Backup ────────────────────────────────────────────────────
 
-func (m *MockStore) GetConfigBackupById(id int64) (*db_models.CliConfigBackup, error) {
-	if m.GetConfigBackupByIdFn != nil {
-		return m.GetConfigBackupByIdFn(id)
+func (m *MockStore) SaveConfigBackup(b *db_models.ConfigBackup) error {
+	if b.ID == 0 {
+		m.backupSeq++
+		b.ID = m.backupSeq
 	}
-	return nil, nil
-}
-
-func (m *MockStore) CreateGroup(g *db_models.CliGroup) error {
-	if m.CreateGroupFn != nil {
-		return m.CreateGroupFn(g)
-	}
+	m.backups[b.ID] = b
 	return nil
 }
-
-func (m *MockStore) GetGroupById(id int64) (*db_models.CliGroup, error) {
-	if m.GetGroupByIdFn != nil {
-		return m.GetGroupByIdFn(id)
+func (m *MockStore) ListConfigBackups(neName string) ([]*db_models.ConfigBackup, error) {
+	out := make([]*db_models.ConfigBackup, 0, len(m.backups))
+	for _, b := range m.backups {
+		if neName != "" && b.NeName != neName {
+			continue
+		}
+		out = append(out, b)
 	}
-	return nil, nil
+	sort.Slice(out, func(i, j int) bool { return out[i].CreatedAt.After(out[j].CreatedAt) })
+	return out, nil
+}
+func (m *MockStore) GetConfigBackupByID(id int64) (*db_models.ConfigBackup, error) {
+	return m.backups[id], nil
 }
 
-func (m *MockStore) GetGroupByName(name string) (*db_models.CliGroup, error) {
-	if m.GetGroupByNameFn != nil {
-		return m.GetGroupByNameFn(name)
+// ── helpers ──────────────────────────────────────────────────────────
+
+func addPivot(p map[int64]map[int64]struct{}, left, right int64) {
+	if p[left] == nil {
+		p[left] = map[int64]struct{}{}
 	}
-	return nil, nil
+	p[left][right] = struct{}{}
 }
 
-func (m *MockStore) GetAllGroups() ([]*db_models.CliGroup, error) {
-	if m.GetAllGroupsFn != nil {
-		return m.GetAllGroupsFn()
+func removePivot(p map[int64]map[int64]struct{}, left, right int64) {
+	if p[left] != nil {
+		delete(p[left], right)
 	}
-	return nil, nil
 }
 
-func (m *MockStore) UpdateGroup(g *db_models.CliGroup) error {
-	if m.UpdateGroupFn != nil {
-		return m.UpdateGroupFn(g)
+func keysOf(s map[int64]struct{}) []int64 {
+	out := make([]int64, 0, len(s))
+	for k := range s {
+		out = append(out, k)
 	}
-	return nil
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
-func (m *MockStore) DeleteGroupById(id int64) error {
-	if m.DeleteGroupByIdFn != nil {
-		return m.DeleteGroupByIdFn(id)
+// rightLookup returns every left-key whose right-set contains `right`.
+func rightLookup(p map[int64]map[int64]struct{}, right int64) []int64 {
+	out := make([]int64, 0)
+	for left, rights := range p {
+		if _, ok := rights[right]; ok {
+			out = append(out, left)
+		}
 	}
-	return nil
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
+	return out
 }
 
-func (m *MockStore) CreateUserGroupMapping(mapping *db_models.CliUserGroupMapping) error {
-	if m.CreateUserGroupMappingFn != nil {
-		return m.CreateUserGroupMappingFn(mapping)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteUserGroupMapping(mapping *db_models.CliUserGroupMapping) error {
-	if m.DeleteUserGroupMappingFn != nil {
-		return m.DeleteUserGroupMappingFn(mapping)
-	}
-	return nil
-}
-
-func (m *MockStore) GetAllGroupsOfUser(userId int64) ([]*db_models.CliUserGroupMapping, error) {
-	if m.GetAllGroupsOfUserFn != nil {
-		return m.GetAllGroupsOfUserFn(userId)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) GetAllUsersOfGroup(groupId int64) ([]*db_models.CliUserGroupMapping, error) {
-	if m.GetAllUsersOfGroupFn != nil {
-		return m.GetAllUsersOfGroupFn(groupId)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) DeleteAllUserGroupMappingByUserId(userId int64) error {
-	if m.DeleteAllUserGroupMappingByUserIdFn != nil {
-		return m.DeleteAllUserGroupMappingByUserIdFn(userId)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteAllUserGroupMappingByGroupId(groupId int64) error {
-	if m.DeleteAllUserGroupMappingByGroupIdFn != nil {
-		return m.DeleteAllUserGroupMappingByGroupIdFn(groupId)
-	}
-	return nil
-}
-
-func (m *MockStore) CreateGroupNeMapping(mapping *db_models.CliGroupNeMapping) error {
-	if m.CreateGroupNeMappingFn != nil {
-		return m.CreateGroupNeMappingFn(mapping)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteGroupNeMapping(mapping *db_models.CliGroupNeMapping) error {
-	if m.DeleteGroupNeMappingFn != nil {
-		return m.DeleteGroupNeMappingFn(mapping)
-	}
-	return nil
-}
-
-func (m *MockStore) GetAllNesOfGroup(groupId int64) ([]*db_models.CliGroupNeMapping, error) {
-	if m.GetAllNesOfGroupFn != nil {
-		return m.GetAllNesOfGroupFn(groupId)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) GetAllGroupsOfNe(neId int64) ([]*db_models.CliGroupNeMapping, error) {
-	if m.GetAllGroupsOfNeFn != nil {
-		return m.GetAllGroupsOfNeFn(neId)
-	}
-	return nil, nil
-}
-
-func (m *MockStore) DeleteAllGroupNeMappingByGroupId(groupId int64) error {
-	if m.DeleteAllGroupNeMappingByGroupIdFn != nil {
-		return m.DeleteAllGroupNeMappingByGroupIdFn(groupId)
-	}
-	return nil
-}
-
-func (m *MockStore) DeleteAllGroupNeMappingByNeId(neId int64) error {
-	if m.DeleteAllGroupNeMappingByNeIdFn != nil {
-		return m.DeleteAllGroupNeMappingByNeIdFn(neId)
-	}
-	return nil
-}
+// Compile-time check: MockStore implements the full DatabaseStore surface.
+var _ store.DatabaseStore = (*MockStore)(nil)

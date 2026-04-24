@@ -50,9 +50,8 @@ func main() {
 
 	// Seed default data after server is running
 	go func() {
-		log.Println("[seed] Ensuring default user exists...")
-		service.SeedDefaultUser()
-		service.SeedDefaultNes()
+		log.Println("[seed] Ensuring default user + policy exist...")
+		service.SeedFirstBoot()
 		log.Println("[seed] Done.")
 	}()
 

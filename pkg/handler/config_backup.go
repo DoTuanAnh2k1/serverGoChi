@@ -28,7 +28,7 @@ type configBackupSaveResp struct {
 
 type configBackupListResp struct {
 	Status  string                    `json:"status"`
-	Backups []*db_models.CliConfigBackup `json:"backups"`
+	Backups []*db_models.ConfigBackup `json:"backups"`
 }
 
 type configBackupGetResp struct {
@@ -94,7 +94,7 @@ func HandlerConfigBackupList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if list == nil {
-		list = []*db_models.CliConfigBackup{}
+		list = []*db_models.ConfigBackup{}
 	}
 
 	response.Write(w, http.StatusOK, configBackupListResp{Status: "ok", Backups: list})
@@ -117,7 +117,7 @@ func HandlerConfigBackupGet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	b, configXML, err := service.GetConfigBackupById(id)
+	b, configXML, err := service.GetConfigBackupByID(id)
 	if err != nil {
 		logger.Logger.Errorf("config-backup/get id=%d: %v", id, err)
 		response.InternalError(w, "failed to get config backup")

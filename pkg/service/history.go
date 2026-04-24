@@ -8,14 +8,14 @@ import (
 	"strings"
 	"time"
 
+	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/logger"
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
-	"github.com/DoTuanAnh2k1/serverGoChi/models/db_models"
 )
 
-// DeleteOldHistory deletes history older than the previous month.
+// DeleteOldHistory deletes history older than the first day of the previous
+// month. Returns number of rows removed.
 func DeleteOldHistory(now time.Time) (int64, error) {
-	// Cutoff = first day of previous month
 	cutoff := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, now.Location())
 	deleted, err := store.GetSingleton().DeleteHistoryBefore(cutoff)
 	if err != nil {
@@ -26,28 +26,24 @@ func DeleteOldHistory(now time.Time) (int64, error) {
 	return deleted, nil
 }
 
-// GetRecentHistory returns the N most recent history records.
-func GetRecentHistory(limit int) ([]db_models.CliOperationHistory, error) {
+func GetRecentHistory(limit int) ([]db_models.OperationHistory, error) {
 	return store.GetSingleton().GetRecentHistory(limit)
 }
 
-func GetRecentHistoryFiltered(limit int, scope, neName, account string) ([]db_models.CliOperationHistory, error) {
-	return store.GetSingleton().GetRecentHistoryFiltered(limit, scope, neName, account)
+func GetRecentHistoryFiltered(limit int, scope, neNamespace, account string) ([]db_models.OperationHistory, error) {
+	return store.GetSingleton().GetRecentHistoryFiltered(limit, scope, neNamespace, account)
 }
 
-// SaveHistoryCommand saves a history record to the database.
-func SaveHistoryCommand(historyCommand db_models.CliOperationHistory) error {
-	sto := store.GetSingleton()
-	logger.Logger.Debug("Save command")
-	err := sto.SaveHistoryCommand(historyCommand)
-	if err != nil {
-		logger.Logger.Error("Cant save history command: ", err)
+func SaveHistory(h db_models.OperationHistory) error {
+	if err := store.GetSingleton().SaveOperationHistory(h); err != nil {
+		logger.Logger.Errorf("SaveHistory: %v", err)
 		return err
 	}
 	return nil
 }
 
-// ExportDailyHistoryByNe exports daily history grouped by NE to CSV files.
+// ExportDailyHistoryByNe writes one CSV per NE for the given date under
+// CLI_LOG_EXPORT_DIR (defaults to CWD).
 func ExportDailyHistoryByNe(date time.Time) error {
 	exportDir := os.Getenv("CLI_LOG_EXPORT_DIR")
 	if exportDir == "" {
@@ -58,38 +54,35 @@ func ExportDailyHistoryByNe(date time.Time) error {
 	if err != nil {
 		return fmt.Errorf("query daily history: %w", err)
 	}
-
 	if len(histories) == 0 {
 		logger.Logger.Infof("export: no history records found for %s", date.Format("2006-01-02"))
 		return nil
 	}
 
-	// Group by NE name
-	grouped := make(map[string][]db_models.CliOperationHistory)
+	grouped := make(map[string][]db_models.OperationHistory)
 	for _, h := range histories {
-		key := h.NeName
+		key := h.NeNamespace
 		if strings.TrimSpace(key) == "" {
 			key = "unknown"
 		}
 		grouped[key] = append(grouped[key], h)
 	}
 
-	if err := os.MkdirAll(exportDir, 0755); err != nil {
+	if err := os.MkdirAll(exportDir, 0o755); err != nil {
 		return fmt.Errorf("create export dir %q: %w", exportDir, err)
 	}
 
 	dateStr := date.Format("20060102")
 	var writeErrors []string
-	for neName, records := range grouped {
-		filename := fmt.Sprintf("cli_log_%s_%s.csv", sanitizeFilename(neName), dateStr)
+	for ns, records := range grouped {
+		filename := fmt.Sprintf("cli_log_%s_%s.csv", sanitizeFilename(ns), dateStr)
 		filePath := filepath.Join(exportDir, filename)
 		if err := writeCSV(filePath, records); err != nil {
-			writeErrors = append(writeErrors, fmt.Sprintf("NE %q: %v", neName, err))
+			writeErrors = append(writeErrors, fmt.Sprintf("NE %q: %v", ns, err))
 		} else {
 			logger.Logger.Infof("export: wrote %d records to %s", len(records), filePath)
 		}
 	}
-
 	if len(writeErrors) > 0 {
 		return fmt.Errorf("some CSV files failed to write: %s", strings.Join(writeErrors, "; "))
 	}
@@ -97,10 +90,10 @@ func ExportDailyHistoryByNe(date time.Time) error {
 }
 
 var csvHeader = []string{
-	"user", "command", "result", "execute_time", "ne", "remote_address", "id",
+	"account", "cmd_text", "result", "executed_time", "ne_namespace", "ne_ip", "ip_address", "scope", "id",
 }
 
-func writeCSV(path string, records []db_models.CliOperationHistory) error {
+func writeCSV(path string, records []db_models.OperationHistory) error {
 	f, err := os.Create(path)
 	if err != nil {
 		return fmt.Errorf("create file: %w", err)
@@ -117,22 +110,22 @@ func writeCSV(path string, records []db_models.CliOperationHistory) error {
 	for _, r := range records {
 		row := []string{
 			r.Account,
-			r.CmdName,
+			r.CmdText,
 			r.Result,
 			r.ExecutedTime.Format(time.RFC3339),
-			r.NeName,
+			r.NeNamespace,
+			r.NeIP,
 			r.IPAddress,
+			r.Scope,
 			fmt.Sprintf("%d", r.ID),
 		}
 		if err := w.Write(row); err != nil {
 			return fmt.Errorf("write row id=%d: %w", r.ID, err)
 		}
 	}
-
 	return w.Error()
 }
 
-// sanitizeFilename replaces invalid filename characters.
 func sanitizeFilename(name string) string {
 	invalid := `/\:*?"<>|`
 	result := make([]byte, len(name))

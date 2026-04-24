@@ -1,209 +1,180 @@
-CREATE TABLE `tbl_account` (
-  `account_id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `account_name` varchar(255),
-  `password` varchar(255),
-  `full_name` varchar(255),
-  `email` varchar(255),
-  `address` varchar(255),
-  `phone_number` varchar(255),
-  `avatar` varchar(255),
-  `description` varchar(255),
-  `account_type` int COMMENT '0-SuperAdmin; 1-Admin; 2-Normal (maps to permission: 0/1=admin, 2=user)',
-  `status` boolean COMMENT '0: deleted, 1: live',
-  `is_enable` boolean COMMENT '1: active, 0: inactive',
-  `force_change_pass` boolean,
-  `auto_password` boolean,
-  `only_ad` boolean,
-  `first_login` blob,
-  `default_dashboard` int,
-  `login_failure_count` int,
-  `created_date` timestamp NOT NULL,
-  `updated_date` timestamp,
-  `last_login_time` timestamp,
-  `last_change_pass` timestamp,
-  `locked_time` timestamp,
-  `created_by` varchar(255),
-  `updated_by` varchar(255)
+-- v2 schema — flat, no role hierarchy. See models/db_models for canonical
+-- field types. v1 tables (tbl_account, cli_*) are NOT migrated; drop them
+-- explicitly in dev/staging or run with a fresh DB. GORM auto-migrate
+-- handles the v2 tables on startup; this file documents the intended shape
+-- for code review and the Mongo index plan in pkg/repository/mongodb.
+--
+-- Authorization model in one sentence: "user X may execute command Y on NE
+-- Z" iff (X enabled, not locked, not blacklisted) AND (X ∈ ne_access_group
+-- containing Z) AND (X ∈ cmd_exec_group containing Y) AND (Y is registered
+-- against Z's id).
+
+DROP TABLE IF EXISTS `tbl_account`;
+DROP TABLE IF EXISTS `cli_user_ne_mapping`;
+DROP TABLE IF EXISTS `cli_user_group_mapping`;
+DROP TABLE IF EXISTS `cli_group_ne_mapping`;
+DROP TABLE IF EXISTS `cli_group_cmd_permission`;
+DROP TABLE IF EXISTS `cli_group_mgt_permission`;
+DROP TABLE IF EXISTS `cli_command_group_mapping`;
+DROP TABLE IF EXISTS `cli_command_def`;
+DROP TABLE IF EXISTS `cli_command_group`;
+DROP TABLE IF EXISTS `cli_ne_profile`;
+DROP TABLE IF EXISTS `cli_password_history`;
+DROP TABLE IF EXISTS `cli_password_policy`;
+DROP TABLE IF EXISTS `cli_group`;
+DROP TABLE IF EXISTS `cli_ne`;
+DROP TABLE IF EXISTS `cli_login_history`;
+DROP TABLE IF EXISTS `cli_operation_history`;
+DROP TABLE IF EXISTS `cli_config_backup`;
+DROP TABLE IF EXISTS `cli_ne_monitor`;
+DROP TABLE IF EXISTS `cli_ne_slave`;
+DROP TABLE IF EXISTS `cli_ne_config`;
+
+CREATE TABLE `user` (
+  `id`                    bigint PRIMARY KEY AUTO_INCREMENT,
+  `username`              varchar(64)  NOT NULL UNIQUE,
+  `password_hash`         varchar(256) NOT NULL,
+  `email`                 varchar(128),
+  `full_name`             varchar(128),
+  `phone`                 varchar(32),
+  `is_enabled`            boolean      NOT NULL DEFAULT TRUE,
+  `password_expires_at`   timestamp    NULL,
+  `login_failure_count`   int          NOT NULL DEFAULT 0,
+  `locked_at`             timestamp    NULL,
+  `last_login_at`         timestamp    NULL,
+  `created_at`            timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at`            timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
-CREATE TABLE `cli_login_history` (
-  `id` int PRIMARY KEY AUTO_INCREMENT,
-  `user_name` varchar(255) NOT NULL,
-  `ip_address` varchar(255),
-  `time_login` timestamp
+CREATE TABLE `ne` (
+  `id`            bigint PRIMARY KEY AUTO_INCREMENT,
+  `namespace`     varchar(64)  NOT NULL UNIQUE,
+  `ne_type`       varchar(32)  NOT NULL,
+  `site_name`     varchar(64),
+  `description`   varchar(255),
+  `master_ip`     varchar(64),
+  `master_port`   int,
+  `ssh_username`  varchar(64),
+  `ssh_password`  varchar(255),
+  `command_url`   varchar(255),
+  `conf_mode`     varchar(32)
 );
+CREATE INDEX `idx_ne_type` ON `ne` (`ne_type`);
 
-CREATE TABLE `cli_ne` (
-  `id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `ne_name` varchar(255),
-  `namespace` varchar(255),
-  `site_name` varchar(255),
-  `system_type` varchar(255),
-  `description` varchar(255),
-  `command_url` varchar(255),
-  `conf_mode` varchar(255),
-  `conf_master_ip` varchar(255),
-  `conf_slave_ip` varchar(255),
-  `conf_port_master_ssh` int,
-  `conf_port_slave_ssh` int,
-  `conf_port_master_tcp` int,
-  `conf_port_slave_tcp` int,
-  `conf_username` varchar(255),
-  `conf_password` varchar(255),
-  `ne_profile_id` bigint  -- classifies the NE by command set (SMF/AMF/UPF/...)
+CREATE TABLE `command` (
+  `id`            bigint PRIMARY KEY AUTO_INCREMENT,
+  `ne_id`         bigint       NOT NULL,
+  `service`       varchar(16)  NOT NULL,   -- 'ne-config' | 'ne-command'
+  `cmd_text`      varchar(512) NOT NULL,
+  `description`   varchar(512),
+  UNIQUE KEY `uq_command` (`ne_id`, `service`, `cmd_text`)
 );
+ALTER TABLE `command` ADD CONSTRAINT `fk_command_ne` FOREIGN KEY (`ne_id`) REFERENCES `ne` (`id`) ON DELETE CASCADE;
 
-CREATE TABLE `cli_user_ne_mapping` (
-  `user_id` bigint,
-  `tbl_ne_id` bigint,
-  PRIMARY KEY (`user_id`, `tbl_ne_id`)
-);
-
-CREATE TABLE `cli_group` (
-  `id` bigint PRIMARY KEY AUTO_INCREMENT,
-  `name` varchar(255) NOT NULL UNIQUE,
+CREATE TABLE `ne_access_group` (
+  `id`          bigint PRIMARY KEY AUTO_INCREMENT,
+  `name`        varchar(64) NOT NULL UNIQUE,
   `description` varchar(255)
 );
-
-CREATE TABLE `cli_user_group_mapping` (
-  `user_id` bigint,
-  `group_id` bigint,
-  PRIMARY KEY (`user_id`, `group_id`)
+CREATE TABLE `ne_access_group_user` (
+  `group_id` bigint NOT NULL,
+  `user_id`  bigint NOT NULL,
+  PRIMARY KEY (`group_id`, `user_id`)
 );
-
-CREATE TABLE `cli_group_ne_mapping` (
-  `group_id` bigint,
-  `tbl_ne_id` bigint,
-  PRIMARY KEY (`group_id`, `tbl_ne_id`)
+CREATE TABLE `ne_access_group_ne` (
+  `group_id` bigint NOT NULL,
+  `ne_id`    bigint NOT NULL,
+  PRIMARY KEY (`group_id`, `ne_id`)
 );
+ALTER TABLE `ne_access_group_user` ADD CONSTRAINT `fk_nag_user_group` FOREIGN KEY (`group_id`) REFERENCES `ne_access_group` (`id`) ON DELETE CASCADE;
+ALTER TABLE `ne_access_group_user` ADD CONSTRAINT `fk_nag_user_user`  FOREIGN KEY (`user_id`)  REFERENCES `user` (`id`)            ON DELETE CASCADE;
+ALTER TABLE `ne_access_group_ne`   ADD CONSTRAINT `fk_nag_ne_group`   FOREIGN KEY (`group_id`) REFERENCES `ne_access_group` (`id`) ON DELETE CASCADE;
+ALTER TABLE `ne_access_group_ne`   ADD CONSTRAINT `fk_nag_ne_ne`      FOREIGN KEY (`ne_id`)    REFERENCES `ne` (`id`)              ON DELETE CASCADE;
 
-CREATE TABLE `cli_operation_history` (
-  `id` int PRIMARY KEY AUTO_INCREMENT,
-  `account` varchar(255) NOT NULL,
-  `cmd_name` varchar(255) NOT NULL,
-  `ne_name` varchar(255),
-  `ne_ip` varchar(255),
-  `ip_address` varchar(255),
-  `scope` varchar(255) COMMENT 'necommand, neconfig, cliconfig',
-  `result` varchar(255),
-  `created_date` timestamp NOT NULL,
-  `executed_time` timestamp
-);
-
-CREATE TABLE `cli_config_backup` (
-  `id`         bigint PRIMARY KEY AUTO_INCREMENT,
-  `ne_name`    varchar(255) NOT NULL,
-  `ne_ip`      varchar(255),
-  `file_path`  varchar(255) NOT NULL COMMENT 'đường dẫn file XML trên disk',
-  `size`       bigint       COMMENT 'kích thước file tính bằng byte',
-  `created_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
-
-ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `user_ne` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
-ALTER TABLE `cli_user_ne_mapping` ADD CONSTRAINT `mapping_ne` FOREIGN KEY (`tbl_ne_id`) REFERENCES `cli_ne` (`id`);
-ALTER TABLE `cli_user_group_mapping` ADD CONSTRAINT `user_group_user` FOREIGN KEY (`user_id`) REFERENCES `tbl_account` (`account_id`);
-ALTER TABLE `cli_user_group_mapping` ADD CONSTRAINT `user_group_group` FOREIGN KEY (`group_id`) REFERENCES `cli_group` (`id`);
-ALTER TABLE `cli_group_ne_mapping` ADD CONSTRAINT `group_ne_group` FOREIGN KEY (`group_id`) REFERENCES `cli_group` (`id`);
-ALTER TABLE `cli_group_ne_mapping` ADD CONSTRAINT `group_ne_ne` FOREIGN KEY (`tbl_ne_id`) REFERENCES `cli_ne` (`id`);
--- Email must be unique when present; empty string must be stored as NULL (MySQL allows multiple NULLs per UNIQUE).
-ALTER TABLE `tbl_account` ADD CONSTRAINT `uq_tbl_account_email` UNIQUE (`email`);
-
--- ─────────────────────────────────────────────────────────────────────────
--- RBAC (docs/rbac-design.md): NE Profile + Command Registry + Group→Cmd
--- perm rules. Decoupled from tbl_account.account_type for backward compat;
--- the legacy account_type is still used by CheckRole middleware while the
--- fine-grained permissions are evaluated by service/rbac.
--- ─────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE `cli_ne_profile` (
+CREATE TABLE `cmd_exec_group` (
   `id`          bigint PRIMARY KEY AUTO_INCREMENT,
-  `name`        varchar(64)  NOT NULL UNIQUE,
-  `description` varchar(512)
+  `name`        varchar(64) NOT NULL UNIQUE,
+  `description` varchar(255)
+);
+CREATE TABLE `cmd_exec_group_user` (
+  `group_id` bigint NOT NULL,
+  `user_id`  bigint NOT NULL,
+  PRIMARY KEY (`group_id`, `user_id`)
+);
+CREATE TABLE `cmd_exec_group_command` (
+  `group_id`   bigint NOT NULL,
+  `command_id` bigint NOT NULL,
+  PRIMARY KEY (`group_id`, `command_id`)
+);
+ALTER TABLE `cmd_exec_group_user`    ADD CONSTRAINT `fk_ceg_user_group` FOREIGN KEY (`group_id`)   REFERENCES `cmd_exec_group` (`id`) ON DELETE CASCADE;
+ALTER TABLE `cmd_exec_group_user`    ADD CONSTRAINT `fk_ceg_user_user`  FOREIGN KEY (`user_id`)    REFERENCES `user` (`id`)           ON DELETE CASCADE;
+ALTER TABLE `cmd_exec_group_command` ADD CONSTRAINT `fk_ceg_cmd_group`  FOREIGN KEY (`group_id`)   REFERENCES `cmd_exec_group` (`id`) ON DELETE CASCADE;
+ALTER TABLE `cmd_exec_group_command` ADD CONSTRAINT `fk_ceg_cmd_cmd`    FOREIGN KEY (`command_id`) REFERENCES `command` (`id`)        ON DELETE CASCADE;
+
+-- Singleton (enforced by service.GetPasswordPolicy seeding id=1).
+CREATE TABLE `password_policy` (
+  `id`                bigint PRIMARY KEY AUTO_INCREMENT,
+  `min_length`        int     NOT NULL DEFAULT 8,
+  `max_age_days`      int     NOT NULL DEFAULT 0,
+  `require_uppercase` boolean NOT NULL DEFAULT FALSE,
+  `require_lowercase` boolean NOT NULL DEFAULT FALSE,
+  `require_digit`     boolean NOT NULL DEFAULT FALSE,
+  `require_special`   boolean NOT NULL DEFAULT FALSE,
+  `history_count`     int     NOT NULL DEFAULT 0,
+  `max_login_failure` int     NOT NULL DEFAULT 0,
+  `lockout_minutes`   int     NOT NULL DEFAULT 0
 );
 
-CREATE TABLE `cli_command_def` (
-  `id`          bigint PRIMARY KEY AUTO_INCREMENT,
-  `service`     varchar(32)  NOT NULL,     -- 'ne-command' | 'ne-config' | '*'
-  `ne_profile`  varchar(64)  NOT NULL DEFAULT '*',
-  `pattern`     varchar(256) NOT NULL,
-  `category`    varchar(32)  NOT NULL,     -- 'monitoring' | 'configuration' | 'admin' | 'debug'
-  `risk_level`  int          NOT NULL DEFAULT 0,
-  `description` varchar(512),
-  `created_by`  varchar(64),
-  UNIQUE KEY `uq_cmd_def_service_profile_pattern` (`service`, `ne_profile`, `pattern`)
-);
-
-CREATE TABLE `cli_command_group` (
-  `id`          bigint PRIMARY KEY AUTO_INCREMENT,
-  `name`        varchar(64)  NOT NULL UNIQUE,
-  `ne_profile`  varchar(64)  NOT NULL DEFAULT '*',
-  `service`     varchar(32)  NOT NULL DEFAULT '*',
-  `description` varchar(512),
-  `created_by`  varchar(64)
-);
-
-CREATE TABLE `cli_command_group_mapping` (
-  `command_group_id` bigint NOT NULL,
-  `command_def_id`   bigint NOT NULL,
-  PRIMARY KEY (`command_group_id`, `command_def_id`)
-);
-
-CREATE TABLE `cli_group_cmd_permission` (
-  `id`          bigint PRIMARY KEY AUTO_INCREMENT,
-  `group_id`    bigint       NOT NULL,
-  `service`     varchar(32)  NOT NULL,     -- 'ne-command' | 'ne-config' | '*'
-  `ne_scope`    varchar(128) NOT NULL DEFAULT '*',
-  `grant_type`  varchar(16)  NOT NULL,     -- 'command_group' | 'category' | 'pattern'
-  `grant_value` varchar(256) NOT NULL,
-  `effect`      varchar(8)   NOT NULL,     -- 'allow' | 'deny'
-  UNIQUE KEY `uq_group_cmd_perm` (`group_id`, `service`, `ne_scope`, `grant_type`, `grant_value`)
-);
-
-ALTER TABLE `cli_ne`                 ADD CONSTRAINT `ne_profile_fk`    FOREIGN KEY (`ne_profile_id`)    REFERENCES `cli_ne_profile` (`id`);
-ALTER TABLE `cli_command_group_mapping` ADD CONSTRAINT `cgm_group_fk`  FOREIGN KEY (`command_group_id`) REFERENCES `cli_command_group` (`id`) ON DELETE CASCADE;
-ALTER TABLE `cli_command_group_mapping` ADD CONSTRAINT `cgm_def_fk`    FOREIGN KEY (`command_def_id`)   REFERENCES `cli_command_def`   (`id`) ON DELETE CASCADE;
-ALTER TABLE `cli_group_cmd_permission`  ADD CONSTRAINT `gcp_group_fk`  FOREIGN KEY (`group_id`)         REFERENCES `cli_group` (`id`)        ON DELETE CASCADE;
-
--- ─────────────────────────────────────────────────────────────────────────
--- Password policy + history + mgt permissions (docs/rbac-design.md §4.8,
--- §4.11, §5.2). Policy is attached per-group; when a user belongs to
--- multiple groups the service picks the strict-est value per field.
--- ─────────────────────────────────────────────────────────────────────────
-
-CREATE TABLE `cli_password_policy` (
-  `id`                 bigint PRIMARY KEY AUTO_INCREMENT,
-  `name`               varchar(64)  NOT NULL UNIQUE,
-  `max_age_days`       int          NOT NULL DEFAULT 0,     -- 0 = never expires
-  `min_length`         int          NOT NULL DEFAULT 8,
-  `require_uppercase`  boolean      NOT NULL DEFAULT FALSE,
-  `require_lowercase`  boolean      NOT NULL DEFAULT FALSE,
-  `require_digit`      boolean      NOT NULL DEFAULT FALSE,
-  `require_special`    boolean      NOT NULL DEFAULT FALSE,
-  `history_count`      int          NOT NULL DEFAULT 0,
-  `max_login_failure`  int          NOT NULL DEFAULT 0,     -- 0 = no lockout
-  `lockout_minutes`    int          NOT NULL DEFAULT 0
-);
-
-CREATE TABLE `cli_password_history` (
+CREATE TABLE `password_history` (
   `id`            bigint PRIMARY KEY AUTO_INCREMENT,
   `user_id`       bigint       NOT NULL,
   `password_hash` varchar(256) NOT NULL,
   `changed_at`    timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+ALTER TABLE `password_history` ADD CONSTRAINT `fk_pwh_user` FOREIGN KEY (`user_id`) REFERENCES `user` (`id`) ON DELETE CASCADE;
+CREATE INDEX `idx_pwh_user_changed` ON `password_history` (`user_id`, `changed_at`);
 
-CREATE TABLE `cli_group_mgt_permission` (
-  `id`        bigint PRIMARY KEY AUTO_INCREMENT,
-  `group_id`  bigint       NOT NULL,
-  `resource`  varchar(32)  NOT NULL,
-  `action`    varchar(16)  NOT NULL,
-  UNIQUE KEY `uq_mgt_perm` (`group_id`, `resource`, `action`)
+CREATE TABLE `user_access_list` (
+  `id`         bigint PRIMARY KEY AUTO_INCREMENT,
+  `list_type`  varchar(16)  NOT NULL,    -- 'blacklist' | 'whitelist'
+  `match_type` varchar(16)  NOT NULL,    -- 'username' | 'ip_cidr' | 'email_domain'
+  `pattern`    varchar(255) NOT NULL,
+  `reason`     varchar(255),
+  `created_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE KEY `uq_user_acl` (`list_type`, `match_type`, `pattern`)
 );
 
-ALTER TABLE `cli_group`   ADD COLUMN `password_policy_id` bigint;
-ALTER TABLE `cli_group`   ADD CONSTRAINT `cli_group_policy_fk` FOREIGN KEY (`password_policy_id`) REFERENCES `cli_password_policy` (`id`);
-ALTER TABLE `tbl_account` ADD COLUMN `password_expires_at`    timestamp NULL;
+CREATE TABLE `operation_history` (
+  `id`            int PRIMARY KEY AUTO_INCREMENT,
+  `account`       varchar(64)  NOT NULL,
+  `cmd_text`      varchar(512) NOT NULL,
+  `ne_namespace`  varchar(64),
+  `ne_ip`         varchar(64),
+  `ip_address`    varchar(64),
+  `scope`         varchar(16)  COMMENT 'ne-command, ne-config, mgt',
+  `result`        varchar(255),
+  `created_date`  timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `executed_time` timestamp    NULL
+);
+CREATE INDEX `idx_history_account`     ON `operation_history` (`account`);
+CREATE INDEX `idx_history_created`     ON `operation_history` (`created_date`);
+CREATE INDEX `idx_history_scope`       ON `operation_history` (`scope`);
 
-ALTER TABLE `cli_password_history`     ADD CONSTRAINT `pwh_user_fk` FOREIGN KEY (`user_id`)  REFERENCES `tbl_account` (`account_id`) ON DELETE CASCADE;
-ALTER TABLE `cli_group_mgt_permission` ADD CONSTRAINT `gmp_group_fk` FOREIGN KEY (`group_id`) REFERENCES `cli_group` (`id`)           ON DELETE CASCADE;
+CREATE TABLE `login_history` (
+  `id`         int PRIMARY KEY AUTO_INCREMENT,
+  `username`   varchar(64) NOT NULL,
+  `ip_address` varchar(64),
+  `time_login` timestamp   NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX `idx_login_username` ON `login_history` (`username`);
 
-CREATE INDEX `idx_password_history_user_changed` ON `cli_password_history` (`user_id`, `changed_at`);
+CREATE TABLE `config_backup` (
+  `id`         bigint PRIMARY KEY AUTO_INCREMENT,
+  `ne_name`    varchar(64) NOT NULL,
+  `ne_ip`      varchar(64),
+  `file_path`  varchar(255) NOT NULL,
+  `size`       bigint,
+  `created_at` timestamp    NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX `idx_cfgbk_ne_name` ON `config_backup` (`ne_name`);
+CREATE INDEX `idx_cfgbk_created` ON `config_backup` (`created_at`);

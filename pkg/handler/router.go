@@ -13,13 +13,14 @@ import (
 	"github.com/go-chi/chi"
 )
 
-// RouterBasePath Variable
-var RouterBasePath string
+var (
+	RouterBasePath string
+	Router         *chi.Mux
+)
 
-// Router Variable
-var Router *chi.Mux
-
-// Init initializes the HTTP router
+// Init wires up the v2 HTTP surface. The shape mirrors docs/api-v2.md and the
+// frontend tabs: users, nes, commands, ne-access-groups, cmd-exec-groups,
+// password-policy, access-list, history, authorize, config-backup.
 func Init() {
 	routerCfg := config.GetRouterConfig()
 	Router = chi.NewRouter()
@@ -43,256 +44,108 @@ func Init() {
 	Router.Get("/docs", handlerSwaggerUI)
 	Router.Get("/docs/openapi.yaml", handlerOpenAPISpec)
 
-	Router.Route("/aa", func(router chi.Router) {
-		router.Get("/heath-check-db", HealthCheck)
-		router.Post("/validate-token", HandlerValidateToken)
+	Router.Route("/aa", func(r chi.Router) {
+		r.Get("/health-check-db", HealthCheck)
+		r.Post("/validate-token", HandlerValidateToken)
 
-		router.Route("/change-password", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Post("/", HandlerChangePassword)
-		})
+		// Rate-limited public login.
+		r.With(middleware.RateLimit(middleware.LoginRateLimiter)).Post("/authenticate", HandlerAuthenticate)
 
-		router.With(middleware.RateLimit(middleware.LoginRateLimiter)).Post("/authenticate", HandlerAuthenticate)
+		// History save is open (proxy/cli-gate pushes audit events without JWT).
+		r.Post("/history/save", HandlerSaveHistory)
 
-		router.Route("/authenticate/user", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
+		// Everything else needs a valid JWT. v2 has no role check — access
+		// decisions live in the service layer via NE access / cmd exec
+		// groups, invoked via /authorize/check.
+		r.Group(func(p chi.Router) {
+			p.Use(middleware.Authenticate)
 
-			// Read — any authenticated user (Normal users need this to view directory)
-			r.Get("/show", HandlerAuthenticateUserShow)
+			p.Post("/change-password", HandlerChangePassword)
 
-			// Write — admin only
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/set", HandlerAuthenticateUserSet)
-				g.Post("/delete", HandlerAuthenticateUserDelete)
-				g.Post("/purge", HandlerAuthenticateUserPurge)
-				g.Post("/reset-password", HandlerAdminResetPassword)
-			})
-		})
-
-		router.Route("/authorize", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Use(middleware.CheckRole)
-
-			r.Route("/ne", func(subRouter chi.Router) {
-				subRouter.Post("/create", HandlerNeCreate)
-				subRouter.Post("/update", HandlerNeUpdate)
-				subRouter.Post("/remove", HandlerNeRemove)
-				subRouter.Post("/delete", HandlerNeDelete)
-				subRouter.Post("/set", HandlerNeSet)
-				subRouter.Get("/show", HandlerNeShow)
-
-				subRouter.Route("/config", func(cfgRouter chi.Router) {
-					cfgRouter.Post("/create", HandlerNeConfigCreate)
-					cfgRouter.Get("/list", HandlerNeConfigList)
-					cfgRouter.Post("/update", HandlerNeConfigUpdate)
-					cfgRouter.Post("/delete", HandlerNeConfigDelete)
-				})
+			p.Route("/users", func(u chi.Router) {
+				u.Get("/", HandlerListUsers)
+				u.Post("/", HandlerCreateUser)
+				u.Get("/{id}", HandlerGetUser)
+				u.Put("/{id}", HandlerUpdateUser)
+				u.Delete("/{id}", HandlerDeleteUser)
+				u.Post("/{id}/reset-password", HandlerAdminResetPassword)
 			})
 
-			r.Route("/user", func(subRouter chi.Router) {
-				subRouter.Post("/set", HandlerAuthorizeUserSet)
-				subRouter.Post("/delete", HandlerAuthorizeUserDelete)
-				subRouter.Get("/show", HandlerAuthorizeUserShow)
+			p.Route("/nes", func(n chi.Router) {
+				n.Get("/", HandlerListNEs)
+				n.Post("/", HandlerCreateNE)
+				n.Get("/{id}", HandlerGetNE)
+				n.Put("/{id}", HandlerUpdateNE)
+				n.Delete("/{id}", HandlerDeleteNE)
 			})
-		})
 
-		router.Route("/admin", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-
-			// Read — any authenticated user
-			r.Get("/user/list", HandlerAdminUserList)
-			r.Get("/user/full", HandlerAdminUserFullList)
-			r.Get("/ne/list", HandlerAdminNeList)
-
-			// Self-or-admin: handler enforces actor==target unless caller is admin.
-			r.Post("/user/update", HandlerAdminUserUpdate)
-
-			// Admin-only writes
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/ne/create", HandlerAdminNeCreate)
-				g.Post("/ne/update", HandlerAdminNeUpdate)
+			p.Route("/commands", func(c chi.Router) {
+				c.Get("/", HandlerListCommands)
+				c.Post("/", HandlerCreateCommand)
+				c.Put("/{id}", HandlerUpdateCommand)
+				c.Delete("/{id}", HandlerDeleteCommand)
 			})
-		})
 
-		router.Route("/group", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-
-			// Read — any authenticated user
-			r.Get("/list", HandlerGroupList)
-			r.Post("/show", HandlerGroupShow)
-			r.Get("/user", HandlerUserGroupList)
-			r.Get("/ne", HandlerGroupNeList)
-
-			// Admin-only writes
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/create", HandlerGroupCreate)
-				g.Post("/update", HandlerGroupUpdate)
-				g.Post("/delete", HandlerGroupDelete)
-				g.Post("/user/assign", HandlerUserGroupAssign)
-				g.Post("/user/unassign", HandlerUserGroupUnassign)
-				g.Post("/ne/assign", HandlerGroupNeAssign)
-				g.Post("/ne/unassign", HandlerGroupNeUnassign)
+			p.Route("/ne-access-groups", func(g chi.Router) {
+				g.Get("/", HandlerListNeAccessGroups)
+				g.Post("/", HandlerCreateNeAccessGroup)
+				g.Put("/{id}", HandlerUpdateNeAccessGroup)
+				g.Delete("/{id}", HandlerDeleteNeAccessGroup)
+				g.Get("/{id}/users", HandlerNeAccessGroupUsers)
+				g.Post("/{id}/users", HandlerNeAccessGroupAddUser)
+				g.Delete("/{id}/users/{user_id}", HandlerNeAccessGroupRemoveUser)
+				g.Get("/{id}/nes", HandlerNeAccessGroupNEs)
+				g.Post("/{id}/nes", HandlerNeAccessGroupAddNE)
+				g.Delete("/{id}/nes/{ne_id}", HandlerNeAccessGroupRemoveNE)
 			})
-		})
 
-		router.Route("/import", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Use(middleware.CheckRole)
-			r.Post("/", HandlerImport)
-		})
-
-		router.Route("/history", func(r chi.Router) {
-			// /save is open: the SSH proxy and downstream services log commands
-			// before the user's JWT is available (and forwarding the token adds
-			// friction for a simple audit sink). The caller supplies the account
-			// in the body. /list stays authenticated — reading the audit log is
-			// an admin-side concern.
-			r.Post("/save", HandlerSaveHistory)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.Authenticate)
-				g.Get("/list", HandlerListHistory)
+			p.Route("/cmd-exec-groups", func(g chi.Router) {
+				g.Get("/", HandlerListCmdExecGroups)
+				g.Post("/", HandlerCreateCmdExecGroup)
+				g.Put("/{id}", HandlerUpdateCmdExecGroup)
+				g.Delete("/{id}", HandlerDeleteCmdExecGroup)
+				g.Get("/{id}/users", HandlerCmdExecGroupUsers)
+				g.Post("/{id}/users", HandlerCmdExecGroupAddUser)
+				g.Delete("/{id}/users/{user_id}", HandlerCmdExecGroupRemoveUser)
+				g.Get("/{id}/commands", HandlerCmdExecGroupCommands)
+				g.Post("/{id}/commands", HandlerCmdExecGroupAddCommand)
+				g.Delete("/{id}/commands/{command_id}", HandlerCmdExecGroupRemoveCommand)
 			})
-		})
 
-		router.Route("/list", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-
-			r.Get("/ne", HandlerListNe)
-			r.Get("/ne/monitor", HandlerListNeMonitor)
-			r.Get("/ne/config", HandlerListNeConfig)
-		})
-
-		router.Route("/subscribers", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-
-			r.Get("/files", HandlerListSubscriberFiles)
-			r.Get("/files/{index}", HandlerViewSubscriberFile)
-		})
-
-		router.Route("/config-backup", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-
-			r.Post("/save", HandlerConfigBackupSave)
-			r.Get("/list", HandlerConfigBackupList)
-			r.Get("/{id}", HandlerConfigBackupGet)
-		})
-
-		// ── RBAC (docs/rbac-design.md) ────────────────────────────────────
-		//
-		// NE profiles classify NEs by command set (SMF/AMF/UPF/...).
-		// Command defs are the registry of allowed patterns per profile.
-		// Command groups bundle defs so permissions can reference whole
-		// bundles. Group cmd-permissions tie a group to commands at a
-		// specific ne_scope with an effect ("allow" | "deny"), evaluated
-		// by the AWS-IAM + scope-specificity logic in service/rbac.
-		router.Route("/ne-profile", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/list", HandlerListNeProfiles)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/create", HandlerCreateNeProfile)
-				g.Post("/update", HandlerUpdateNeProfile)
-				g.Delete("/{id}", HandlerDeleteNeProfile)
+			p.Route("/password-policy", func(pp chi.Router) {
+				pp.Get("/", HandlerGetPasswordPolicy)
+				pp.Put("/", HandlerUpsertPasswordPolicy)
 			})
-		})
 
-		router.Route("/ne/{ne_id}/profile", func(r chi.Router) {
-			r.Use(middleware.Authenticate, middleware.CheckRole)
-			r.Post("/", HandlerAssignNeProfile)
-		})
-
-		router.Route("/command-def", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/list", HandlerListCommandDefs)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/create", HandlerCreateCommandDef)
-				g.Post("/update", HandlerUpdateCommandDef)
-				g.Post("/import", HandlerImportCommandDefs)
-				g.Delete("/{id}", HandlerDeleteCommandDef)
+			p.Route("/access-list", func(al chi.Router) {
+				al.Get("/", HandlerListAccessList)
+				al.Post("/", HandlerCreateAccessList)
+				al.Delete("/{id}", HandlerDeleteAccessList)
 			})
-		})
 
-		router.Route("/command-group", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/list", HandlerListCommandGroups)
-			r.Get("/{id}/commands", HandlerListCommandsOfGroup)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/create", HandlerCreateCommandGroup)
-				g.Post("/update", HandlerUpdateCommandGroup)
-				g.Delete("/{id}", HandlerDeleteCommandGroup)
-				g.Post("/{id}/commands", HandlerAddCommandToGroup)
-				g.Delete("/{id}/commands/{cmd_id}", HandlerRemoveCommandFromGroup)
+			p.Route("/authorize", func(a chi.Router) {
+				a.Post("/check", HandlerAuthorizeCheck)
 			})
-		})
 
-		router.Route("/group/{id}/cmd-permissions", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/", HandlerListGroupCmdPermissions)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/", HandlerCreateGroupCmdPermission)
-				g.Delete("/{perm_id}", HandlerDeleteGroupCmdPermission)
-			})
-		})
+			p.Get("/history", HandlerListHistory)
 
-		// Authorize — queried by downstream ne-config / ne-command services
-		// once per session (effective) or per-command (check-command). Both
-		// need only a valid JWT; evaluation handles the allow/deny.
-		router.Route("/authorize/rbac", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/effective", HandlerAuthorizeEffective)
-			r.Post("/check-command", HandlerAuthorizeCheckCommand)
-		})
-
-		router.Route("/password-policy", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/list", HandlerListPasswordPolicies)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/create", HandlerCreatePasswordPolicy)
-				g.Post("/update", HandlerUpdatePasswordPolicy)
-				g.Delete("/{id}", HandlerDeletePasswordPolicy)
-			})
-		})
-
-		router.Route("/group/{id}/password-policy", func(r chi.Router) {
-			r.Use(middleware.Authenticate, middleware.CheckRole)
-			r.Post("/", HandlerAssignPasswordPolicyToGroup)
-		})
-
-		router.Route("/group/{id}/mgt-permissions", func(r chi.Router) {
-			r.Use(middleware.Authenticate)
-			r.Get("/", HandlerListMgtPermissions)
-			r.Group(func(g chi.Router) {
-				g.Use(middleware.CheckRole)
-				g.Post("/", HandlerCreateMgtPermission)
-				g.Delete("/{perm_id}", HandlerDeleteMgtPermission)
+			p.Route("/config-backup", func(cb chi.Router) {
+				cb.Post("/save", HandlerConfigBackupSave)
+				cb.Get("/list", HandlerConfigBackupList)
+				cb.Get("/{id}", HandlerConfigBackupGet)
 			})
 		})
 	})
 }
 
-// HealthCheck kiểm tra kết nối đến database.
-//
-// Input : GET (không có body/query params)
-// Output: 200 "Database still alive" nếu DB phản hồi
-//         500 kèm error message nếu Ping thất bại
-// Flow  : store.GetSingleton().Ping() → trả kết quả
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	err := store.GetSingleton().Ping()
-	if err != nil {
+	if err := store.GetSingleton().Ping(); err != nil {
 		response.InternalError(w, err.Error())
-	} else {
-		response.Success(w, "Database still alive")
+		return
 	}
+	response.Success(w, "Database still alive")
 }
 
-// handlerOpenAPISpec serves api.yaml
 func handlerOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	specPath := os.Getenv("API_SPEC_PATH")
 	if specPath == "" {
@@ -305,10 +158,9 @@ func handlerOpenAPISpec(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", "application/yaml")
 	w.WriteHeader(http.StatusOK)
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
-// SwaggerUIHTML returns the Swagger UI HTML page pointing to the given spec URL.
 func SwaggerUIHTML(specURL string) string {
 	if specURL == "" {
 		specURL = "/docs/openapi.yaml"
@@ -335,10 +187,8 @@ func SwaggerUIHTML(specURL string) string {
 </html>`
 }
 
-// handlerSwaggerUI serves a Swagger UI page via CDN
 func handlerSwaggerUI(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
 	fmt.Fprint(w, SwaggerUIHTML("/docs/openapi.yaml"))
 }
-

@@ -22,7 +22,10 @@ func getSecretKey() []byte {
 	return []byte(key)
 }
 
-func CreateToken(username string, roles string) (string, error) {
+// CreateToken mints a JWT carrying only `sub` (username). v2 has no role
+// hierarchy — authorization runs entirely against the user's group
+// memberships at the service layer, not against a token claim.
+func CreateToken(username string) (string, error) {
 	expiry := config.GetJwtConfig().ExpiryHours
 	if expiry <= 0 {
 		expiry = 24
@@ -30,7 +33,6 @@ func CreateToken(username string, roles string) (string, error) {
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub": username,
-		"aud": roles,
 		"exp": time.Now().Add(time.Duration(expiry) * time.Hour).Unix(),
 	})
 
@@ -44,8 +46,9 @@ func CreateToken(username string, roles string) (string, error) {
 	return prefixKey + tokenString, nil
 }
 
-// ParseToken parses a JWT (with or without "Basic " prefix) and returns username, roles.
-func ParseToken(tokenString string) (string, string, error) {
+// ParseToken parses a JWT (with or without the "Basic " prefix) and returns
+// the username from the `sub` claim.
+func ParseToken(tokenString string) (string, error) {
 	tokenString = strings.TrimPrefix(tokenString, prefixKey)
 
 	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -56,12 +59,16 @@ func ParseToken(tokenString string) (string, string, error) {
 	})
 	if err != nil {
 		logger.Logger.Errorf("token: parse JWT: %v", err)
-		return "", "", err
+		return "", err
 	}
 
 	claims, ok := token.Claims.(jwt.MapClaims)
 	if !ok || !token.Valid {
-		return "", "", errors.New("invalid token")
+		return "", errors.New("invalid token")
 	}
-	return claims["sub"].(string), claims["aud"].(string), nil
+	sub, _ := claims["sub"].(string)
+	if sub == "" {
+		return "", errors.New("invalid token: missing sub")
+	}
+	return sub, nil
 }

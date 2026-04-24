@@ -55,24 +55,21 @@ func (c *Client) Init(cfg config_models.DatabaseConfig) error {
 
 func (c *Client) autoMigrate() error {
 	return c.Db.AutoMigrate(
-		&db_models.TblAccount{},
-		&db_models.CliNe{},
-		&db_models.CliUserNeMapping{},
-		&db_models.CliOperationHistory{},
-		&db_models.CliLoginHistory{},
-		&db_models.CliConfigBackup{},
-		&db_models.CliGroup{},
-		&db_models.CliUserGroupMapping{},
-		&db_models.CliGroupNeMapping{},
-		// RBAC (docs/rbac-design.md §4.7–4.11)
-		&db_models.CliNeProfile{},
-		&db_models.CliCommandDef{},
-		&db_models.CliCommandGroup{},
-		&db_models.CliCommandGroupMapping{},
-		&db_models.CliGroupCmdPermission{},
-		&db_models.CliPasswordPolicy{},
-		&db_models.CliPasswordHistory{},
-		&db_models.CliGroupMgtPermission{},
+		&db_models.User{},
+		&db_models.NE{},
+		&db_models.Command{},
+		&db_models.NeAccessGroup{},
+		&db_models.NeAccessGroupUser{},
+		&db_models.NeAccessGroupNe{},
+		&db_models.CmdExecGroup{},
+		&db_models.CmdExecGroupUser{},
+		&db_models.CmdExecGroupCommand{},
+		&db_models.PasswordPolicy{},
+		&db_models.PasswordHistory{},
+		&db_models.UserAccessList{},
+		&db_models.OperationHistory{},
+		&db_models.LoginHistory{},
+		&db_models.ConfigBackup{},
 	)
 }
 
