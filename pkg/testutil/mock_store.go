@@ -40,6 +40,12 @@ type MockStore struct {
 	aclSeq       int64
 	opHistorySeq int32
 	backupSeq    int64
+
+	// Function-field hooks let individual tests override a single method
+	// without having to rebuild the in-memory state. Any hook set to nil
+	// falls through to the default map-backed behavior.
+	GetDailyOperationHistoryFn func(date time.Time) ([]db_models.OperationHistory, error)
+	DeleteHistoryBeforeFn      func(cutoff time.Time) (int64, error)
 }
 
 func NewMockStore() *MockStore {
@@ -465,6 +471,9 @@ func (m *MockStore) GetRecentHistoryFiltered(limit int, scope, neNamespace, acco
 	return out, nil
 }
 func (m *MockStore) GetDailyOperationHistory(date time.Time) ([]db_models.OperationHistory, error) {
+	if m.GetDailyOperationHistoryFn != nil {
+		return m.GetDailyOperationHistoryFn(date)
+	}
 	start := time.Date(date.Year(), date.Month(), date.Day(), 0, 0, 0, 0, date.Location())
 	end := start.Add(24 * time.Hour)
 	out := make([]db_models.OperationHistory, 0)
@@ -476,6 +485,9 @@ func (m *MockStore) GetDailyOperationHistory(date time.Time) ([]db_models.Operat
 	return out, nil
 }
 func (m *MockStore) DeleteHistoryBefore(cutoff time.Time) (int64, error) {
+	if m.DeleteHistoryBeforeFn != nil {
+		return m.DeleteHistoryBeforeFn(cutoff)
+	}
 	kept := make([]db_models.OperationHistory, 0, len(m.history))
 	removed := int64(0)
 	for _, h := range m.history {

@@ -90,7 +90,7 @@ func TestNextMonthlyCleanup_LandsOnFirstOfNextMonth(t *testing.T) {
 
 func TestRunTasks_StopsWhenContextCancelled(t *testing.T) {
 	store.SetSingleton(&testutil.MockStore{
-		GetDailyOperationHistoryFn: func(_ time.Time) ([]db_models.CliOperationHistory, error) {
+		GetDailyOperationHistoryFn: func(_ time.Time) ([]db_models.OperationHistory, error) {
 			return nil, nil
 		},
 	})
@@ -117,7 +117,7 @@ func TestRunTasks_StopsWhenContextCancelled(t *testing.T) {
 func TestRunTasks_ExportsImmediatelyOnStart(t *testing.T) {
 	called := make(chan struct{}, 1)
 	store.SetSingleton(&testutil.MockStore{
-		GetDailyOperationHistoryFn: func(_ time.Time) ([]db_models.CliOperationHistory, error) {
+		GetDailyOperationHistoryFn: func(_ time.Time) ([]db_models.OperationHistory, error) {
 			select {
 			case called <- struct{}{}:
 			default:
