@@ -273,17 +273,28 @@ public final class MgtServiceClient {
     }
 
     /**
-     * POST /aa/history/save — used by SSH / cli-netconf to log a CLI command.
-     * account is taken from the JWT — do not send it.
+     * POST /aa/history/save — used by SSH / cli-netconf / ne-command to log
+     * a CLI command. Endpoint is UNAUTHENTICATED (no JWT required) so the
+     * downstream service can log without carrying the end-user token.
+     *
+     * Pass {@code account} = username of the actor that ran the command.
+     * If omitted, the server records "unknown" and the audit trail loses
+     * identity. Callers should always resolve the username from whatever
+     * auth layer they sit behind and pass it here.
+     *
+     * NOTE: the legacy (token-first) signature was removed — the server no
+     * longer requires a token on this path, and keeping both overloads
+     * collides at the 6-String signature.
      */
-    public static Response historySave(String token, String cmdName, String neName, String neIp,
-                                       String scope, String result) throws Exception {
-        return postAuth(token, "/aa/history/save", toJson(map(
+    public static Response historySave(String cmdName, String neName, String neIp,
+                                       String scope, String result, String account) throws Exception {
+        return postUnauth("/aa/history/save", toJson(map(
                 "cmd_name", cmdName,
                 "ne_name",  neName,
                 "ne_ip",    neIp,
                 "scope",    scope,
-                "result",   result)));
+                "result",   result,
+                "account",  account)));
     }
 
     // ── Admin (frontend API) ─────────────────────────────────────────────────
@@ -357,6 +368,160 @@ public final class MgtServiceClient {
 
     public static Response groupNeUnassign(String token, long groupId, long neId) throws Exception {
         return postAuth(token, "/aa/group/ne/unassign", toJson(Map.of("group_id", groupId, "ne_id", neId)));
+    }
+
+    // ── RBAC (docs/rbac-design.md) ────────────────────────────────────────────
+    //
+    // Six entities: NE Profile, Command Def, Command Group + its M:N mapping,
+    // Group Command Permission (allow/deny with ne_scope). Evaluator is AWS-IAM
+    // plus Vault-style scope specificity — most-specific scope wins, deny beats
+    // allow at the same scope, implicit deny otherwise.
+
+    // NE Profile — classify NEs by command set (SMF / AMF / UPF / ...).
+
+    public static Response neProfileList(String token) throws Exception {
+        return getAuth(token, "/aa/ne-profile/list");
+    }
+    public static Response neProfileCreate(String token, String name, String description) throws Exception {
+        return postAuth(token, "/aa/ne-profile/create", toJson(map("name", name, "description", description)));
+    }
+    public static Response neProfileUpdate(String token, long id, String name, String description) throws Exception {
+        return postAuth(token, "/aa/ne-profile/update", toJson(map("id", id, "name", name, "description", description)));
+    }
+    public static Response neProfileDelete(String token, long id) throws Exception {
+        return deleteAuth(token, "/aa/ne-profile/" + id);
+    }
+    /** POST /aa/ne/{ne_id}/profile — body { "ne_profile_id": <id> | null } */
+    public static Response neAssignProfile(String token, long neId, Long profileId) throws Exception {
+        return postAuth(token, "/aa/ne/" + neId + "/profile", toJson(map("ne_profile_id", profileId)));
+    }
+
+    // Command Def — one command pattern, scoped to (service, ne_profile).
+
+    public static Response commandDefList(String token, String service, String neProfile, String category) throws Exception {
+        StringBuilder q = new StringBuilder("/aa/command-def/list");
+        boolean first = true;
+        if (service   != null && !service.isEmpty())   { q.append(first?'?':'&').append("service=").append(urlEnc(service)); first = false; }
+        if (neProfile != null && !neProfile.isEmpty()) { q.append(first?'?':'&').append("ne_profile=").append(urlEnc(neProfile)); first = false; }
+        if (category  != null && !category.isEmpty()) { q.append(first?'?':'&').append("category=").append(urlEnc(category)); }
+        return getAuth(token, q.toString());
+    }
+    public static Response commandDefCreate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/command-def/create", toJson(fields));
+    }
+    public static Response commandDefUpdate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/command-def/update", toJson(fields));
+    }
+    public static Response commandDefDelete(String token, long id) throws Exception {
+        return deleteAuth(token, "/aa/command-def/" + id);
+    }
+    /** Bulk import — body is a JSON array of command-def objects. */
+    public static Response commandDefImport(String token, String jsonArray) throws Exception {
+        return postAuth(token, "/aa/command-def/import", jsonArray);
+    }
+
+    // Command Group — bundle of defs for the same profile.
+
+    public static Response commandGroupList(String token, String service, String neProfile) throws Exception {
+        StringBuilder q = new StringBuilder("/aa/command-group/list");
+        boolean first = true;
+        if (service   != null && !service.isEmpty())   { q.append(first?'?':'&').append("service=").append(urlEnc(service)); first = false; }
+        if (neProfile != null && !neProfile.isEmpty()) { q.append(first?'?':'&').append("ne_profile=").append(urlEnc(neProfile)); }
+        return getAuth(token, q.toString());
+    }
+    public static Response commandGroupCreate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/command-group/create", toJson(fields));
+    }
+    public static Response commandGroupUpdate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/command-group/update", toJson(fields));
+    }
+    public static Response commandGroupDelete(String token, long id) throws Exception {
+        return deleteAuth(token, "/aa/command-group/" + id);
+    }
+    public static Response commandGroupMembers(String token, long groupId) throws Exception {
+        return getAuth(token, "/aa/command-group/" + groupId + "/commands");
+    }
+    public static Response commandGroupAddMember(String token, long groupId, long commandDefId) throws Exception {
+        return postAuth(token, "/aa/command-group/" + groupId + "/commands",
+                toJson(map("command_def_id", commandDefId)));
+    }
+    public static Response commandGroupRemoveMember(String token, long groupId, long commandDefId) throws Exception {
+        return deleteAuth(token, "/aa/command-group/" + groupId + "/commands/" + commandDefId);
+    }
+
+    // Group Cmd Permission — allow/deny rules on a group.
+
+    public static Response groupCmdPermissionList(String token, long groupId) throws Exception {
+        return getAuth(token, "/aa/group/" + groupId + "/cmd-permissions");
+    }
+    /**
+     * POST /aa/group/{id}/cmd-permissions — body:
+     *   { service, ne_scope, grant_type, grant_value, effect }
+     *   service ∈ {ne-command, ne-config, *}
+     *   ne_scope ∈ {*, profile:<name>, ne:<ne_name>}
+     *   grant_type ∈ {command_group, category, pattern}
+     *   effect ∈ {allow, deny}
+     */
+    public static Response groupCmdPermissionAdd(String token, long groupId, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/group/" + groupId + "/cmd-permissions", toJson(fields));
+    }
+    public static Response groupCmdPermissionDelete(String token, long groupId, long permId) throws Exception {
+        return deleteAuth(token, "/aa/group/" + groupId + "/cmd-permissions/" + permId);
+    }
+
+    // Authorize — the queries every ne-command / ne-config service should make.
+
+    /**
+     * GET /aa/authorize/rbac/effective — returns the caller's full reachable
+     * NEs + effective allow/deny rules grouped by (service, ne_scope, effect,
+     * grant_value). Call once at session start, cache until the user logs out.
+     */
+    public static Response authorizeEffective(String token) throws Exception {
+        return getAuth(token, "/aa/authorize/rbac/effective");
+    }
+
+    /**
+     * POST /aa/authorize/rbac/check-command — realtime check for one command
+     * on one NE. Use for high-risk ops where cache staleness is unacceptable.
+     * Body: { "service": ..., "command": ..., "ne_id": ... }
+     */
+    public static Response authorizeCheckCommand(String token, String service, String command, long neId) throws Exception {
+        return postAuth(token, "/aa/authorize/rbac/check-command", toJson(map(
+                "service", service, "command", command, "ne_id", neId)));
+    }
+
+    // ── Password Policy (docs/rbac-design.md §4.8) ────────────────────────────
+
+    public static Response passwordPolicyList(String token) throws Exception {
+        return getAuth(token, "/aa/password-policy/list");
+    }
+    public static Response passwordPolicyCreate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/password-policy/create", toJson(fields));
+    }
+    public static Response passwordPolicyUpdate(String token, Map<String, Object> fields) throws Exception {
+        return postAuth(token, "/aa/password-policy/update", toJson(fields));
+    }
+    public static Response passwordPolicyDelete(String token, long id) throws Exception {
+        return deleteAuth(token, "/aa/password-policy/" + id);
+    }
+    /** POST /aa/group/{id}/password-policy — body { "password_policy_id": <id> | null } */
+    public static Response groupAssignPasswordPolicy(String token, long groupId, Long policyId) throws Exception {
+        return postAuth(token, "/aa/group/" + groupId + "/password-policy",
+                toJson(map("password_policy_id", policyId)));
+    }
+
+    // ── Mgt Permissions (docs/rbac-design.md §4.11) ───────────────────────────
+
+    public static Response mgtPermissionList(String token, long groupId) throws Exception {
+        return getAuth(token, "/aa/group/" + groupId + "/mgt-permissions");
+    }
+    /** POST /aa/group/{id}/mgt-permissions — body { resource, action } (wildcard "*" allowed). */
+    public static Response mgtPermissionAdd(String token, long groupId, String resource, String action) throws Exception {
+        return postAuth(token, "/aa/group/" + groupId + "/mgt-permissions",
+                toJson(map("resource", resource, "action", action)));
+    }
+    public static Response mgtPermissionDelete(String token, long groupId, long permId) throws Exception {
+        return deleteAuth(token, "/aa/group/" + groupId + "/mgt-permissions/" + permId);
     }
 
     // ── Import ───────────────────────────────────────────────────────────────
@@ -513,13 +678,23 @@ public final class MgtServiceClient {
         return send(req);
     }
 
-    /** POST {path} (JSON body) without Authorization header — for /aa/authenticate and /aa/validate-token. */
+    /** POST {path} (JSON body) without Authorization header — for /aa/authenticate, /aa/validate-token, /aa/history/save. */
     public static Response postUnauth(String path, String jsonBody) throws Exception {
         HttpRequest req = unauth(path)
                 .header("Content-Type", "application/json")
                 .POST(BodyPublishers.ofString(jsonBody, StandardCharsets.UTF_8))
                 .build();
         return send(req);
+    }
+
+    /** DELETE {path} with Authorization header. */
+    public static Response deleteAuth(String token, String path) throws Exception {
+        return send(authed(token, path).DELETE().build());
+    }
+
+    /** URL-encode a single query-string value (UTF-8, %-escaped). */
+    public static String urlEnc(String s) {
+        return URLEncoder.encode(s == null ? "" : s, StandardCharsets.UTF_8);
     }
 
     private static HttpRequest.Builder authed(String token, String path) {

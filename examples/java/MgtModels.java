@@ -374,6 +374,178 @@ public final class MgtModels {
     }
 
     // ═══════════════════════════════════════════════════════════════════════
+    //  RBAC — NE Profile, Command Def, Command Group, Group Cmd Permission
+    //  (docs/rbac-design.md §4.7)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public record NeProfile(Long id, String name, String description) {
+        public static NeProfile from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new NeProfile(F.l(m, "id"), F.s(m, "name"), F.s(m, "description"));
+        }
+    }
+
+    public record CommandDef(Long id, String service, String neProfile, String pattern,
+                             String category, Integer riskLevel, String description,
+                             String createdBy) {
+        public static CommandDef from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new CommandDef(
+                    F.l(m, "id"), F.s(m, "service"), F.s(m, "ne_profile"),
+                    F.s(m, "pattern"), F.s(m, "category"),
+                    F.i(m, "risk_level"), F.s(m, "description"),
+                    F.s(m, "created_by"));
+        }
+    }
+
+    public record CommandGroup(Long id, String name, String neProfile, String service,
+                               String description, String createdBy) {
+        public static CommandGroup from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new CommandGroup(
+                    F.l(m, "id"), F.s(m, "name"), F.s(m, "ne_profile"),
+                    F.s(m, "service"), F.s(m, "description"), F.s(m, "created_by"));
+        }
+    }
+
+    public record GroupCmdPermission(Long id, Long groupId, String service, String neScope,
+                                     String grantType, String grantValue, String effect) {
+        public static GroupCmdPermission from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new GroupCmdPermission(
+                    F.l(m, "id"), F.l(m, "group_id"),
+                    F.s(m, "service"), F.s(m, "ne_scope"),
+                    F.s(m, "grant_type"), F.s(m, "grant_value"),
+                    F.s(m, "effect"));
+        }
+    }
+
+    /** Entry inside {@code EffectiveResponse.commands[service]}. */
+    public record EffectiveEntry(String service, String neScope, String effect,
+                                 List<EffectivePat> patterns, EffectiveSource source) {
+        public static EffectiveEntry from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            List<EffectivePat> pats = new ArrayList<>();
+            Object raw = m.get("patterns");
+            if (raw instanceof List) {
+                for (Object p : (List<?>) raw) {
+                    EffectivePat ep = EffectivePat.from(p);
+                    if (ep != null) pats.add(ep);
+                }
+            }
+            return new EffectiveEntry(
+                    F.s(m, "service"), F.s(m, "ne_scope"), F.s(m, "effect"),
+                    pats, EffectiveSource.from(m.get("source")));
+        }
+    }
+
+    public record EffectivePat(String pattern, Integer riskLevel) {
+        public static EffectivePat from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new EffectivePat(F.s(m, "pattern"), F.i(m, "risk_level"));
+        }
+    }
+
+    public record EffectiveSource(Long groupId, String grantType, String grantValue) {
+        public static EffectiveSource from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new EffectiveSource(
+                    F.l(m, "group_id"), F.s(m, "grant_type"), F.s(m, "grant_value"));
+        }
+    }
+
+    public record EffectiveNE(Long neId, String neName, String neProfile) {
+        public static EffectiveNE from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new EffectiveNE(F.l(m, "ne_id"), F.s(m, "ne_name"), F.s(m, "ne_profile"));
+        }
+    }
+
+    /** Response from {@code GET /aa/authorize/rbac/effective}. */
+    public record EffectiveResponse(String username, List<EffectiveNE> nes,
+                                    Map<String, List<EffectiveEntry>> commands) {
+        public static EffectiveResponse from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            List<EffectiveNE> nes = new ArrayList<>();
+            Object rawNes = m.get("nes");
+            if (rawNes instanceof List) {
+                for (Object n : (List<?>) rawNes) {
+                    EffectiveNE en = EffectiveNE.from(n);
+                    if (en != null) nes.add(en);
+                }
+            }
+            Map<String, List<EffectiveEntry>> cmds = new LinkedHashMap<>();
+            Object rawCmds = m.get("commands");
+            if (rawCmds instanceof Map) {
+                for (Map.Entry<?, ?> e : ((Map<?, ?>) rawCmds).entrySet()) {
+                    List<EffectiveEntry> entries = new ArrayList<>();
+                    if (e.getValue() instanceof List) {
+                        for (Object item : (List<?>) e.getValue()) {
+                            EffectiveEntry ee = EffectiveEntry.from(item);
+                            if (ee != null) entries.add(ee);
+                        }
+                    }
+                    cmds.put(String.valueOf(e.getKey()), entries);
+                }
+            }
+            return new EffectiveResponse(F.s(m, "username"), nes, cmds);
+        }
+    }
+
+    /** Response from {@code POST /aa/authorize/rbac/check-command}. */
+    public record CheckCommandResult(Boolean allowed, String neName, String neProfile,
+                                     String matchedRule, String reason, Integer riskLevel) {
+        public static CheckCommandResult from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new CheckCommandResult(
+                    F.bool(m, "allowed"), F.s(m, "ne_name"), F.s(m, "ne_profile"),
+                    F.s(m, "matched_rule"), F.s(m, "reason"), F.i(m, "risk_level"));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    //  Password Policy + Mgt Permission (docs/rbac-design.md §4.8, §4.11)
+    // ═══════════════════════════════════════════════════════════════════════
+
+    public record PasswordPolicy(
+            Long id, String name, Integer maxAgeDays, Integer minLength,
+            Boolean requireUppercase, Boolean requireLowercase,
+            Boolean requireDigit, Boolean requireSpecial,
+            Integer historyCount, Integer maxLoginFailure, Integer lockoutMinutes) {
+        public static PasswordPolicy from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new PasswordPolicy(
+                    F.l(m, "id"), F.s(m, "name"),
+                    F.i(m, "max_age_days"), F.i(m, "min_length"),
+                    F.bool(m, "require_uppercase"), F.bool(m, "require_lowercase"),
+                    F.bool(m, "require_digit"), F.bool(m, "require_special"),
+                    F.i(m, "history_count"), F.i(m, "max_login_failure"),
+                    F.i(m, "lockout_minutes"));
+        }
+    }
+
+    public record MgtPermission(Long id, Long groupId, String resource, String action) {
+        public static MgtPermission from(Object o) {
+            if (!(o instanceof Map)) return null;
+            Map<?, ?> m = (Map<?, ?>) o;
+            return new MgtPermission(
+                    F.l(m, "id"), F.l(m, "group_id"),
+                    F.s(m, "resource"), F.s(m, "action"));
+        }
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
     //  Subscribers
     // ═══════════════════════════════════════════════════════════════════════
 

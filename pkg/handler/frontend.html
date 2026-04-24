@@ -625,6 +625,7 @@ const I18N = {
     nav_ne_profiles:'NE Profiles', nav_command_defs:'Command Defs', nav_command_groups:'Command Groups', nav_group_perms:'Group Permissions',
     nav_password_policies:'Password Policies', nav_mgt_perms:'Mgt Permissions',
     navcat_identity:'Identity', navcat_network:'Network', navcat_rbac:'RBAC / Commands', navcat_security:'Security', navcat_audit:'Audit & Tools',
+    history_col_time:'Time', history_col_user:'User', history_col_command:'Command', history_col_ne:'NE', history_col_result:'Result', history_col_scope:'Scope',
     create_password_policy:'Create Password Policy', all_password_policies:'All Password Policies', no_password_policies:'No password policies',
     password_policy_created:'Password policy created', password_policy_updated:'Password policy updated', password_policy_deleted:'Password policy deleted',
     assign_policy_to_group:'Assign Policy to Group', policy:'Policy', assign:'Assign', unassign:'Unassign',
@@ -676,52 +677,75 @@ const I18N = {
     // guide
     guide_html: `
       <h3>Getting Started</h3>
-      <p>MGT Service is a management platform for 5G core network elements. Use this panel to manage users, permissions, NEs, and their mappings.</p>
+      <p>MGT Service is the authorization + audit plane for a 5G core CLI system. The sidebar is grouped into 5 categories: <b>Identity</b>, <b>Network</b>, <b>RBAC / Commands</b>, <b>Security</b>, <b>Audit &amp; Tools</b>. RBAC + Security tabs are admin-only.</p>
 
-      <h3>Users</h3>
-      <ul>
-        <li><b>Create</b> — Enter username and password, click Create</li>
-        <li><b>Disable</b> — Click Disable button next to the user (soft delete, can re-enable)</li>
-        <li>Default admin: <code>admin</code> / <code>admin123</code></li>
-      </ul>
-
-      <h3>Network Elements</h3>
-      <ul>
-        <li>NEs are 5G core nodes (SMF, AMF, UPF, etc.)</li>
-        <li>Each NE has: name, site, IP, port, namespace, description</li>
-        <li>System type is auto-set to <code>5GC</code></li>
-      </ul>
-
-      <h3>NE Mapping</h3>
-      <p>Assign access either directly or through a group. Pick a user, then toggle <b>Target: NE / Group</b>:</p>
-      <ul>
-        <li><b>NE</b> — assign one or more NEs directly to the user (shown as blue badges).</li>
-        <li><b>Group</b> — add the user to one or more groups; they inherit every NE attached to those groups (shown as green badges with a "via group" tooltip).</li>
-      </ul>
-      <p>The <code>/aa/list/ne</code> endpoint returns the union — deduplicated — of direct NEs and NEs reachable through group membership. The Remove button only unbinds direct mappings; to remove access that came through a group, edit the group in the Groups tab.</p>
-
-      <h3>Groups</h3>
-      <p>Groups bundle a set of NEs and a set of users so access is managed by role, not per-user. Workflow:</p>
+      <h3>User management model</h3>
+      <p>A user is identified by a <code>username</code> + bcrypt-hashed password in <code>tbl_account</code>. Two orthogonal access layers apply:</p>
       <ol>
-        <li>Create a group (name + description) in the <b>Groups</b> tab.</li>
-        <li>Click <b>Manage</b> on that group to attach NEs — or use <b>Add all NEs</b> to bind every NE in one click.</li>
-        <li>Add users either from the same Manage modal, or from the <b>NE Mapping</b> tab using Target = Group.</li>
+        <li><b>Legacy role</b> — <code>account_type</code> ∈ {SuperAdmin (0), Admin (1), Normal (2)}. SuperAdmin is hidden from every listing but can still log in. Role decides "can this user SSH into <code>cli-config</code>?" — only Admin/SuperAdmin can; Normal users see only <code>ne-config</code>/<code>ne-command</code> in the SSH menu.</li>
+        <li><b>Group-based RBAC</b> — a user belongs to zero or more groups. Each group grants: (a) a set of <b>NEs</b> (direct mapping OR via <code>cli_group_ne_mapping</code>), (b) allow/deny rules on what <b>commands</b> may run on those NEs, (c) a <b>password policy</b>, (d) optional <b>management permissions</b> on the mgt-svc itself.</li>
+      </ol>
+      <p>Effective permissions = union across all groups the user is in. Password policy merges to the <i>strictest</i> field value.</p>
+
+      <h4>Lifecycle</h4>
+      <ul>
+        <li><b>Create</b> — Users tab → fill username + password + optional email/full_name/phone + account_type (1 Admin / 2 Normal) + one or more groups. Admin users must supply full_name + phone + ≥1 group.</li>
+        <li><b>Disable</b> — soft-delete (sets <code>is_enable=false</code>). Disabled users cannot log in; their email is treated as free for reuse.</li>
+        <li><b>Re-enable</b> — re-run <b>Create</b> with the same username. Non-empty fields in the request override the stored values (omitted fields keep their previous values); password is always refreshed.</li>
+        <li><b>Change password</b> — top-right "Change Password". Server resolves the user's effective policy → enforces min_length + require_{U,L,D,S} + history_count (cannot reuse last N hashes). <code>password_expires_at</code> is set to <code>now + max_age_days</code> when the policy defines aging.</li>
+        <li><b>Admin reset</b> — Users tab action. Bypasses the old-password check but still validates against policy + history.</li>
+        <li><b>Lockout</b> — if the effective policy sets <code>max_login_failure</code> + <code>lockout_minutes</code>, N consecutive bad passwords freeze the account for M minutes. The login endpoint returns <code>403 {locked_until, retry_in_seconds}</code>. A successful login resets the counter.</li>
+      </ul>
+
+      <h3>Network elements + profiles</h3>
+      <ul>
+        <li>NEs are the nodes you're proxying into — SMF, AMF, UPF, PE routers, etc. Stored in <code>cli_ne</code> with (site, namespace, conf_master_ip, conf_port_master_tcp, command_url, conf_mode).</li>
+        <li><b>NE Profile</b> (e.g. "SMF", "AMF", "UPF") classifies NEs by command set. Command definitions and permissions reference a profile; an NE is tagged with <code>ne_profile_id</code>.</li>
+      </ul>
+
+      <h3>NE access vs command access</h3>
+      <p>These are <b>two separate decisions</b>:</p>
+      <ol>
+        <li><b>NE access</b> — which NEs is the user allowed to reach at all. Granted via <code>cli_user_ne_mapping</code> (direct) or <code>cli_group_ne_mapping</code> (via group). <code>GET /aa/list/ne</code> returns the union.</li>
+        <li><b>Command access</b> — on a reachable NE, which commands is the user allowed to run. Stored in <code>cli_group_cmd_permission</code> with <code>(effect, service, ne_scope, grant_type, grant_value)</code>.</li>
       </ol>
 
+      <h4>Command authorization — allow / deny rules</h4>
+      <p>Each rule on a group specifies:</p>
+      <ul>
+        <li><b>effect</b> — <code>allow</code> | <code>deny</code></li>
+        <li><b>service</b> — <code>ne-command</code> | <code>ne-config</code> | <code>*</code></li>
+        <li><b>ne_scope</b> — <code>*</code> (all NEs), <code>profile:SMF</code> (NEs with that profile), <code>ne:HTSMF01</code> (one specific NE)</li>
+        <li><b>grant_type + grant_value</b> — either a bundle (<code>command_group: smf-subscriber-ops</code>), a category (<code>category: monitoring</code>), or a raw pattern (<code>pattern: show *</code>)</li>
+      </ul>
+      <p>Evaluation: <b>explicit deny &gt; explicit allow &gt; implicit deny</b> at the most-specific matching scope. <code>ne:X</code> beats <code>profile:Y</code> beats <code>*</code>. Downstream services call <code>GET /aa/authorize/rbac/effective</code> once per session and cache it, or <code>POST /aa/authorize/rbac/check-command</code> per command for high-risk ops.</p>
+
+      <h3>Group Permissions tab</h3>
+      <p>Pick a group → list its rules, add allow/deny rules, revoke one by id. Effect is colour-coded: <span class="badge badge-green">ALLOW</span> / <span class="badge badge-red">DENY</span>.</p>
+
+      <h3>Password Policies tab</h3>
+      <p>CRUD policies (min_length, max_age_days, history_count, max_login_failure, lockout_minutes, require_{U,L,D,S}). Assign a policy to a group at the bottom of that tab. A user's effective policy is the strict-est merge over every group they're in.</p>
+
+      <h3>Mgt Permissions tab</h3>
+      <p>Per-group <code>(resource, action)</code> grants for managing the mgt-svc itself: user/ne/group/command/policy/history × create/read/update/delete. <code>*</code> is a wildcard on either side.</p>
+
+      <h3>Command Defs + Groups</h3>
+      <p>Command defs register each pattern + category + risk level per (service, ne_profile). Command groups bundle defs so a single permission rule can reference many patterns. CSV import/export supports header <code>service,ne_profile,pattern,category,risk_level,description</code> with double-quote escaping.</p>
+
+      <h3>History</h3>
+      <p>Audit trail of every command run through the SSH bastion (cli-config / ne-config / ne-command). Columns: Time, User, Command, NE, Result, Scope. <code>POST /aa/history/save</code> is unauthenticated so downstream services (ne-config, ne-command) can log without holding the user token — they supply <code>account</code> in the body. Rows where the caller forgot to set <code>account</code> show <span class="badge badge-amber">unknown</span>.</p>
+
       <h3>Import / Export</h3>
-      <p>Bulk import data using a text file format. Click <b>Export data.txt</b> to generate a snapshot in the same format — you can edit it and import it back.</p>
+      <p>Bulk import legacy entities via text file. Click <b>Export data.txt</b> to generate a snapshot in the same format.</p>
       <table><thead><tr><th>Section</th><th>Fields</th></tr></thead><tbody>
         <tr><td><code>[users]</code></td><td>username, password, email (optional)</td></tr>
         <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission (admin or user)</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
       </tbody></table>
-      <p>Click <b>Load Sample</b> for an example. Existing users/roles are skipped (not duplicated). Exported user rows use a placeholder password (<code>changeme</code>) because stored passwords are bcrypt-hashed and cannot be recovered.</p>
+      <p>RBAC entities use their own CSV import inside the <b>Command Defs</b> tab, not this section.</p>
 
-      <h3>History</h3>
-      <p>View operation audit log. All create/delete/assign actions are recorded with timestamp, user, and result.</p>
-
-      <h3>Keyboard Shortcuts</h3>
+      <h3>Keyboard shortcuts</h3>
       <ul>
         <li><code>Enter</code> in login form — submit</li>
         <li><code>Arrow keys</code> + <code>Enter</code> in autocomplete — navigate and select</li>
@@ -735,6 +759,7 @@ const I18N = {
     nav_ne_profiles:'NE Profiles', nav_command_defs:'Định nghĩa lệnh', nav_command_groups:'Nhóm lệnh', nav_group_perms:'Phân quyền nhóm',
     nav_password_policies:'Chính sách mật khẩu', nav_mgt_perms:'Quyền quản trị',
     navcat_identity:'Danh tính', navcat_network:'Mạng', navcat_rbac:'RBAC / Lệnh', navcat_security:'Bảo mật', navcat_audit:'Audit & Công cụ',
+    history_col_time:'Thời gian', history_col_user:'Người dùng', history_col_command:'Lệnh', history_col_ne:'NE', history_col_result:'Kết quả', history_col_scope:'Scope',
     create_password_policy:'Tạo chính sách mật khẩu', all_password_policies:'Tất cả chính sách mật khẩu', no_password_policies:'Chưa có chính sách mật khẩu',
     password_policy_created:'Đã tạo chính sách mật khẩu', password_policy_updated:'Đã cập nhật chính sách mật khẩu', password_policy_deleted:'Đã xoá chính sách mật khẩu',
     assign_policy_to_group:'Gán chính sách cho nhóm', policy:'Chính sách', assign:'Gán', unassign:'Bỏ gán',
@@ -782,50 +807,73 @@ const I18N = {
     import_data:'Nhập dữ liệu', import_desc:'Tải file lên hoặc dán nội dung vào ô bên dưới.', upload_file:'Tải file', load_sample:'Tải mẫu', import:'Nhập', import_results:'Kết quả nhập', export_data:'Xuất data.txt',
     guide_html: `
       <h3>Bắt đầu</h3>
-      <p>MGT Service là nền tảng quản lý các phần tử mạng lõi 5G. Sử dụng trang này để quản lý người dùng, phân quyền, NE và các mapping.</p>
+      <p>MGT Service là lớp phân quyền + audit cho hệ CLI mạng lõi 5G. Sidebar gom thành 5 nhóm: <b>Identity</b>, <b>Network</b>, <b>RBAC / Commands</b>, <b>Security</b>, <b>Audit &amp; Tools</b>. Các tab RBAC + Security chỉ admin mới thấy.</p>
 
-      <h3>Người dùng</h3>
-      <ul>
-        <li><b>Tạo</b> — Nhập tên và mật khẩu, bấm Tạo</li>
-        <li><b>Vô hiệu hóa</b> — Bấm nút Vô hiệu hóa (xóa mềm, có thể kích hoạt lại)</li>
-        <li>Admin mặc định: <code>admin</code> / <code>admin123</code></li>
-      </ul>
-
-      <h3>Phần tử mạng (NE)</h3>
-      <ul>
-        <li>NE là các node mạng lõi 5G (SMF, AMF, UPF, ...)</li>
-        <li>Mỗi NE gồm: tên, site, IP, port, namespace, mô tả</li>
-        <li>System type tự động là <code>5GC</code></li>
-      </ul>
-
-      <h3>Gán NE</h3>
-      <p>Cấp quyền cho user theo 2 cách — trực tiếp hoặc qua nhóm. Chọn user, rồi chuyển nút <b>Đối tượng: NE / Nhóm</b>:</p>
-      <ul>
-        <li><b>NE</b> — gán một hay nhiều NE trực tiếp cho user (badge xanh dương).</li>
-        <li><b>Nhóm</b> — thêm user vào một hay nhiều nhóm; user tự động thấy mọi NE gắn với nhóm (badge xanh lá, hover để xem tooltip).</li>
-      </ul>
-      <p>API <code>/aa/list/ne</code> trả về hợp (dedup) của NE trực tiếp và NE đi qua nhóm. Nút Remove chỉ xoá mapping trực tiếp; muốn bỏ NE đến từ nhóm, hãy vào tab <b>Nhóm</b> và sửa nhóm đó.</p>
-
-      <h3>Nhóm</h3>
-      <p>Nhóm gom một tập NE và một tập user lại để quản lý quyền theo vai trò thay vì từng user. Quy trình:</p>
+      <h3>Mô hình quản lý người dùng</h3>
+      <p>User định danh bằng <code>username</code> + mật khẩu đã bcrypt-hash trong <code>tbl_account</code>. Có 2 lớp phân quyền độc lập chồng lên nhau:</p>
       <ol>
-        <li>Tạo nhóm (tên + mô tả) trong tab <b>Nhóm</b>.</li>
-        <li>Bấm <b>Manage</b> để gán NE — hoặc dùng <b>Add all NEs</b> để gắn toàn bộ NE trong một lần.</li>
-        <li>Thêm user vào nhóm trực tiếp trong modal Manage, hoặc ở tab <b>Gán NE</b> với Đối tượng = Nhóm.</li>
+        <li><b>Legacy role</b> — <code>account_type</code> ∈ {SuperAdmin (0), Admin (1), Normal (2)}. SuperAdmin ẩn khỏi mọi listing nhưng vẫn đăng nhập và thao tác được. Role quyết định "SSH vào có được vào <code>cli-config</code> không?" — chỉ Admin/SuperAdmin được vào; Normal user chỉ thấy <code>ne-config</code>/<code>ne-command</code>.</li>
+        <li><b>Group-based RBAC</b> — user thuộc 0..N nhóm. Mỗi nhóm cấp: (a) tập <b>NE</b> được truy cập (trực tiếp hoặc qua <code>cli_group_ne_mapping</code>), (b) rule allow/deny <b>lệnh</b> nào chạy được trên NE đó, (c) <b>password policy</b>, (d) <b>mgt permission</b> để quản trị mgt-svc.</li>
+      </ol>
+      <p>Quyền hiệu lực = hợp của tất cả nhóm user thuộc về. Password policy merge theo giá trị <i>strict nhất</i>.</p>
+
+      <h4>Vòng đời tài khoản</h4>
+      <ul>
+        <li><b>Tạo</b> — tab Users → điền username + password + email/full_name/phone tuỳ chọn + account_type (1 Admin / 2 Normal) + 1..N nhóm. Admin bắt buộc có full_name + phone + ≥1 nhóm.</li>
+        <li><b>Vô hiệu hoá</b> — soft-delete (<code>is_enable=false</code>). User bị disable không login được; email của họ được coi là "free" để dùng lại.</li>
+        <li><b>Kích hoạt lại</b> — gọi lại <b>Tạo</b> với cùng username. Field có giá trị mới sẽ override; field bỏ trống giữ nguyên; password luôn refresh.</li>
+        <li><b>Đổi mật khẩu</b> — nút "Change Password" góc trên. Server resolve effective policy → enforce min_length + require_{U,L,D,S} + history_count (không được dùng lại N hash gần nhất). <code>password_expires_at = now + max_age_days</code> nếu policy có max_age.</li>
+        <li><b>Admin reset</b> — action ở tab Users. Bỏ qua bước check old-password nhưng vẫn validate theo policy + history.</li>
+        <li><b>Lockout</b> — nếu effective policy có <code>max_login_failure</code> + <code>lockout_minutes</code>, sai N lần sẽ khoá account M phút. Login endpoint trả <code>403 {locked_until, retry_in_seconds}</code>. Login thành công reset counter.</li>
+      </ul>
+
+      <h3>Network element + profile</h3>
+      <ul>
+        <li>NE là các node đích (SMF, AMF, UPF, PE router, ...). Lưu ở <code>cli_ne</code> với (site, namespace, conf_master_ip, conf_port_master_tcp, command_url, conf_mode).</li>
+        <li><b>NE Profile</b> (ví dụ "SMF", "AMF", "UPF") phân loại NE theo tập lệnh. Command def + rule phân quyền đều reference profile; NE được tag <code>ne_profile_id</code>.</li>
+      </ul>
+
+      <h3>NE access vs Command access</h3>
+      <p>Đây là <b>2 quyết định độc lập</b>:</p>
+      <ol>
+        <li><b>NE access</b> — user có reach được NE không. Cấp qua <code>cli_user_ne_mapping</code> (trực tiếp) hoặc <code>cli_group_ne_mapping</code> (qua group). <code>GET /aa/list/ne</code> trả hợp.</li>
+        <li><b>Command access</b> — trên NE reachable được, lệnh nào chạy được. Lưu ở <code>cli_group_cmd_permission</code> với <code>(effect, service, ne_scope, grant_type, grant_value)</code>.</li>
       </ol>
 
+      <h4>Allow / deny rule</h4>
+      <p>Mỗi rule trên nhóm gồm:</p>
+      <ul>
+        <li><b>effect</b> — <code>allow</code> | <code>deny</code></li>
+        <li><b>service</b> — <code>ne-command</code> | <code>ne-config</code> | <code>*</code></li>
+        <li><b>ne_scope</b> — <code>*</code> (mọi NE), <code>profile:SMF</code> (NE cùng profile), <code>ne:HTSMF01</code> (NE cụ thể)</li>
+        <li><b>grant_type + grant_value</b> — bundle (<code>command_group: smf-subscriber-ops</code>), category (<code>category: monitoring</code>), hoặc raw pattern (<code>pattern: show *</code>)</li>
+      </ul>
+      <p>Evaluation: <b>explicit deny &gt; explicit allow &gt; implicit deny</b> tại scope cụ thể nhất có match. <code>ne:X</code> thắng <code>profile:Y</code> thắng <code>*</code>. Downstream service gọi <code>GET /aa/authorize/rbac/effective</code> 1 lần/session và cache lại, hoặc <code>POST /aa/authorize/rbac/check-command</code> realtime cho lệnh risky.</p>
+
+      <h3>Tab Group Permissions</h3>
+      <p>Chọn nhóm → xem rule, thêm allow/deny, revoke theo id. Effect có màu: <span class="badge badge-green">ALLOW</span> / <span class="badge badge-red">DENY</span>.</p>
+
+      <h3>Tab Password Policies</h3>
+      <p>CRUD policy (min_length, max_age_days, history_count, max_login_failure, lockout_minutes, require_{U,L,D,S}). Gán policy cho group ở cuối tab. Policy hiệu lực của user = merge strict nhất từ mọi group user đó thuộc.</p>
+
+      <h3>Tab Mgt Permissions</h3>
+      <p>Per-group <code>(resource, action)</code> grant để quản trị chính mgt-svc: user/ne/group/command/policy/history × create/read/update/delete. <code>*</code> là wildcard 2 phía.</p>
+
+      <h3>Command Defs + Groups</h3>
+      <p>Command def đăng ký mỗi pattern + category + risk_level theo (service, ne_profile). Command group gom def thành bundle để 1 rule phân quyền tham chiếu nhiều pattern. CSV import/export header <code>service,ne_profile,pattern,category,risk_level,description</code>, escape bằng dấu nháy kép.</p>
+
+      <h3>Lịch sử (audit)</h3>
+      <p>Log mọi lệnh qua SSH bastion (cli-config / ne-config / ne-command). Cột: Thời gian, Người dùng, Lệnh, NE, Kết quả, Scope. <code>POST /aa/history/save</code> không yêu cầu auth để downstream service log mà không cần giữ token — tự điền <code>account</code> trong body. Dòng nào caller quên gửi <code>account</code> hiển thị <span class="badge badge-amber">unknown</span>.</p>
+
       <h3>Nhập liệu / Xuất liệu</h3>
-      <p>Nhập dữ liệu hàng loạt từ file text. Bấm <b>Xuất data.txt</b> để tải snapshot cùng định dạng — có thể chỉnh sửa rồi nhập lại.</p>
+      <p>Import legacy entities hàng loạt từ file text. Bấm <b>Xuất data.txt</b> để tải snapshot.</p>
       <table><thead><tr><th>Section</th><th>Trường</th></tr></thead><tbody>
         <tr><td><code>[users]</code></td><td>username, password, email (tùy chọn)</td></tr>
         <tr><td><code>[nes]</code></td><td>ne_name, site_name, namespace, command_url, conf_mode, conf_master_ip, conf_port_master_ssh, conf_username, conf_password, description</td></tr>
         <tr><td><code>[user_roles]</code></td><td>username, permission (admin hoặc user)</td></tr>
         <tr><td><code>[user_nes]</code></td><td>username, ne_name</td></tr>
       </tbody></table>
-      <p>Bấm <b>Tải mẫu</b> để xem ví dụ. Người dùng/role đã tồn tại sẽ được bỏ qua (không trùng). Bản xuất dùng mật khẩu placeholder <code>changeme</code> vì mật khẩu gốc đã được bcrypt-hash, không khôi phục được.</p>
-
-      <h3>Lịch sử</h3>
-      <p>Xem nhật ký thao tác. Tất cả hành động tạo/xóa/gán đều được ghi lại với thời gian, người dùng và kết quả.</p>
+      <p>Entity RBAC có CSV import riêng trong tab <b>Command Defs</b>, không dùng chỗ này.</p>
 
       <h3>Phím tắt</h3>
       <ul>
@@ -1543,12 +1591,17 @@ function renderHistory(){
   if(histPage<1)histPage=1;
   const start=(histPage-1)*HIST_PAGE_SIZE;
   const slice=data.slice(start,start+HIST_PAGE_SIZE);
-  let html='<table><thead><tr><th>Time</th><th>User</th><th>Command</th><th>NE</th><th>Result</th><th>Scope</th></tr></thead><tbody>';
+  let html='<table><thead><tr><th>'+t('history_col_time')+'</th><th>'+t('history_col_user')+'</th><th>'+t('history_col_command')+'</th><th>'+t('history_col_ne')+'</th><th>'+t('history_col_result')+'</th><th>'+t('history_col_scope')+'</th></tr></thead><tbody>';
   slice.forEach(h=>{
     const time=h.executed_time?new Date(h.executed_time).toLocaleString():'-';
-    const scopeBadge=h.scope==='cli-config'?'<span class="badge badge-blue">cli-config</span>':h.scope==='ne-command'?'<span class="badge badge-green">ne-command</span>':h.scope==='ne-config'?'<span class="badge" style="background:#4a1d7f;color:#c4b5fd">ne-config</span>':'<span class="badge badge-blue">'+esc(h.scope||'-')+'</span>';
+    const scopeBadge=h.scope==='cli-config'?'<span class="badge badge-blue">cli-config</span>':h.scope==='ne-command'?'<span class="badge badge-green">ne-command</span>':h.scope==='ne-config'?'<span class="badge badge-violet">ne-config</span>':'<span class="badge badge-blue">'+esc(h.scope||'-')+'</span>';
     const resultBadge=h.result==='success'?'<span class="badge badge-green">success</span>':h.result==='failure'?'<span class="badge badge-red">failure</span>':'<span class="badge badge-blue">'+esc(h.result||'-')+'</span>';
-    html+='<tr><td style="white-space:nowrap;font-size:.8rem">'+time+'</td><td>'+esc(h.account||'-')+'</td><td style="font-family:monospace;font-size:.8rem">'+esc(h.cmd_name||'-')+'</td><td>'+esc(h.ne_name||'-')+'</td><td>'+resultBadge+'</td><td>'+scopeBadge+'</td></tr>';
+    // Highlight unknown/empty actor so the audit gap is visible.
+    const acct=h.account||'';
+    const userCell = !acct || acct==='unknown'
+      ? '<span class="badge badge-amber" title="downstream service did not send account">unknown</span>'
+      : '<b style="color:#f1f5f9">'+esc(acct)+'</b>';
+    html+='<tr><td style="white-space:nowrap;font-size:.8rem;color:#94a3b8">'+time+'</td><td>'+userCell+'</td><td style="font-family:monospace;font-size:.82rem;color:#e2e8f0">'+esc(h.cmd_name||'-')+'</td><td><code style="font-size:.85em;color:#93c5fd">'+esc(h.ne_name||'-')+'</code></td><td>'+resultBadge+'</td><td>'+scopeBadge+'</td></tr>';
   });
   html+='</tbody></table>';
   if(totalPages>1){

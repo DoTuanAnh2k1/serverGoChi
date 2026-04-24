@@ -185,6 +185,98 @@ Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / Eng
 
 ---
 
+## Cơ chế quản lý người dùng
+
+Phần này mô tả **toàn bộ** vòng đời tài khoản + 2 lớp phân quyền chồng lên nhau. Chỗ nào viết "effective" là kết quả sau khi hợp lại qua mọi group user thuộc về.
+
+### Tài khoản (`tbl_account`)
+
+Một user được định danh bằng `account_name` + mật khẩu bcrypt. Trường quan trọng:
+
+| Field | Vai trò |
+|---|---|
+| `account_name` (unique) | username để login |
+| `password` | hash bcrypt của `account_name + plaintext` |
+| `email` (unique, nullable) | unique với user đang active; disabled user "nhả" email ra lại |
+| `account_type` | 0=SuperAdmin, 1=Admin, 2=Normal |
+| `is_enable` | soft delete — `false` = không login được |
+| `login_failure_count` + `locked_time` | đếm login sai, tính lockout |
+| `password_expires_at` | set theo `max_age_days` của effective policy — null = never |
+| `last_change_pass`, `last_login_time` | timestamp cho audit |
+
+### Vòng đời
+
+```
+Create ──► Enabled ──► Login ──┬──► Change password ──► same Enabled state
+                │              │         (password_expires_at reset)
+                │              └──► N failures ──► Locked ──► wait M min ──► Enabled
+                ▼
+             Disabled ◄── Admin clicks "Disable"
+                │
+                ▼
+             Re-enable (create with same username) — merge non-empty fields
+```
+
+| Bước | Handler | Chi tiết |
+|---|---|---|
+| **Create** | `POST /aa/authenticate/user/set` | Validate username + password bắt buộc; email format + email unique (bỏ qua account disabled); nếu `account_type` là admin thì bắt buộc full_name + phone + ≥1 group. Hash bcrypt + set `is_enable=true, status=true, CreatedDate=now`. |
+| **Re-enable** | cùng endpoint, cùng username | Nếu username đang `is_enable=false`, handler merge field non-empty từ request vào record cũ (field không truyền giữ nguyên). Password luôn refresh. Admin required-fields validate trên kết quả merged. Trả 201. |
+| **Disable** | `POST /aa/authenticate/user/delete` | Soft-delete: set `is_enable=false`. SuperAdmin không xoá được. |
+| **Change password (self)** | `POST /aa/change-password` | Verify old-password → resolve effective policy → validate new (min_length + require_{U,L,D,S}) → `IsPasswordReused` so với last N hash → append old hash vào history + prune → update `password`, `password_expires_at`, reset `login_failure_count`. |
+| **Admin reset** | `POST /aa/authenticate/user/reset-password` | Bỏ bước check old-password nhưng vẫn áp dụng policy + history. |
+| **Login** | `POST /aa/authenticate` | Check lockout trước bcrypt (nếu bị khoá → 403 `{locked_until, retry_in_seconds}`); sai → `login_failure_count++`, `locked_time=now`, 401; đúng → reset counter, issue JWT. |
+
+### 2 lớp phân quyền độc lập
+
+Hai layer áp song song — **chặt nhất trong 2 layer thắng**.
+
+**Layer 1 — Legacy `account_type`** (binary cho SSH mode + middleware `CheckRole`):
+
+| `account_type` | cli-config (REPL) | ne-config / ne-command (proxy) | API admin endpoints |
+|---|---|---|---|
+| 0 SuperAdmin | ✅ | ✅ | ✅ (ẩn khỏi listing) |
+| 1 Admin | ✅ | ✅ | ✅ |
+| 2 Normal | ❌ (menu ẩn) | ✅ | ❌ |
+
+**Layer 2 — Group-based RBAC** (per-NE, per-command):
+
+User thuộc 0..N group. Mỗi group cấp:
+1. **NE access** — tập NE reachable. Union với direct `cli_user_ne_mapping`. API `GET /aa/list/ne` trả union dedup.
+2. **Command permission** — rule `cli_group_cmd_permission`: `(effect, service, ne_scope, grant_type, grant_value)`. Evaluator: AWS-IAM × scope-specificity. Downstream ne-config/ne-command gọi `GET /aa/authorize/rbac/effective` hoặc `POST /aa/authorize/rbac/check-command` để verify.
+3. **Password policy** — per-group qua `cli_group.password_policy_id`. Effective policy = strict-est merge (min_length max, require_* union, history_count max, max_age_days min-non-zero, max_login_failure min-non-zero, lockout_minutes max).
+4. **Mgt permission** — per-group `(resource, action)` cho user/ne/group/command/policy/history × create/read/update/delete. Wildcard `*` 2 phía.
+
+### Flow quản lý end-to-end
+
+```
+1. Admin tạo NE Profile:  set ne-profile name SMF
+2. Admin tạo NE:          POST /aa/admin/ne/create + PATCH ne_profile_id
+3. Admin tạo command-def: set command-def service ne-command ne_profile SMF pattern "get subscriber" category monitoring
+4. Admin gom command-def vào command-group (tuỳ chọn).
+5. Admin tạo password policy: POST /aa/password-policy/create  + assign cho group.
+6. Admin tạo group:       POST /aa/group/create
+7. Admin gán quyền cho group:
+     - /aa/group/{id}/cmd-permissions  (allow/deny command-group|category|pattern với ne_scope)
+     - /aa/group/{id}/ne/assign        (NE nào group được reach)
+     - /aa/group/{id}/password-policy  (chính sách password)
+     - /aa/group/{id}/mgt-permissions  (quyền quản trị mgt-svc nếu cần)
+8. Admin tạo user: POST /aa/authenticate/user/set với group_ids kèm theo.
+9. User login → JWT.
+10. User chạy lệnh qua ne-command/ne-config; downstream query /authorize/rbac/effective, cache, verify mỗi command.
+11. Mỗi command chạy xong → log sang /aa/history/save (không cần JWT, nhớ truyền `account`).
+```
+
+### SuperAdmin
+
+Không tạo qua API / CLI / frontend được — chỉ seed lần đầu (`service/seed.go`). SuperAdmin:
+- Ẩn khỏi mọi listing (`GET /aa/admin/user/list`, `GET /aa/authenticate/user/show`).
+- Không xoá được qua API.
+- Có thể đăng nhập bình thường, thao tác như Admin.
+
+Nếu cần tạo SuperAdmin thứ 2 → sửa trực tiếp trong DB (`UPDATE tbl_account SET account_type=0 WHERE account_name=...`).
+
+---
+
 ## SSH CLI (`cmd/ssh`)
 
 Một bastion SSH chạy song song với mgt-svc. **Ai cũng SSH vào được** — sau khi authenticate, menu `mode>` hiển thị các mode dựa trên role:

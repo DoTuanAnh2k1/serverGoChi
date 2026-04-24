@@ -33,9 +33,19 @@ String token = auth.token();          // "Basic eyJ..."
 List<MgtModels.Ne> nes = MgtServiceClient.listNeTyped(token);
 nes.forEach(n -> System.out.println(n.ne() + " → " + n.confMasterIp()));
 
-// 3. Save command history.
-MgtServiceClient.historySave(token,
-        "show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success");
+// 3. Save command history — endpoint is unauthenticated; always pass the
+//    actor's username so the audit trail is meaningful.
+MgtServiceClient.historySave(
+        "show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success", "alice");
+
+// 4. RBAC — cache effective permissions once per session, check per-command for high-risk ops.
+MgtServiceClient.Response effRes = MgtServiceClient.authorizeEffective(token);
+MgtModels.EffectiveResponse eff = effRes.as(MgtModels.EffectiveResponse::from);
+
+MgtServiceClient.Response ckRes = MgtServiceClient.authorizeCheckCommand(
+        token, "ne-command", "delete session 1", /*ne_id*/ 5L);
+MgtModels.CheckCommandResult ck = ckRes.as(MgtModels.CheckCommandResult::from);
+if (!Boolean.TRUE.equals(ck.allowed())) { throw new RuntimeException("denied: " + ck.reason()); }
 
 // 4. Typed history query.
 List<MgtModels.History> recent =
@@ -120,5 +130,33 @@ All endpoints in `api.yaml`, grouped:
 - Groups: `groupList`, `groupShow`, `groupCreate`, `groupUpdate`, `groupDelete`,
   `userGroupList`, `userGroupAssign`, `userGroupUnassign`,
   `groupNeList`, `groupNeAssign`, `groupNeUnassign`
+- RBAC (docs/rbac-design.md §4.7):
+  - NE Profile: `neProfileList`, `neProfileCreate`, `neProfileUpdate`, `neProfileDelete`, `neAssignProfile`
+  - Command Def: `commandDefList`, `commandDefCreate`, `commandDefUpdate`, `commandDefDelete`, `commandDefImport`
+  - Command Group: `commandGroupList`, `commandGroupCreate`, `commandGroupUpdate`, `commandGroupDelete`,
+    `commandGroupMembers`, `commandGroupAddMember`, `commandGroupRemoveMember`
+  - Group cmd permission: `groupCmdPermissionList`, `groupCmdPermissionAdd`, `groupCmdPermissionDelete`
+  - Authorize: `authorizeEffective`, `authorizeCheckCommand` — downstream services (ne-command / ne-config) should
+    cache `authorizeEffective` per session and call `authorizeCheckCommand` realtime for risky operations
+- Password Policy (docs/rbac-design.md §4.8): `passwordPolicyList`, `passwordPolicyCreate`, `passwordPolicyUpdate`,
+  `passwordPolicyDelete`, `groupAssignPasswordPolicy`
+- Mgt Permission (docs/rbac-design.md §4.11): `mgtPermissionList`, `mgtPermissionAdd`, `mgtPermissionDelete`
 - Import: `importBulk`
 - Subscribers: `subscribersFiles`, `subscribersFile`
+
+### History save — unauthenticated + account field
+
+`POST /aa/history/save` no longer requires a JWT. The caller should always
+supply `account` = username of the actor that ran the command; when omitted
+the server records `"unknown"` and the audit trail loses identity.
+
+```java
+// Correct — downstream resolves the username from its own auth layer and passes it here.
+MgtServiceClient.historySave(
+        "show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success", "alice");
+
+// Also works for minimal services (use MgtHistoryClient) — same account semantics.
+MgtHistoryClient.saveHistory(
+        "http://mgt-svc:3000",
+        "show running-config", "HTSMF01", "10.10.1.1", "ne-command", "success", "alice");
+```
