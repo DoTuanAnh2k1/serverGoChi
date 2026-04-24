@@ -170,6 +170,7 @@ body.role-user .admin-only{display:none !important}
   <a onclick="showSection('ne-mapping')" data-section="ne-mapping" data-i18n="nav_ne_mapping">NE Mapping</a>
   <a onclick="showSection('ne-profiles')" data-section="ne-profiles" data-i18n="nav_ne_profiles" class="admin-only">NE Profiles</a>
   <div class="nav-cat admin-only" data-i18n="navcat_rbac">RBAC / Commands</div>
+  <a onclick="showSection('command-catalog')" data-section="command-catalog" data-i18n="nav_command_catalog" class="admin-only">Command Catalog</a>
   <a onclick="showSection('command-defs')" data-section="command-defs" data-i18n="nav_command_defs" class="admin-only">Command Defs</a>
   <a onclick="showSection('command-groups')" data-section="command-groups" data-i18n="nav_command_groups" class="admin-only">Command Groups</a>
   <a onclick="showSection('group-perms')" data-section="group-perms" data-i18n="nav_group_perms" class="admin-only">Group Permissions</a>
@@ -370,6 +371,67 @@ body.role-user .admin-only{display:none !important}
   <div class="card">
     <h3 style="margin-bottom:1rem" data-i18n="all_ne_profiles">All NE Profiles</h3>
     <div id="neProfilesTable"><div class="loading">Loading...</div></div>
+  </div>
+</div>
+
+<!-- Command Catalog -->
+<div class="section admin-only" id="sec-command-catalog">
+  <div class="card">
+    <h3 style="margin-bottom:.4rem" data-i18n="catalog_title">Command Catalog</h3>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:0" data-i18n="catalog_intro">Import a pool of raw command patterns (XML or CSV), then bulk-apply NE profile / category / risk level to many of them at once. The pool is stored in your browser (localStorage); re-import any time. The "Bulk Apply" card sends a batch to <code>POST /aa/command-def/import</code>.</p>
+  </div>
+
+  <div class="card admin-only">
+    <h3 style="margin-bottom:.75rem" data-i18n="catalog_import">1. Import patterns</h3>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:.5rem" data-i18n="catalog_import_desc">Accepts <b>XML</b> (any <code>&lt;command&gt;</code>, <code>&lt;cmd&gt;</code>, or <code>&lt;pattern&gt;</code> element with text or <code>name</code>/<code>pattern</code>/<code>value</code> attribute) or <b>CSV</b> (header <code>pattern[,description]</code>).</p>
+    <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.5rem">
+      <input type="file" id="catalogFile" accept=".xml,.csv,.txt" style="display:none" onchange="handleCatalogFile(event)">
+      <button class="btn btn-outline btn-sm" onclick="document.getElementById('catalogFile').click()" data-i18n="upload_file">Upload File</button>
+      <button class="btn btn-outline btn-sm" onclick="loadCatalogSampleXml()" data-i18n="catalog_sample_xml">Load Sample XML</button>
+      <button class="btn btn-outline btn-sm" onclick="loadCatalogSampleCsv()" data-i18n="catalog_sample_csv">Load Sample CSV</button>
+      <button class="btn btn-outline btn-sm" onclick="downloadCatalog()" data-i18n="catalog_download">Download Pool</button>
+      <button class="btn btn-danger btn-sm" onclick="clearCatalog()" data-i18n="catalog_clear">Clear Pool</button>
+    </div>
+    <div class="form-group">
+      <label data-i18n="catalog_paste_label">Paste content (auto-detect XML vs CSV by leading char):</label>
+      <textarea id="catalogPasteText" rows="6" style="width:100%;padding:.6rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.82rem;font-family:monospace;resize:vertical;outline:none" placeholder='<commands>&#10;  <command>show version</command>&#10;  <command>show interface *</command>&#10;</commands>&#10;&#10;OR&#10;&#10;pattern,description&#10;show version,Show device version&#10;ping *,Network reachability'></textarea>
+    </div>
+    <button class="btn btn-primary" onclick="ingestCatalogText()" data-i18n="catalog_ingest">Add to Pool</button>
+  </div>
+
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.5rem;flex-wrap:wrap;gap:.5rem">
+      <h3 style="margin:0" data-i18n="catalog_pool">2. Pool</h3>
+      <span id="catalogStats" style="color:#94a3b8;font-size:.85rem"></span>
+    </div>
+    <div style="display:flex;gap:.5rem;align-items:center;margin-bottom:.5rem;flex-wrap:wrap">
+      <input id="catalogFilter" oninput="renderCatalog()" placeholder="Filter pattern (substring or 'show *' wildcard)…" style="flex:1;min-width:280px;padding:.4rem .55rem;border:1px solid #475569;border-radius:6px;background:#0f172a;color:#e2e8f0;font-size:.85rem">
+      <button class="btn btn-outline btn-sm" onclick="catalogSelectAllMatching()" data-i18n="catalog_select_matching">Select all matching</button>
+      <button class="btn btn-outline btn-sm" onclick="catalogClearSelection()" data-i18n="catalog_clear_sel">Clear selection</button>
+    </div>
+    <div id="catalogTable"><div class="empty" data-i18n="catalog_empty">Pool is empty — import XML/CSV above</div></div>
+  </div>
+
+  <div class="card admin-only">
+    <h3 style="margin-bottom:.5rem" data-i18n="catalog_apply">3. Bulk Apply — assign profile + category to selected</h3>
+    <p style="color:#94a3b8;font-size:.85rem;margin-bottom:.75rem" data-i18n="catalog_apply_desc">Pick patterns above, then choose what metadata to apply. Click Apply → batch POST to <code>/aa/command-def/import</code>. Existing (service, ne_profile, pattern) combos are skipped server-side.</p>
+    <div class="form-row">
+      <div class="form-group"><label>Service *</label>
+        <select id="catalogApplyService"><option value="ne-command">ne-command</option><option value="ne-config">ne-config</option><option value="*">*</option></select>
+      </div>
+      <div class="form-group"><label>NE Profile</label>
+        <input id="catalogApplyProfile" placeholder="* or SMF / AMF / UPF …" value="*">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Category *</label>
+        <select id="catalogApplyCategory"><option value="monitoring">monitoring</option><option value="configuration">configuration</option><option value="admin">admin</option><option value="debug">debug</option></select>
+      </div>
+      <div class="form-group"><label>Risk Level</label>
+        <select id="catalogApplyRisk"><option value="0">0 safe</option><option value="1">1</option><option value="2">2 dangerous</option></select>
+      </div>
+    </div>
+    <button class="btn btn-primary" onclick="catalogBulkApply()" data-i18n="catalog_apply_btn">Apply to <span id="catalogApplyCount">0</span> selected</button>
   </div>
 </div>
 
@@ -622,7 +684,24 @@ const I18N = {
     // nav
     nav_dashboard:'Dashboard', nav_users:'Users', nav_nes:'Network Elements',
     nav_ne_mapping:'NE Mapping', nav_groups:'Groups', nav_history:'History', nav_import:'Import', nav_guide:'Guide',
-    nav_ne_profiles:'NE Profiles', nav_command_defs:'Command Defs', nav_command_groups:'Command Groups', nav_group_perms:'Group Permissions',
+    nav_ne_profiles:'NE Profiles', nav_command_catalog:'Command Catalog', nav_command_defs:'Command Defs', nav_command_groups:'Command Groups', nav_group_perms:'Group Permissions',
+    catalog_title:'Command Catalog', catalog_intro:'Import a pool of raw command patterns (XML or CSV), then bulk-apply NE profile / category / risk to many at once. Pool is stored in your browser; re-import any time.',
+    catalog_import:'1. Import patterns', catalog_import_desc:'Accepts XML (any <command>/<cmd>/<pattern> element) or CSV (header pattern[,description]).',
+    catalog_paste_label:'Paste content (auto-detect XML vs CSV by leading char):',
+    catalog_sample_xml:'Load Sample XML', catalog_sample_csv:'Load Sample CSV',
+    catalog_download:'Download Pool', catalog_clear:'Clear Pool', catalog_clear_confirm:'Clear the entire catalog pool? Imports cannot be recovered without re-uploading the source file.',
+    catalog_cleared:'Pool cleared.', catalog_added:'Added {n} new pattern(s). Pool now has {total}.',
+    catalog_no_patterns:'No patterns parsed from input.',
+    catalog_ingest:'Add to Pool', catalog_pool:'2. Pool', catalog_apply:'3. Bulk Apply', catalog_apply_desc:'Pick patterns above, then choose what metadata to apply.',
+    catalog_apply_btn:'Apply to selected', catalog_applied:'Sent {n} command-defs to import.',
+    catalog_select_matching:'Select all matching', catalog_clear_sel:'Clear selection',
+    catalog_filter_empty:'Type a filter first (substring or "show *" wildcard).',
+    catalog_no_selection:'Select at least one pattern from the pool.',
+    catalog_selected_n:'Selected {n} matching pattern(s).',
+    catalog_empty:'Pool is empty — import XML/CSV above.',
+    catalog_no_match:'No pattern matches the current filter.',
+    catalog_stats:'{shown} shown / {total} total · {sel} selected',
+    catalog_col_pattern:'Pattern', catalog_col_description:'Description',
     nav_password_policies:'Password Policies', nav_mgt_perms:'Mgt Permissions',
     navcat_identity:'Identity', navcat_network:'Network', navcat_rbac:'RBAC / Commands', navcat_security:'Security', navcat_audit:'Audit & Tools',
     history_col_time:'Time', history_col_user:'User', history_col_command:'Command', history_col_ne:'NE', history_col_result:'Result', history_col_scope:'Scope',
@@ -737,8 +816,16 @@ const I18N = {
       <h3>Mgt Permissions tab</h3>
       <p>Per-group <code>(resource, action)</code> grants for managing the mgt-svc itself: user/ne/group/command/policy/history × create/read/update/delete. <code>*</code> is a wildcard on either side.</p>
 
-      <h3>Command Defs + Groups</h3>
-      <p>Command defs register each pattern + category + risk level per (service, ne_profile). Command groups bundle defs so a single permission rule can reference many patterns. CSV import/export supports header <code>service,ne_profile,pattern,category,risk_level,description</code> with double-quote escaping.</p>
+      <h3>Command Catalog (new)</h3>
+      <p>Two-step workflow for command registration when you have a vendor manifest:</p>
+      <ol>
+        <li><b>Command Catalog</b> tab: import a raw pool of command patterns from XML or CSV (just <code>pattern[,description]</code>). Pool is stored in browser <code>localStorage</code>; re-import any time. Filter via substring or "show *" wildcard, then "Select all matching" to bulk-tick.</li>
+        <li><b>Bulk Apply</b> card on the same tab: pick the metadata once (service, ne_profile, category, risk_level) and apply it to every selected pattern. Sends one batch <code>POST /aa/command-def/import</code>; backend de-dupes on (service, ne_profile, pattern).</li>
+      </ol>
+      <p>Use <b>Command Defs</b> tab for direct row-by-row CRUD when you don't have a manifest. CSV import there still supports the full schema <code>service,ne_profile,pattern,category,risk_level,description</code>.</p>
+
+      <h3>Command Groups</h3>
+      <p>Bundle command-defs so a single permission rule can reference many patterns. Open "Manage Commands" modal to add/remove members.</p>
 
       <h3>History</h3>
       <p>Audit trail of every command run through the SSH bastion (cli-config / ne-config / ne-command). Columns: Time, User, Command, NE, Result, Scope. <code>POST /aa/history/save</code> is unauthenticated so downstream services (ne-config, ne-command) can log without holding the user token — they supply <code>account</code> in the body. Rows where the caller forgot to set <code>account</code> show <span class="badge badge-amber">unknown</span>.</p>
@@ -764,7 +851,24 @@ const I18N = {
   vi: {
     nav_dashboard:'Tổng quan', nav_users:'Người dùng', nav_nes:'Phần tử mạng',
     nav_ne_mapping:'Gán NE', nav_groups:'Nhóm', nav_history:'Lịch sử', nav_import:'Nhập liệu', nav_guide:'Hướng dẫn',
-    nav_ne_profiles:'NE Profiles', nav_command_defs:'Định nghĩa lệnh', nav_command_groups:'Nhóm lệnh', nav_group_perms:'Phân quyền nhóm',
+    nav_ne_profiles:'NE Profiles', nav_command_catalog:'Catalog lệnh', nav_command_defs:'Định nghĩa lệnh', nav_command_groups:'Nhóm lệnh', nav_group_perms:'Phân quyền nhóm',
+    catalog_title:'Catalog lệnh', catalog_intro:'Import 1 pool các pattern lệnh thô (XML hoặc CSV), sau đó bulk-apply NE profile / category / risk_level cho nhiều pattern cùng lúc. Pool lưu trong browser, có thể re-import bất kỳ lúc nào.',
+    catalog_import:'1. Import pattern', catalog_import_desc:'Chấp nhận XML (bất kỳ element <command>/<cmd>/<pattern>) hoặc CSV (header pattern[,description]).',
+    catalog_paste_label:'Dán nội dung (tự nhận XML/CSV theo ký tự đầu tiên):',
+    catalog_sample_xml:'Mẫu XML', catalog_sample_csv:'Mẫu CSV',
+    catalog_download:'Tải xuống Pool', catalog_clear:'Xoá Pool', catalog_clear_confirm:'Xoá toàn bộ catalog pool? Cần upload lại file gốc nếu muốn lấy lại.',
+    catalog_cleared:'Đã xoá pool.', catalog_added:'Đã thêm {n} pattern mới. Pool hiện có {total}.',
+    catalog_no_patterns:'Không parse được pattern nào từ input.',
+    catalog_ingest:'Thêm vào Pool', catalog_pool:'2. Pool', catalog_apply:'3. Bulk Apply', catalog_apply_desc:'Chọn pattern phía trên, sau đó chọn metadata muốn áp.',
+    catalog_apply_btn:'Áp cho selected', catalog_applied:'Đã gửi {n} command-def để import.',
+    catalog_select_matching:'Chọn tất cả khớp', catalog_clear_sel:'Bỏ chọn',
+    catalog_filter_empty:'Gõ filter trước (substring hoặc "show *" wildcard).',
+    catalog_no_selection:'Chọn ít nhất 1 pattern.',
+    catalog_selected_n:'Đã chọn {n} pattern khớp.',
+    catalog_empty:'Pool rỗng — import XML/CSV ở trên.',
+    catalog_no_match:'Không pattern nào khớp filter.',
+    catalog_stats:'{shown} hiển thị / {total} total · {sel} đã chọn',
+    catalog_col_pattern:'Pattern', catalog_col_description:'Mô tả',
     nav_password_policies:'Chính sách mật khẩu', nav_mgt_perms:'Quyền quản trị',
     navcat_identity:'Danh tính', navcat_network:'Mạng', navcat_rbac:'RBAC / Lệnh', navcat_security:'Bảo mật', navcat_audit:'Audit & Công cụ',
     history_col_time:'Thời gian', history_col_user:'Người dùng', history_col_command:'Lệnh', history_col_ne:'NE', history_col_result:'Kết quả', history_col_scope:'Scope',
@@ -875,8 +979,16 @@ const I18N = {
       <h3>Tab Mgt Permissions</h3>
       <p>Per-group <code>(resource, action)</code> grant để quản trị chính mgt-svc: user/ne/group/command/policy/history × create/read/update/delete. <code>*</code> là wildcard 2 phía.</p>
 
-      <h3>Command Defs + Groups</h3>
-      <p>Command def đăng ký mỗi pattern + category + risk_level theo (service, ne_profile). Command group gom def thành bundle để 1 rule phân quyền tham chiếu nhiều pattern. CSV import/export header <code>service,ne_profile,pattern,category,risk_level,description</code>, escape bằng dấu nháy kép.</p>
+      <h3>Command Catalog (mới)</h3>
+      <p>Workflow 2 bước khi có vendor manifest sẵn:</p>
+      <ol>
+        <li>Tab <b>Command Catalog</b>: import pool pattern thô từ XML hoặc CSV (chỉ <code>pattern[,description]</code>). Pool lưu trong <code>localStorage</code> của browser, có thể re-import bất kỳ lúc nào. Filter bằng substring hoặc wildcard "show *", bấm "Select all matching" để tick hàng loạt.</li>
+        <li>Card <b>Bulk Apply</b> cùng tab: chọn metadata 1 lần (service, ne_profile, category, risk_level) và áp cho mọi pattern đã chọn. Gửi 1 batch <code>POST /aa/command-def/import</code>; backend tự dedupe theo (service, ne_profile, pattern).</li>
+      </ol>
+      <p>Dùng tab <b>Command Defs</b> cho CRUD từng row khi không có manifest. CSV import ở đó vẫn hỗ trợ full schema <code>service,ne_profile,pattern,category,risk_level,description</code>.</p>
+
+      <h3>Command Groups</h3>
+      <p>Gom command-def thành bundle để 1 rule phân quyền tham chiếu nhiều pattern. Mở modal "Manage Commands" để add/remove member.</p>
 
       <h3>Lịch sử (audit)</h3>
       <p>Log mọi lệnh qua SSH bastion (cli-config / ne-config / ne-command). Cột: Thời gian, Người dùng, Lệnh, NE, Kết quả, Scope. <code>POST /aa/history/save</code> không yêu cầu auth để downstream service log mà không cần giữ token — tự điền <code>account</code> trong body. Dòng nào caller quên gửi <code>account</code> hiển thị <span class="badge badge-amber">unknown</span>.</p>
@@ -1092,6 +1204,7 @@ function showSection(name) {
   if (name === 'groups') loadGroups();
   if (name === 'history') loadHistory();
   if (name === 'ne-profiles') loadNeProfiles();
+  if (name === 'command-catalog') renderCatalog();
   if (name === 'command-defs') loadCommandDefs();
   if (name === 'command-groups') loadCommandGroups();
   if (name === 'group-perms') { populateGpGroupSelect(); loadGroupPermissions(); }
@@ -2182,6 +2295,272 @@ async function revokePermission(gid, permID){
   if (res.status !== 200) { toast(failMsg(res), 'error'); return; }
   toast(t('permission_revoked'));
   loadGroupPermissions();
+}
+
+// ────────────────────────────────────────────────────────────────
+// Command Catalog — a frontend-only pool of raw command patterns.
+//
+// Stored in localStorage as JSON {pattern,description}[]. Source can be
+// a vendor XML manifest or a CSV with header `pattern[,description]`.
+// The Bulk Apply card lets the admin pick N patterns + decide
+// service/ne_profile/category/risk in one shot, and POST a batch to
+// /aa/command-def/import — backend already de-dupes on
+// (service, ne_profile, pattern).
+// ────────────────────────────────────────────────────────────────
+
+const CATALOG_KEY = 'mgt_command_catalog';
+let catalogSelected = new Set(); // patterns currently checked
+
+function loadCatalog() {
+  try {
+    const raw = localStorage.getItem(CATALOG_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr : [];
+  } catch { return []; }
+}
+function saveCatalog(arr) {
+  // Dedupe by pattern, keep first description seen.
+  const seen = new Map();
+  arr.forEach(it => { if (it && it.pattern && !seen.has(it.pattern)) seen.set(it.pattern, it.description||''); });
+  const out = [];
+  for (const [p, d] of seen) out.push({pattern: p, description: d});
+  localStorage.setItem(CATALOG_KEY, JSON.stringify(out));
+  return out;
+}
+
+// Parse: detect XML if leading char is '<', else treat as CSV. The XML
+// parser walks any element named `command`, `cmd`, or `pattern` and
+// captures the text content OR the `name` / `pattern` / `value`
+// attribute, whichever is non-empty. CSV expects header
+// `pattern[,description]` and tolerates quoted fields with "" escapes.
+function parseCatalogText(text) {
+  const t = (text || '').trim();
+  if (!t) return [];
+  if (t.startsWith('<')) return parseCatalogXml(t);
+  return parseCatalogCsv(t);
+}
+
+function parseCatalogXml(text) {
+  const out = [];
+  let dom;
+  try { dom = new DOMParser().parseFromString(text, 'application/xml'); }
+  catch { return out; }
+  if (!dom || dom.querySelector('parsererror')) return out;
+  const all = dom.querySelectorAll('command, cmd, pattern');
+  all.forEach(el => {
+    const txt = (el.textContent || '').trim();
+    const a = el.getAttribute('pattern') || el.getAttribute('name') || el.getAttribute('value') || '';
+    const pat = (a || txt).trim();
+    if (!pat) return;
+    // Skip if text contains nested <command> children (the parent likely
+    // wraps a list, not a single pattern).
+    if (el.querySelector && el.querySelector('command, cmd, pattern')) return;
+    const desc = el.getAttribute('description') || el.getAttribute('desc') || '';
+    out.push({ pattern: pat, description: desc });
+  });
+  return out;
+}
+
+function parseCatalogCsv(text) {
+  const rows = parseCsv(text); // already defined for command-def CSV
+  if (!rows.length) return [];
+  const header = rows[0].map(s => (s||'').trim().toLowerCase());
+  const iPat = header.indexOf('pattern');
+  const iDesc = header.indexOf('description');
+  if (iPat < 0) {
+    // Treat as headerless single-column list.
+    return rows.map(r => ({pattern: (r[0]||'').trim(), description: ''})).filter(it => it.pattern);
+  }
+  const out = [];
+  for (let i = 1; i < rows.length; i++) {
+    const p = (rows[i][iPat]||'').trim();
+    if (!p) continue;
+    out.push({pattern: p, description: iDesc >= 0 ? (rows[i][iDesc]||'') : ''});
+  }
+  return out;
+}
+
+function handleCatalogFile(ev) {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    document.getElementById('catalogPasteText').value = r.result;
+    ingestCatalogText();
+  };
+  r.readAsText(f);
+}
+
+function ingestCatalogText() {
+  const text = document.getElementById('catalogPasteText').value;
+  const fresh = parseCatalogText(text);
+  if (!fresh.length) { toast(t('catalog_no_patterns'), 'error'); return; }
+  const before = loadCatalog();
+  const merged = saveCatalog([...before, ...fresh]);
+  document.getElementById('catalogPasteText').value = '';
+  toast(t('catalog_added').replace('{n}', merged.length - before.length).replace('{total}', merged.length));
+  renderCatalog();
+}
+
+function loadCatalogSampleXml() {
+  document.getElementById('catalogPasteText').value =
+    '<commands>\n' +
+    '  <command>show version</command>\n' +
+    '  <command>show running-config</command>\n' +
+    '  <command pattern="show interface *" description="Per-interface stats"/>\n' +
+    '  <command>ping *</command>\n' +
+    '  <command>traceroute *</command>\n' +
+    '  <command>get subscriber</command>\n' +
+    '  <command>get session</command>\n' +
+    '  <command>delete session *</command>\n' +
+    '  <command>show sctp</command>\n' +
+    '  <command>show ue *</command>\n' +
+    '  <command>show pfcp-session *</command>\n' +
+    '  <command>show gtp-tunnel *</command>\n' +
+    '</commands>';
+}
+
+function loadCatalogSampleCsv() {
+  document.getElementById('catalogPasteText').value =
+    'pattern,description\n' +
+    'show version,Show device version\n' +
+    'show running-config,Active running configuration\n' +
+    'ping *,Network reachability\n' +
+    'get subscriber,SMF: list subscribers\n' +
+    'get session,SMF: list sessions\n' +
+    'delete session *,SMF: tear down PDU session\n' +
+    'show ue *,AMF: UE detail\n';
+}
+
+function downloadCatalog() {
+  const arr = loadCatalog();
+  if (!arr.length) { toast(t('catalog_empty'), 'error'); return; }
+  const lines = ['pattern,description', ...arr.map(it =>
+    csvEscape(it.pattern) + ',' + csvEscape(it.description||''))];
+  const blob = new Blob([lines.join('\n') + '\n'], {type: 'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'command_catalog.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function clearCatalog() {
+  if (!confirm(t('catalog_clear_confirm'))) return;
+  localStorage.removeItem(CATALOG_KEY);
+  catalogSelected.clear();
+  toast(t('catalog_cleared'));
+  renderCatalog();
+}
+
+// matchesFilter: substring contains OR a `<pat> *` wildcard suffix.
+function matchesFilter(pattern, filter) {
+  if (!filter) return true;
+  const f = filter.trim().toLowerCase();
+  if (f.endsWith('*')) {
+    const prefix = f.slice(0, -1).trimEnd();
+    if (!prefix) return true;
+    return pattern.toLowerCase().startsWith(prefix);
+  }
+  return pattern.toLowerCase().includes(f);
+}
+
+function renderCatalog() {
+  const arr = loadCatalog();
+  const filterEl = document.getElementById('catalogFilter');
+  const filter = filterEl ? filterEl.value : '';
+  const filtered = arr.filter(it => matchesFilter(it.pattern, filter));
+  document.getElementById('catalogStats').textContent =
+    t('catalog_stats').replace('{shown}', filtered.length).replace('{total}', arr.length).replace('{sel}', catalogSelected.size);
+  document.getElementById('catalogApplyCount').textContent = String(catalogSelected.size);
+  if (!arr.length) {
+    document.getElementById('catalogTable').innerHTML = '<div class="empty">' + t('catalog_empty') + '</div>';
+    return;
+  }
+  if (!filtered.length) {
+    document.getElementById('catalogTable').innerHTML = '<div class="empty">' + t('catalog_no_match') + '</div>';
+    return;
+  }
+  let html = '<table><thead><tr>'
+    + '<th style="width:32px"><input type="checkbox" id="catalogSelectAll" onchange="catalogToggleAll(this.checked)"></th>'
+    + '<th>' + t('catalog_col_pattern') + '</th>'
+    + '<th>' + t('catalog_col_description') + '</th>'
+    + '<th style="width:60px"></th>'
+    + '</tr></thead><tbody>';
+  filtered.forEach((it, i) => {
+    const checked = catalogSelected.has(it.pattern) ? 'checked' : '';
+    const safePat = esc(it.pattern);
+    html += '<tr>'
+      + '<td><input type="checkbox" ' + checked + ' onchange="catalogToggleOne(this.checked, \'' + safePat.replace(/'/g, "\\'") + '\')"></td>'
+      + '<td><code style="color:#f1f5f9;font-size:.85em">' + safePat + '</code></td>'
+      + '<td style="color:#94a3b8;font-size:.82rem">' + esc(it.description || '-') + '</td>'
+      + '<td><button class="btn btn-outline btn-sm" onclick="catalogDeleteOne(\'' + safePat.replace(/'/g, "\\'") + '\')">×</button></td>'
+      + '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('catalogTable').innerHTML = html;
+}
+
+function catalogToggleOne(on, pattern) {
+  if (on) catalogSelected.add(pattern); else catalogSelected.delete(pattern);
+  document.getElementById('catalogStats').textContent =
+    t('catalog_stats').replace('{shown}', '?').replace('{total}', '?').replace('{sel}', catalogSelected.size);
+  document.getElementById('catalogApplyCount').textContent = String(catalogSelected.size);
+  renderCatalog();
+}
+
+function catalogToggleAll(on) {
+  const arr = loadCatalog();
+  const filter = document.getElementById('catalogFilter').value;
+  const visible = arr.filter(it => matchesFilter(it.pattern, filter));
+  if (on) visible.forEach(it => catalogSelected.add(it.pattern));
+  else visible.forEach(it => catalogSelected.delete(it.pattern));
+  renderCatalog();
+}
+
+function catalogSelectAllMatching() {
+  const arr = loadCatalog();
+  const filter = document.getElementById('catalogFilter').value;
+  if (!filter.trim()) { toast(t('catalog_filter_empty'), 'error'); return; }
+  const visible = arr.filter(it => matchesFilter(it.pattern, filter));
+  visible.forEach(it => catalogSelected.add(it.pattern));
+  toast(t('catalog_selected_n').replace('{n}', visible.length));
+  renderCatalog();
+}
+
+function catalogClearSelection() {
+  catalogSelected.clear();
+  renderCatalog();
+}
+
+function catalogDeleteOne(pattern) {
+  const arr = loadCatalog().filter(it => it.pattern !== pattern);
+  saveCatalog(arr);
+  catalogSelected.delete(pattern);
+  renderCatalog();
+}
+
+async function catalogBulkApply() {
+  if (!catalogSelected.size) { toast(t('catalog_no_selection'), 'error'); return; }
+  const service = document.getElementById('catalogApplyService').value;
+  const neProfile = document.getElementById('catalogApplyProfile').value.trim() || '*';
+  const category = document.getElementById('catalogApplyCategory').value;
+  const risk = parseInt(document.getElementById('catalogApplyRisk').value, 10) || 0;
+  const pool = loadCatalog();
+  const byPattern = new Map(pool.map(it => [it.pattern, it.description||'']));
+  const body = [];
+  for (const pat of catalogSelected) {
+    body.push({
+      service: service, ne_profile: neProfile, pattern: pat,
+      category: category, risk_level: risk,
+      description: byPattern.get(pat) || '',
+    });
+  }
+  const res = await api('POST', '/command-def/import', body);
+  if (res.status !== 201 && res.status !== 200) { toast(failMsg(res, 'import failed'), 'error'); return; }
+  toast(t('catalog_applied').replace('{n}', body.length));
+  catalogSelected.clear();
+  renderCatalog();
 }
 
 // ────────────────────────────────────────────────────────────────

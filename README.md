@@ -166,7 +166,8 @@ Embedded tại `http://localhost:3000/admin` — song ngữ Tiếng Việt / Eng
 **RBAC / Commands** (admin-only, docs/rbac-design.md §4.7)
 | Tab | Mô tả |
 |---|---|
-| Command Defs | CRUD command registry + **CSV import/export** (Load Sample 9 rows, filter service/profile/category, risk-level colored badge) |
+| Command Catalog | Pool pattern thô (lưu localStorage browser). Import từ XML hoặc CSV. Filter substring + wildcard `show *`. Multi-select + "Select all matching" + Bulk Apply (chọn metadata 1 lần, áp cho mọi pattern đã tick → batch POST /aa/command-def/import) |
+| Command Defs | CRUD command registry + **CSV import/export** (Load Sample 9 rows, filter service/profile/category, risk-level colored badge). Dùng cho row-by-row CRUD; với bulk thì dùng Command Catalog |
 | Command Groups | CRUD bundle + modal "Manage Commands" để add/remove member |
 | Group Permissions | Chọn group → list/add/revoke allow/deny rule với `ne_scope` (* / profile:X / ne:Y), effect ALLOW=green DENY=red |
 

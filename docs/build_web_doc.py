@@ -129,9 +129,15 @@ def main():
 
     add_h(doc, "4.3. RBAC / Commands (admin-only)", 2)
     add_table(doc, ["Tab", "Chức năng"], [
+        ["Command Catalog",
+         "Pool pattern thô (lưu localStorage). Import từ XML hoặc CSV. Filter substring + wildcard `show *`. "
+         "Multi-select + 'Select all matching'. Bulk Apply: chọn 1 lần metadata (service / ne_profile / category / "
+         "risk_level) → áp cho mọi pattern đã tick → batch POST /aa/command-def/import. Workflow 2 bước này thay "
+         "cho việc gõ tay từng command-def khi có vendor manifest."],
         ["Command Defs",
          "CRUD command registry + filter (service/profile/category) + CSV import/export. Header CSV: "
-         "`service,ne_profile,pattern,category,risk_level,description`. \"Load Sample\" điền 9 row mẫu."],
+         "`service,ne_profile,pattern,category,risk_level,description`. \"Load Sample\" điền 9 row mẫu. "
+         "Dùng cho row-by-row CRUD; với bulk thì dùng Command Catalog."],
         ["Command Groups",
          "CRUD bundle. Mỗi group có button \"Manage Commands\" mở modal — chọn def từ dropdown để add/remove member."],
         ["Group Permissions",
@@ -169,7 +175,7 @@ def main():
     add_num(doc, "Đăng nhập với SuperAdmin (seed sẵn lúc init DB).")
     add_num(doc, "Vào tab **NE Profiles** → tạo profile cho từng loại NE: SMF, AMF, UPF, …")
     add_num(doc, "Vào tab **Network Elements** → tạo từng NE và gán profile tương ứng.")
-    add_num(doc, "Vào tab **Command Defs** → import sample CSV hoặc khai báo từng command pattern, gắn category/risk_level.")
+    add_num(doc, "Vào tab **Command Catalog** → import vendor XML/CSV manifest vào pool. Filter + multi-select + Bulk Apply để gán metadata (service/profile/category/risk) cho từng nhóm pattern. Tab **Command Defs** dùng cho row-by-row CRUD nếu cần chỉnh tay.")
     add_num(doc, "Vào tab **Command Groups** → gom command-def thành bundle theo profile (vd: smf-subscriber-ops, smf-session-ops).")
     add_num(doc, "Vào tab **Password Policies** → tạo các policy (strict / standard / relaxed).")
     add_num(doc, "Vào tab **Groups** → tạo group cho từng team (team-smf, team-amf, noc-l1, noc-l2, …).")
@@ -215,6 +221,14 @@ def main():
     # 6. Tài nguyên đặc biệt
     add_h(doc, "6. Tài nguyên đặc biệt", 1)
 
+    add_h(doc, "6.0. Command Catalog (workflow 2-bước)", 2)
+    add_para(doc, "Tab Command Catalog có 3 card xếp dọc:")
+    add_bullet(doc, "**1. Import patterns** — upload file (.xml/.csv) hoặc paste vào textarea. Auto-detect format theo ký tự đầu (`<` = XML). XML parser quét bất kỳ element <command>/<cmd>/<pattern> với text hoặc attribute pattern/name/value. CSV parser cần header `pattern[,description]`. Pool ghi vào localStorage `mgt_command_catalog`.")
+    add_bullet(doc, "**2. Pool** — table tất cả pattern hiện có. Filter input chấp nhận substring (`get`) hoặc wildcard suffix (`show *`). \"Select all matching\" tick toàn bộ row hiển thị; checkbox header tick/untick visible. Mỗi row có nút × để xoá khỏi pool.")
+    add_bullet(doc, "**3. Bulk Apply** — chọn service / ne_profile / category / risk_level 1 lần → bấm Apply → frontend build array {service, ne_profile, pattern, category, risk_level, description} cho mọi pattern đã tick → POST /aa/command-def/import. Backend dedupe theo (service, ne_profile, pattern), nên import lại không tạo duplicate.")
+    add_para(doc, "Workflow: import 1 lần lúc onboard vendor → mỗi khi cần phân loại 1 nhóm command thì filter + select + bulk apply, không phải gõ tay từng pattern.")
+    add_para(doc, "Pool LOCAL theo browser — admin khác không thấy. Để share, download CSV → gửi cho người khác → họ paste lại.")
+
     add_h(doc, "6.1. CSV import/export Command Defs", 2)
     add_para(doc, "Tab Command Defs có riêng card \"CSV Import / Export\":")
     add_bullet(doc, "**Download CSV** — xuất tất cả command-def đang có (sau khi áp filter service/profile/category) ra file CSV.")
@@ -257,6 +271,7 @@ def main():
                   ["Network Elements", "✅ (full CRUD)", "❌ (read-only NE list lấy từ /aa/list/ne)"],
                   ["NE Mapping", "✅", "❌"],
                   ["NE Profiles", "✅", "❌"],
+                  ["Command Catalog", "✅ (pool localStorage per-browser)", "❌"],
                   ["Command Defs", "✅", "❌"],
                   ["Command Groups", "✅", "❌"],
                   ["Group Permissions", "✅", "❌"],
