@@ -11,3 +11,6 @@ config/uploads/*
 bin/
 /import
 /main
+
+# Java compile artifacts from docker-based test compile
+examples/java/*.class
