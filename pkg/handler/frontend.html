@@ -421,6 +421,8 @@ function listView(opts){
   const showWrite = isAdmin();
   bar.innerHTML = `<input id="lv-q" placeholder="${t('btn.search')}…" />
     <button class="btn btn-secondary" id="lv-refresh">${t('btn.refresh')}</button>
+    ${opts.exportPath ? `<button class="btn btn-secondary" id="lv-export">⬇ Export CSV</button>` : ''}
+    ${opts.importPath && showWrite ? `<button class="btn btn-secondary" id="lv-import">⬆ Import CSV</button><input type="file" id="lv-import-file" accept=".csv" style="display:none">` : ''}
     <span class="grow"></span>
     ${opts.onNew && showWrite ? `<button class="btn btn-primary" id="lv-new">＋ ${t('btn.new')}</button>` : ''}`;
   container.appendChild(bar);
@@ -469,6 +471,33 @@ function listView(opts){
   document.getElementById('lv-refresh').onclick = reload;
   document.getElementById('lv-q').oninput = () => { page = 1; renderTable(); };
   if (opts.onNew && showWrite) document.getElementById('lv-new').onclick = opts.onNew;
+  if (opts.exportPath) {
+    document.getElementById('lv-export').onclick = () => {
+      const a = document.createElement('a');
+      a.href = API.base + opts.exportPath;
+      // Append token as query param for download (no fetch needed).
+      a.href += (opts.exportPath.includes('?') ? '&' : '?') + '_token=' + encodeURIComponent(API.token);
+      a.download = ''; a.click();
+    };
+  }
+  if (opts.importPath && showWrite) {
+    document.getElementById('lv-import').onclick = () => document.getElementById('lv-import-file').click();
+    document.getElementById('lv-import-file').onchange = async (e) => {
+      const file = e.target.files[0]; if (!file) return;
+      const form = new FormData(); form.append('file', file);
+      try {
+        const res = await fetch(API.base + opts.importPath, {
+          method: 'POST', headers: { 'Authorization': API.token }, body: form
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || data.error || 'import failed');
+        const msg = `Created: ${data.created}, Skipped: ${data.skipped}` +
+          (data.errors && data.errors.length ? `\nErrors:\n${data.errors.join('\n')}` : '');
+        toast(msg, true); reload();
+      } catch(err) { toast(err.message, false); }
+      e.target.value = '';
+    };
+  }
   reload();
   return { reload };
 }
@@ -508,6 +537,8 @@ TABS.users = (c) => {
   const view = listView({
     container: c,
     fetch: () => API.get('/aa/users'),
+    exportPath: '/aa/export/users',
+    importPath: '/aa/import/users',
     searchKeys: ['username','email','full_name','role'],
     columns: [
       { label:'ID', key:'id' },
@@ -588,6 +619,8 @@ TABS.nes = (c) => {
   const view = listView({
     container: c,
     fetch: () => API.get('/aa/nes'),
+    exportPath: '/aa/export/nes',
+    importPath: '/aa/import/nes',
     searchKeys: ['namespace','ne_type','site_name','master_ip'],
     columns: [
       { label:'ID', key:'id' },
@@ -645,6 +678,8 @@ TABS.commands = async (c) => {
   const view = listView({
     container: c,
     fetch: () => API.get('/aa/commands'),
+    exportPath: '/aa/export/commands',
+    importPath: '/aa/import/commands',
     searchKeys: ['cmd_text','service','description'],
     columns: [
       { label:'ID', key:'id' },
@@ -1043,7 +1078,16 @@ document.getElementById('lang-select').onchange = (e) => {
 applyI18n();
 const uname = localStorage.getItem('username') || '';
 document.getElementById('user-badge').innerHTML = uname ? (esc(uname) + ' ' + rolePill(MY_ROLE)) : '';
-if (!API.token) showLogin(); else showTab('dashboard');
+if (!API.token) { showLogin(); }
+else if (!localStorage.getItem('role')) {
+  // Token from old session without role — re-validate to get role
+  API.post('/aa/validate-token', { token: API.token }).then(res => {
+    MY_ROLE = res.role || 'user';
+    localStorage.setItem('role', MY_ROLE);
+    document.getElementById('user-badge').innerHTML = esc(uname) + ' ' + rolePill(MY_ROLE);
+    showTab('dashboard');
+  }).catch(() => showLogin());
+} else { showTab('dashboard'); }
 </script>
 </body>
 </html>

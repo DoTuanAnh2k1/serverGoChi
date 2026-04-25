@@ -54,6 +54,11 @@ func Init() {
 		// History save is open (proxy/cli-gate pushes audit events without JWT).
 		r.Post("/history/save", HandlerSaveHistory)
 
+		// Export CSV — auth via query param _token (for browser download links).
+		r.Get("/export/users", HandlerExportUsers)
+		r.Get("/export/nes", HandlerExportNEs)
+		r.Get("/export/commands", HandlerExportCommands)
+
 		// All remaining routes need a valid JWT.
 		r.Group(func(p chi.Router) {
 			p.Use(middleware.Authenticate)
@@ -81,6 +86,11 @@ func Init() {
 			// Admin or super_admin required for write operations.
 			p.Group(func(a chi.Router) {
 				a.Use(middleware.RequireAdmin)
+
+				// Import CSV.
+				a.Post("/import/users", HandlerImportUsers)
+				a.Post("/import/nes", HandlerImportNEs)
+				a.Post("/import/commands", HandlerImportCommands)
 
 				a.Post("/users", HandlerCreateUser)
 				a.Put("/users/{id}", HandlerUpdateUser)
