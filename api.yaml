@@ -18,9 +18,16 @@ info:
 
     **Auth:** Most endpoints require `Authorization: Basic <jwt>`.
     The token returned by `POST /aa/authenticate` already includes the
-    `Basic ` prefix — pass it back verbatim. There is no `role` / `aud`
-    claim; authorization is evaluated in the service layer against group
-    memberships via `POST /aa/authorize/check`.
+    `Basic ` prefix — pass it back verbatim. The JWT carries a `role`
+    claim (`super_admin`, `admin`, or `user`).
+
+    **Permission tiers:**
+    - `super_admin` — full access, can manage all accounts including other super_admins
+    - `admin` — can configure everything except cannot modify/delete super_admin accounts
+    - `user` — read-only on the management surface; all write endpoints return 403
+
+    Read endpoints (GET) are available to any authenticated user.
+    Write endpoints (POST/PUT/DELETE) require `admin` or `super_admin` role.
 
 servers:
   - url: http://localhost:3000
@@ -99,6 +106,7 @@ paths:
                 properties:
                   status: { type: string, example: ok }
                   token:  { type: string, example: "Basic eyJhbGciOi…" }
+                  role:   { type: string, enum: [super_admin, admin, user], example: admin }
         "401": { description: Invalid credentials }
         "403": { description: Account locked, disabled, access-list-denied, or password expired }
   /aa/validate-token:
@@ -113,7 +121,7 @@ paths:
       responses:
         "200":
           description: Valid
-          content: { application/json: { schema: { type: object, properties: { status: { type: string }, username: { type: string } } } } }
+          content: { application/json: { schema: { type: object, properties: { status: { type: string }, username: { type: string }, role: { type: string } } } } }
         "401": { description: Invalid / expired }
   /aa/change-password:
     post:
@@ -147,7 +155,10 @@ paths:
           content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/User" } } } }
     post:
       tags: [Users]
-      summary: Create a user (runs the password policy)
+      summary: Create a user (admin+ required; runs the password policy)
+      description: |
+        Only `admin` or `super_admin` can create users. Only `super_admin`
+        can create accounts with role `super_admin`.
       security: [ { BasicJWT: [] } ]
       requestBody:
         required: true
@@ -162,6 +173,7 @@ paths:
                 email:     { type: string }
                 full_name: { type: string }
                 phone:     { type: string }
+                role:      { type: string, enum: [super_admin, admin, user], default: user }
       responses:
         "201": { description: Created, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }
         "400": { description: Policy violation / username already taken }
@@ -175,7 +187,10 @@ paths:
       responses: { "200": { description: OK, content: { application/json: { schema: { $ref: "#/components/schemas/User" } } } }, "404": { description: Not found } }
     put:
       tags: [Users]
-      summary: Patch user profile (email / full_name / phone / is_enabled)
+      summary: Patch user profile (admin+ required)
+      description: |
+        Admin can update any non-super_admin user. Only `super_admin` can
+        modify `super_admin` accounts or promote users to `super_admin`.
       security: [ { BasicJWT: [] } ]
       requestBody:
         required: true
@@ -188,10 +203,11 @@ paths:
                 full_name:  { type: string }
                 phone:      { type: string }
                 is_enabled: { type: boolean }
+                role:       { type: string, enum: [super_admin, admin, user] }
       responses: { "200": { description: OK } }
     delete:
       tags: [Users]
-      summary: Delete a user — cascades to group pivots + password history; audit log is preserved
+      summary: Delete a user (admin+; only super_admin can delete super_admin)
       security: [ { BasicJWT: [] } ]
       responses: { "200": { description: OK } }
   /aa/users/{id}/reset-password:
@@ -199,7 +215,7 @@ paths:
       - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
     post:
       tags: [Users]
-      summary: Admin reset (skips old-password check, still runs policy + history)
+      summary: Admin reset password (admin+; only super_admin can reset super_admin)
       security: [ { BasicJWT: [] } ]
       requestBody:
         required: true
@@ -615,6 +631,7 @@ components:
         email:                 { type: string }
         full_name:             { type: string }
         phone:                 { type: string }
+        role:                  { type: string, enum: [super_admin, admin, user], default: user }
         is_enabled:            { type: boolean }
         password_expires_at:   { type: string, format: date-time, nullable: true }
         login_failure_count:   { type: integer, format: int32 }

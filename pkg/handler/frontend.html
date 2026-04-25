@@ -925,40 +925,108 @@ TABS['authorize-test'] = async (c) => {
 TABS.guide = (c) => {
   c.innerHTML = `<h2>${t('nav.guide')}</h2>
     <div class="panel guide-body">
-      <h3>Mô hình v2 / v2 Model</h3>
+      <h3>Mô hình phân quyền / Authorization Model</h3>
       <p>Một câu hỏi duy nhất: <b>User X có được execute command Y trên NE Z không?</b></p>
       <p>Allowed ⇔ user enabled/not-locked <b>AND</b> command Y đăng ký trên NE Z <b>AND</b> user ∈ 1 ne_access_group chứa Z <b>AND</b> user ∈ 1 cmd_exec_group chứa Y.</p>
-      <h3>Các tab</h3>
+
+      <h3>Phân quyền 3 tầng / Permission Tiers</h3>
+      <table class="data" style="margin:10px 0;">
+        <thead><tr><th>Role</th><th>Quyền / Permission</th><th>Hạn chế / Restriction</th></tr></thead>
+        <tbody>
+          <tr><td><span class="pill pill-red">super_admin</span></td><td>Toàn quyền — quản lý mọi tài khoản, cấu hình hệ thống</td><td>Không có</td></tr>
+          <tr><td><span class="pill pill-cyan">admin</span></td><td>Cấu hình users, NEs, commands, groups, policy, access-list</td><td>Không thể sửa/xóa/reset-pw tài khoản <code>super_admin</code></td></tr>
+          <tr><td><span class="pill pill-green">user</span></td><td>Chỉ xem (read-only) trên giao diện quản trị</td><td>Mọi thao tác ghi (POST/PUT/DELETE) trả về 403</td></tr>
+        </tbody>
+      </table>
+      <p><b>Ghi chú:</b> JWT token chứa claim <code>role</code>. Login response trả về <code>{"token":"...","role":"admin"}</code>.</p>
+
+      <h3>Hướng dẫn thiết lập từ đầu / Setup Guide</h3>
+      <ol>
+        <li><b>Đăng nhập</b> bằng tài khoản seed (<code>admin/admin</code> hoặc <code>anhdt195/123</code> — cả 2 là super_admin).</li>
+        <li><b>Đổi mật khẩu</b> ngay lập tức (Settings hoặc API <code>POST /aa/change-password</code>).</li>
+        <li><b>Tạo NE</b> — vào tab <b>NEs</b>, bấm <b>+ New</b>, điền namespace (VD: <code>htsmf01</code>), loại (SMF/AMF/UPF), IP, SSH credentials.</li>
+        <li><b>Đăng ký command</b> — vào tab <b>Commands</b>, chọn NE, service (<code>ne-config</code> hoặc <code>ne-command</code>), nhập exact command text.</li>
+        <li><b>Tạo NE Access Group</b> — vào tab <b>NE Access Groups</b>, tạo group, thêm users và NEs vào group. User phải thuộc ít nhất 1 group chứa NE đó mới "đến được" NE.</li>
+        <li><b>Tạo Cmd Exec Group</b> — vào tab <b>Cmd Exec Groups</b>, tạo group, thêm users và commands vào group. User phải thuộc ít nhất 1 group chứa command đó mới "chạy được" lệnh.</li>
+        <li><b>Kiểm tra quyền</b> — vào tab <b>Authorize Test</b>, chọn user/NE/command, bấm <b>Check</b> để xem trace chi tiết.</li>
+      </ol>
+
+      <h3>Tạo user mới / Create New Users</h3>
+      <ol>
+        <li>Vào tab <b>Users</b>, bấm <b>+ New</b>.</li>
+        <li>Điền username, password (phải tuân theo Password Policy), email, tên, phone.</li>
+        <li>Chọn <b>Role</b>: <code>user</code> (chỉ xem), <code>admin</code> (quản trị), hoặc <code>super_admin</code> (chỉ super_admin mới tạo được).</li>
+        <li>Sau khi tạo, thêm user vào các group phù hợp để phân quyền NE/command.</li>
+      </ol>
+
+      <h3>Password Policy</h3>
+      <p>Singleton global (1 bộ policy cho toàn hệ thống). Cấu hình tại tab <b>Password Policy</b>:</p>
       <ul>
-        <li><b>Dashboard</b> — thống kê tổng hợp, số user / NE / command / group, tài khoản bị khoá, số lệnh hôm nay, hoạt động gần đây.</li>
-        <li><b>Users</b> — CRUD, reset password, bật/tắt. Tạo mới yêu cầu password theo policy.</li>
-        <li><b>Access Lists</b> — blacklist / whitelist gate login theo username / ip_cidr / email_domain.</li>
-        <li><b>Password Policy</b> — singleton: min length, history, lockout, require rules.</li>
-        <li><b>NEs</b> — namespace duy nhất (htsmf01), kiểu (SMF/AMF/...), thông tin SSH.</li>
-        <li><b>Commands</b> — exact text theo (NE, service). Không pattern matching.</li>
-        <li><b>NE Access Groups</b> — M:N user ↔ NE.</li>
-        <li><b>Cmd Exec Groups</b> — M:N user ↔ command.</li>
-        <li><b>Authorize Test</b> — chọn user / NE / command để chạy evaluator và xem trace.</li>
-        <li><b>History</b> — audit log các lệnh đã chạy. Có filter theo scope / NE / account.</li>
+        <li><b>Min length</b> — độ dài tối thiểu mật khẩu</li>
+        <li><b>Max age (days)</b> — số ngày hết hạn, 0 = không hết hạn</li>
+        <li><b>History count</b> — số password cũ không được reuse, 0 = tắt</li>
+        <li><b>Max login failures</b> — số lần sai trước khi khoá, 0 = tắt lockout</li>
+        <li><b>Lockout minutes</b> — thời gian khoá tài khoản</li>
+        <li><b>Require uppercase/lowercase/digit/special</b> — bật/tắt ký tự bắt buộc</li>
       </ul>
+
+      <h3>Access Lists (Blacklist / Whitelist)</h3>
+      <p>Gate tại thời điểm login. Có 3 loại match:</p>
+      <ul>
+        <li><b>username</b> — match chính xác (case-insensitive)</li>
+        <li><b>ip_cidr</b> — match IP client theo CIDR range (VD: <code>10.0.0.0/8</code>)</li>
+        <li><b>email_domain</b> — match đuôi email (VD: <code>@company.com</code>)</li>
+      </ul>
+      <p><b>Luật:</b> Blacklist match → chặn ngay. Whitelist: nếu có bất kỳ entry nào của loại X thì user phải match ít nhất 1 entry, nếu không → chặn. Không có whitelist = cho phép tất cả.</p>
+
+      <h3>Config Backup</h3>
+      <p>Lưu XML snapshot từ NETCONF commit. API:</p>
+      <ul>
+        <li><code>POST /aa/config-backup/save</code> — lưu XML mới (cần <code>ne_name</code> + <code>config_xml</code>)</li>
+        <li><code>GET /aa/config-backup/list?ne_name=...</code> — liệt kê metadata (không kèm XML)</li>
+        <li><code>GET /aa/config-backup/{id}</code> — lấy metadata + XML content</li>
+      </ul>
+
+      <h3>CSV Log Export (tự động)</h3>
+      <p>Hệ thống tự xuất CSV lịch sử hằng ngày (mặc định 23:00), nhóm theo NE namespace. Cấu hình qua biến môi trường <code>CLI_LOG_EXPORT_DIR</code> và <code>CSV_EXPORT_HOUR</code>.</p>
+
+      <h3>Client Libraries</h3>
+      <ul>
+        <li><b>Java</b> — <code>examples/java/MgtServiceClient.java</code> (JDK 11+, zero dependency, 9 typed models, 100% API)</li>
+        <li><b>C</b> — <code>examples/c/mgt_client.{h,c}</code> (libcurl, 6 structs, 41 functions, 100% API)</li>
+      </ul>
+
       <h3>API endpoints</h3>
-      <pre>POST /aa/authenticate           { username, password } → { token }
-POST /aa/validate-token         { token }
+      <pre>POST /aa/authenticate           { username, password } → { token, role }
+POST /aa/validate-token         { token }              → { username, role }
 POST /aa/change-password        { old_password, new_password }
+
+# User CRUD (admin+ required for write; super_admin protection applies)
 GET/POST/PUT/DELETE /aa/users[/id]
-                                POST /aa/users/{id}/reset-password
+POST                /aa/users/{id}/reset-password
+
+# NE &amp; Command (admin+ required for write)
 GET/POST/PUT/DELETE /aa/nes[/id]
 GET/POST/PUT/DELETE /aa/commands[/id]   (GET ?ne_id=&amp;service=)
+
+# Groups (admin+ required for write)
 GET/POST/PUT/DELETE /aa/ne-access-groups[/id]
-                                /{id}/users, /{id}/nes
+                    /{id}/users, /{id}/nes
 GET/POST/PUT/DELETE /aa/cmd-exec-groups[/id]
-                                /{id}/users, /{id}/commands
+                    /{id}/users, /{id}/commands
+
+# Policy &amp; Access List (admin+ required for write)
 GET/PUT             /aa/password-policy
 GET/POST/DELETE     /aa/access-list
+
+# Authorization
 POST                /aa/authorize/check
-                                { username, ne_id, command_id } → decision
-GET/POST            /aa/history (POST /save is unauth for proxy audit push)
-POST/GET            /aa/config-backup (/save, /list, /{id})</pre>
+                    { username, ne_id, command_id } → decision + trace
+
+# History &amp; Backup
+GET                 /aa/history?limit=&amp;scope=&amp;ne_namespace=&amp;account=
+POST                /aa/history/save    (public — proxy audit push)
+POST/GET            /aa/config-backup   (/save, /list, /{id})</pre>
     </div>`;
 };
 
