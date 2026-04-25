@@ -84,7 +84,7 @@ func ListUsers() ([]*db_models.User, error) {
 
 // UpdateUserProfile patches the mutable profile fields. Password changes go
 // through ChangePassword / AdminResetPassword which also run the policy.
-func UpdateUserProfile(id int64, email, fullName, phone string, isEnabled *bool) error {
+func UpdateUserProfile(id int64, email, fullName, phone string, isEnabled *bool, role string) error {
 	u, err := GetUser(id)
 	if err != nil {
 		return err
@@ -94,6 +94,9 @@ func UpdateUserProfile(id int64, email, fullName, phone string, isEnabled *bool)
 	u.Phone = phone
 	if isEnabled != nil {
 		u.IsEnabled = *isEnabled
+	}
+	if role != "" {
+		u.Role = role
 	}
 	u.UpdatedAt = time.Now().UTC()
 	return store.GetSingleton().UpdateUser(u)

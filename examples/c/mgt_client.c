@@ -14,6 +14,7 @@
 struct mgt_client {
     char *base_url;
     char *token;       /* "Basic <jwt>" returned by /aa/authenticate */
+    char *role;        /* role string from authenticate response */
     CURL *curl;
 };
 
@@ -70,6 +71,7 @@ void mgt_client_free(mgt_client_t *c) {
     if (c->curl) curl_easy_cleanup(c->curl);
     free(c->base_url);
     free(c->token);
+    free(c->role);
     free(c);
 }
 
@@ -77,6 +79,11 @@ void mgt_set_token(mgt_client_t *c, const char *token) {
     if (!c) return;
     free(c->token);
     c->token = strdup_or_null(token);
+}
+
+const char *mgt_get_role(mgt_client_t *c) {
+    if (!c) return NULL;
+    return c->role;
 }
 
 /* ── HTTP ───────────────────────────────────────────────────────────── */
@@ -231,6 +238,20 @@ static int json_find_bool(const char *s, const char *key) {
     return -1;
 }
 
+/* json_find_int: returns the integer value for `key`, or -1 if absent or
+ * not a number. Only handles non-negative integers. */
+static int64_t json_find_int(const char *s, const char *key) {
+    const char *p = json_find_raw(s, key);
+    if (!p) return -1;
+    if (*p < '0' || *p > '9') return -1;
+    int64_t v = 0;
+    while (*p >= '0' && *p <= '9') {
+        v = v * 10 + (*p - '0');
+        p++;
+    }
+    return v;
+}
+
 /* ── Higher-level helpers ──────────────────────────────────────────────── */
 
 int mgt_authenticate(mgt_client_t *c, const char *username, const char *password) {
@@ -242,10 +263,13 @@ int mgt_authenticate(mgt_client_t *c, const char *username, const char *password
     int rc = mgt_post(c, "/aa/authenticate", body, &resp);
     if (rc != 0) { free(resp); return rc; }
     char *tok = json_find_string(resp, "token");
-    free(resp);
-    if (!tok) return -3;
+    if (!tok) { free(resp); return -3; }
     mgt_set_token(c, tok);
     free(tok);
+    /* store role if present */
+    free(c->role);
+    c->role = json_find_string(resp, "role");
+    free(resp);
     return 0;
 }
 
@@ -307,4 +331,321 @@ int mgt_save_history(mgt_client_t *c,
     int rc = mgt_post(c, "/aa/history/save", body, &resp);
     free(resp);
     return rc;
+}
+
+/* ── User management ─────────────────────────────────────────────────── */
+
+int mgt_list_users(mgt_client_t *c, char **out_json) {
+    return mgt_get(c, "/aa/users", out_json);
+}
+
+int mgt_create_user(mgt_client_t *c, const char *username, const char *password,
+                    const char *email, const char *full_name, const char *role,
+                    char **out_json)
+{
+    if (!c || !username || !password) return -1;
+    char body[1024];
+    snprintf(body, sizeof(body),
+        "{\"username\":\"%s\",\"password\":\"%s\",\"email\":\"%s\","
+        "\"full_name\":\"%s\",\"role\":\"%s\"}",
+        username,
+        password,
+        email     ? email     : "",
+        full_name ? full_name : "",
+        role      ? role      : "user");
+    return mgt_post(c, "/aa/users", body, out_json);
+}
+
+int mgt_update_user(mgt_client_t *c, int64_t id, const char *json_patch) {
+    if (!c || !json_patch) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/users/%lld", (long long)id);
+    char *resp = NULL;
+    int rc = mgt_put(c, path, json_patch, &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_delete_user(mgt_client_t *c, int64_t id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/users/%lld", (long long)id);
+    return mgt_delete(c, path);
+}
+
+int mgt_reset_password(mgt_client_t *c, int64_t user_id, const char *new_password) {
+    if (!c || !new_password) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/users/%lld/reset-password", (long long)user_id);
+    char body[256];
+    snprintf(body, sizeof(body), "{\"password\":\"%s\"}", new_password);
+    char *resp = NULL;
+    int rc = mgt_post(c, path, body, &resp);
+    free(resp);
+    return rc;
+}
+
+/* ── NE management ───────────────────────────────────────────────────── */
+
+int mgt_list_nes(mgt_client_t *c, char **out_json) {
+    return mgt_get(c, "/aa/nes", out_json);
+}
+
+int mgt_create_ne(mgt_client_t *c, const char *json_body, char **out_json) {
+    if (!c || !json_body) return -1;
+    return mgt_post(c, "/aa/nes", json_body, out_json);
+}
+
+int mgt_update_ne(mgt_client_t *c, int64_t id, const char *json_patch) {
+    if (!c || !json_patch) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/nes/%lld", (long long)id);
+    char *resp = NULL;
+    int rc = mgt_put(c, path, json_patch, &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_delete_ne(mgt_client_t *c, int64_t id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/nes/%lld", (long long)id);
+    return mgt_delete(c, path);
+}
+
+/* ── Command management ──────────────────────────────────────────────── */
+
+int mgt_list_commands(mgt_client_t *c, char **out_json) {
+    return mgt_get(c, "/aa/commands", out_json);
+}
+
+int mgt_create_command(mgt_client_t *c, int64_t ne_id, const char *service,
+                       const char *cmd_text, const char *description, char **out_json)
+{
+    if (!c || !service || !cmd_text) return -1;
+    char body[2048];
+    snprintf(body, sizeof(body),
+        "{\"ne_id\":%lld,\"service\":\"%s\",\"cmd_text\":\"%s\",\"description\":\"%s\"}",
+        (long long)ne_id,
+        service,
+        cmd_text,
+        description ? description : "");
+    return mgt_post(c, "/aa/commands", body, out_json);
+}
+
+int mgt_update_command(mgt_client_t *c, int64_t id, const char *json_patch) {
+    if (!c || !json_patch) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/commands/%lld", (long long)id);
+    char *resp = NULL;
+    int rc = mgt_put(c, path, json_patch, &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_delete_command(mgt_client_t *c, int64_t id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/commands/%lld", (long long)id);
+    return mgt_delete(c, path);
+}
+
+/* ── NE access groups ────────────────────────────────────────────────── */
+
+int mgt_list_ne_access_groups(mgt_client_t *c, char **out_json) {
+    return mgt_get(c, "/aa/ne-access-groups", out_json);
+}
+
+int mgt_create_ne_access_group(mgt_client_t *c, const char *name, const char *desc,
+                               char **out_json)
+{
+    if (!c || !name) return -1;
+    char body[512];
+    snprintf(body, sizeof(body),
+        "{\"name\":\"%s\",\"description\":\"%s\"}",
+        name, desc ? desc : "");
+    return mgt_post(c, "/aa/ne-access-groups", body, out_json);
+}
+
+int mgt_update_ne_access_group(mgt_client_t *c, int64_t id, const char *name,
+                               const char *desc)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/ne-access-groups/%lld", (long long)id);
+    char body[512];
+    snprintf(body, sizeof(body),
+        "{\"name\":\"%s\",\"description\":\"%s\"}",
+        name ? name : "", desc ? desc : "");
+    char *resp = NULL;
+    int rc = mgt_put(c, path, body, &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_delete_ne_access_group(mgt_client_t *c, int64_t id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/ne-access-groups/%lld", (long long)id);
+    return mgt_delete(c, path);
+}
+
+int mgt_ne_access_group_add_user(mgt_client_t *c, int64_t group_id, int64_t user_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/ne-access-groups/%lld/users/%lld",
+             (long long)group_id, (long long)user_id);
+    char *resp = NULL;
+    int rc = mgt_post(c, path, "{}", &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_ne_access_group_remove_user(mgt_client_t *c, int64_t group_id, int64_t user_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/ne-access-groups/%lld/users/%lld",
+             (long long)group_id, (long long)user_id);
+    return mgt_delete(c, path);
+}
+
+int mgt_ne_access_group_add_ne(mgt_client_t *c, int64_t group_id, int64_t ne_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/ne-access-groups/%lld/nes/%lld",
+             (long long)group_id, (long long)ne_id);
+    char *resp = NULL;
+    int rc = mgt_post(c, path, "{}", &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_ne_access_group_remove_ne(mgt_client_t *c, int64_t group_id, int64_t ne_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/ne-access-groups/%lld/nes/%lld",
+             (long long)group_id, (long long)ne_id);
+    return mgt_delete(c, path);
+}
+
+/* ── Command exec groups ─────────────────────────────────────────────── */
+
+int mgt_list_cmd_exec_groups(mgt_client_t *c, char **out_json) {
+    return mgt_get(c, "/aa/cmd-exec-groups", out_json);
+}
+
+int mgt_create_cmd_exec_group(mgt_client_t *c, const char *name, const char *desc,
+                              char **out_json)
+{
+    if (!c || !name) return -1;
+    char body[512];
+    snprintf(body, sizeof(body),
+        "{\"name\":\"%s\",\"description\":\"%s\"}",
+        name, desc ? desc : "");
+    return mgt_post(c, "/aa/cmd-exec-groups", body, out_json);
+}
+
+int mgt_update_cmd_exec_group(mgt_client_t *c, int64_t id, const char *name,
+                              const char *desc)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/cmd-exec-groups/%lld", (long long)id);
+    char body[512];
+    snprintf(body, sizeof(body),
+        "{\"name\":\"%s\",\"description\":\"%s\"}",
+        name ? name : "", desc ? desc : "");
+    char *resp = NULL;
+    int rc = mgt_put(c, path, body, &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_delete_cmd_exec_group(mgt_client_t *c, int64_t id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/cmd-exec-groups/%lld", (long long)id);
+    return mgt_delete(c, path);
+}
+
+int mgt_cmd_exec_group_add_user(mgt_client_t *c, int64_t group_id, int64_t user_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/cmd-exec-groups/%lld/users/%lld",
+             (long long)group_id, (long long)user_id);
+    char *resp = NULL;
+    int rc = mgt_post(c, path, "{}", &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_cmd_exec_group_remove_user(mgt_client_t *c, int64_t group_id, int64_t user_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/cmd-exec-groups/%lld/users/%lld",
+             (long long)group_id, (long long)user_id);
+    return mgt_delete(c, path);
+}
+
+int mgt_cmd_exec_group_add_command(mgt_client_t *c, int64_t group_id, int64_t command_id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/cmd-exec-groups/%lld/commands/%lld",
+             (long long)group_id, (long long)command_id);
+    char *resp = NULL;
+    int rc = mgt_post(c, path, "{}", &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_cmd_exec_group_remove_command(mgt_client_t *c, int64_t group_id,
+                                      int64_t command_id)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/cmd-exec-groups/%lld/commands/%lld",
+             (long long)group_id, (long long)command_id);
+    return mgt_delete(c, path);
+}
+
+/* ── Policy & access lists ───────────────────────────────────────────── */
+
+int mgt_get_password_policy(mgt_client_t *c, char **out_json) {
+    return mgt_get(c, "/aa/password-policy", out_json);
+}
+
+int mgt_upsert_password_policy(mgt_client_t *c, const char *json_body) {
+    if (!c || !json_body) return -1;
+    char *resp = NULL;
+    int rc = mgt_put(c, "/aa/password-policy", json_body, &resp);
+    free(resp);
+    return rc;
+}
+
+int mgt_list_access_list(mgt_client_t *c, const char *list_type, char **out_json) {
+    if (!c || !list_type) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/access-list?list_type=%s", list_type);
+    return mgt_get(c, path, out_json);
+}
+
+int mgt_create_access_entry(mgt_client_t *c, const char *list_type,
+                            const char *match_type, const char *pattern,
+                            const char *reason, char **out_json)
+{
+    if (!c || !list_type || !match_type || !pattern) return -1;
+    char body[512];
+    snprintf(body, sizeof(body),
+        "{\"list_type\":\"%s\",\"match_type\":\"%s\","
+        "\"pattern\":\"%s\",\"reason\":\"%s\"}",
+        list_type, match_type, pattern,
+        reason ? reason : "");
+    return mgt_post(c, "/aa/access-list", body, out_json);
+}
+
+int mgt_delete_access_entry(mgt_client_t *c, int64_t id) {
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/access-list/%lld", (long long)id);
+    return mgt_delete(c, path);
 }

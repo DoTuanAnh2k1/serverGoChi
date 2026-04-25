@@ -21,6 +21,7 @@ type authenticateReq struct {
 type authenticateResp struct {
 	Status string `json:"status"`
 	Token  string `json:"token"`
+	Role   string `json:"role"`
 }
 
 func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
@@ -36,7 +37,6 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 	tok, err := service.Authenticate(req.Username, req.Password, clientIP(r))
 	if err != nil {
 		logger.Logger.WithField("user", req.Username).Warnf("auth: %v", err)
-		// Don't leak which failure — auth gates are intentionally opaque.
 		switch {
 		case errors.Is(err, service.ErrAccountLocked),
 			errors.Is(err, service.ErrAccountDisabled),
@@ -48,7 +48,11 @@ func HandlerAuthenticate(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	response.Write(w, http.StatusOK, authenticateResp{Status: "ok", Token: tok})
+	role := "user"
+	if u, err := service.GetUserByUsername(req.Username); err == nil {
+		role = u.Role
+	}
+	response.Write(w, http.StatusOK, authenticateResp{Status: "ok", Token: tok, Role: role})
 }
 
 type validateTokenReq struct {
@@ -61,12 +65,12 @@ func HandlerValidateToken(w http.ResponseWriter, r *http.Request) {
 		response.Write(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
-	username, err := token.ParseToken(req.Token)
+	username, role, err := token.ParseToken(req.Token)
 	if err != nil {
 		response.Unauthorized(w)
 		return
 	}
-	response.Write(w, http.StatusOK, map[string]string{"status": "ok", "username": username})
+	response.Write(w, http.StatusOK, map[string]string{"status": "ok", "username": username, "role": role})
 }
 
 type changePasswordReq struct {

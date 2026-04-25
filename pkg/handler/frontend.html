@@ -45,19 +45,20 @@
   #user-badge { font-size: 13px; }
   main { display: grid; grid-template-columns: 230px 1fr; min-height: calc(100vh - 50px); }
   nav {
-    background: var(--panel); border-right: 1px solid var(--border); padding: 16px 0;
+    background: linear-gradient(180deg, #f8faff 0%, #eef2ff 100%); border-right: 1px solid var(--border); padding: 16px 0;
   }
   nav .group-label {
     padding: 10px 18px 4px; font-size: 11px; text-transform: uppercase;
-    letter-spacing: .8px; color: var(--ink-muted); font-weight: 600;
+    letter-spacing: .8px; color: var(--primary); font-weight: 700;
   }
   nav a {
     display: block; padding: 8px 18px; color: var(--ink); text-decoration: none;
     border-left: 3px solid transparent; font-size: 13.5px; cursor: pointer;
+    transition: background .15s, border-color .15s;
   }
-  nav a:hover { background: var(--panel-alt); }
+  nav a:hover { background: #dbeafe; }
   nav a.active {
-    border-left-color: var(--primary); background: var(--panel-alt);
+    border-left-color: var(--primary); background: linear-gradient(90deg, #dbeafe 0%, #eff6ff 100%);
     color: var(--primary); font-weight: 600;
   }
   section.tab { padding: 20px; }
@@ -79,9 +80,11 @@
   table.data th, table.data td {
     padding: 9px 12px; text-align: left; border-bottom: 1px solid var(--border); font-size: 13px;
   }
-  table.data th { background: var(--panel-alt); font-weight: 600; color: var(--ink-muted); }
+  table.data th { background: linear-gradient(135deg, #1e3a5f, #2563eb); font-weight: 600; color: #fff; }
   table.data tr:last-child td { border-bottom: none; }
-  table.data tr:hover td { background: #f7faff; }
+  table.data tr:nth-child(even) td { background: #f0f4ff; }
+  table.data tr:nth-child(odd) td { background: #ffffff; }
+  table.data tr:hover td { background: #dbeafe; }
   .paging {
     display: flex; gap: 4px; align-items: center; margin-top: 12px; justify-content: flex-end;
   }
@@ -134,6 +137,8 @@
   .pill-amber { background: #fef3c7; color: #92400e; }
   .pill-blue { background: #dbeafe; color: #1e40af; }
   .pill-purple { background: #ede9fe; color: #6b21a8; }
+  .pill-cyan { background: #cffafe; color: #155e75; }
+  .pill-orange { background: #ffedd5; color: #9a3412; }
 
   .cards {
     display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
@@ -141,15 +146,16 @@
   }
   .card {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 14px 16px; box-shadow: var(--shadow);
+    padding: 14px 16px; box-shadow: var(--shadow); transition: transform .15s, box-shadow .15s;
   }
+  .card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(37,99,235,0.13); }
   .card .label { font-size: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .4px; }
   .card .value { font-size: 26px; font-weight: 700; margin-top: 4px; color: var(--ink); }
   .card .sub { font-size: 12px; color: var(--ink-muted); margin-top: 6px; }
-  .card.accent { border-top: 3px solid var(--primary); }
-  .card.warn { border-top: 3px solid var(--warn); }
-  .card.bad { border-top: 3px solid var(--bad); }
-  .card.good { border-top: 3px solid var(--good); }
+  .card.accent { border-top: 3px solid var(--primary); background: linear-gradient(180deg, #eff6ff 0%, #fff 100%); }
+  .card.warn { border-top: 3px solid var(--warn); background: linear-gradient(180deg, #fffbeb 0%, #fff 100%); }
+  .card.bad { border-top: 3px solid var(--bad); background: linear-gradient(180deg, #fef2f2 0%, #fff 100%); }
+  .card.good { border-top: 3px solid var(--good); background: linear-gradient(180deg, #f0fdf4 0%, #fff 100%); }
 
   .panel {
     background: var(--panel); border: 1px solid var(--border); border-radius: var(--radius);
@@ -259,6 +265,15 @@ let LANG = localStorage.getItem('lang') || 'en';
 function t(key){ return (I18N[LANG] && I18N[LANG][key]) || I18N.en[key] || key; }
 function applyI18n(){ document.querySelectorAll('[data-i18n]').forEach(el => el.textContent = t(el.getAttribute('data-i18n'))); }
 
+let MY_ROLE = localStorage.getItem('role') || 'user';
+function isAdmin(){ return MY_ROLE === 'admin' || MY_ROLE === 'super_admin'; }
+function isSuperAdmin(){ return MY_ROLE === 'super_admin'; }
+function rolePill(role){
+  if (role === 'super_admin') return '<span class="pill pill-red">super_admin</span>';
+  if (role === 'admin') return '<span class="pill pill-cyan">admin</span>';
+  return '<span class="pill pill-green">user</span>';
+}
+
 const API = {
   base: '',
   token: localStorage.getItem('token') || '',
@@ -333,17 +348,20 @@ async function doLogin(){
   try {
     const res = await API.post('/aa/authenticate', { username: u, password: p });
     API.token = res.token;
+    MY_ROLE = res.role || 'user';
     localStorage.setItem('token', res.token);
     localStorage.setItem('username', u);
+    localStorage.setItem('role', MY_ROLE);
     closeModal();
-    document.getElementById('user-badge').textContent = u;
+    document.getElementById('user-badge').innerHTML = esc(u) + ' ' + rolePill(MY_ROLE);
     showTab('dashboard');
   } catch (e) {
     document.getElementById('li-err').textContent = t('login.err') + ': ' + e.message;
   }
 }
 document.getElementById('logout-btn').onclick = () => {
-  API.token = ''; localStorage.removeItem('token'); localStorage.removeItem('username');
+  API.token = ''; MY_ROLE = 'user';
+  localStorage.removeItem('token'); localStorage.removeItem('username'); localStorage.removeItem('role');
   document.getElementById('user-badge').textContent = '';
   showLogin();
 };
@@ -400,10 +418,11 @@ function listView(opts){
   let page = 1; const pageSize = 20;
   let rows = []; let filtered = [];
   const bar = document.createElement('div'); bar.className = 'toolbar';
+  const showWrite = isAdmin();
   bar.innerHTML = `<input id="lv-q" placeholder="${t('btn.search')}…" />
     <button class="btn btn-secondary" id="lv-refresh">${t('btn.refresh')}</button>
     <span class="grow"></span>
-    ${opts.onNew ? `<button class="btn btn-primary" id="lv-new">＋ ${t('btn.new')}</button>` : ''}`;
+    ${opts.onNew && showWrite ? `<button class="btn btn-primary" id="lv-new">＋ ${t('btn.new')}</button>` : ''}`;
   container.appendChild(bar);
   const tblWrap = document.createElement('div'); container.appendChild(tblWrap);
   const pageWrap = document.createElement('div'); container.appendChild(pageWrap);
@@ -415,24 +434,27 @@ function listView(opts){
     page = r.page;
     let html = '<table class="data"><thead><tr>';
     opts.columns.forEach(c => html += `<th>${c.label}</th>`);
-    if (opts.rowActions) html += '<th></th>';
+    if (opts.rowActions && showWrite) html += '<th></th>';
     html += '</tr></thead><tbody>';
     r.pageRows.forEach((row, idx) => {
       html += '<tr>';
       opts.columns.forEach(c => html += `<td>${c.render ? c.render(row) : esc(row[c.key] ?? '')}</td>`);
-      if (opts.rowActions) html += `<td style="text-align:right;">${opts.rowActions(row, idx).map((a,i) => `<button class="btn btn-sm ${a.cls||'btn-secondary'}" data-lv-i="${idx}" data-lv-a="${i}">${a.label}</button>`).join(' ')}</td>`;
+      if (opts.rowActions && showWrite) {
+        const actions = opts.rowActions(row, idx).filter(a => !a.hidden);
+        html += `<td style="text-align:right;">${actions.map((a,i) => `<button class="btn btn-sm ${a.cls||'btn-secondary'}" data-lv-i="${idx}" data-lv-a="${i}">${a.label}</button>`).join(' ')}</td>`;
+      }
       html += '</tr>';
     });
-    if (r.pageRows.length === 0) html += `<tr><td colspan="${opts.columns.length + (opts.rowActions?1:0)}" class="dim" style="text-align:center;padding:22px;">No entries.</td></tr>`;
+    if (r.pageRows.length === 0) html += `<tr><td colspan="${opts.columns.length + (opts.rowActions && showWrite ?1:0)}" class="dim" style="text-align:center;padding:22px;">No entries.</td></tr>`;
     html += '</tbody></table>';
     tblWrap.innerHTML = html;
-    if (opts.rowActions){
+    if (opts.rowActions && showWrite){
       tblWrap.querySelectorAll('button[data-lv-a]').forEach(btn => {
         btn.onclick = () => {
           const i = +btn.getAttribute('data-lv-i');
           const a = +btn.getAttribute('data-lv-a');
           const globalIdx = r.start + i;
-          const actions = opts.rowActions(filtered[globalIdx], globalIdx);
+          const actions = opts.rowActions(filtered[globalIdx], globalIdx).filter(x => !x.hidden);
           actions[a].fn(filtered[globalIdx]);
         };
       });
@@ -446,7 +468,7 @@ function listView(opts){
   }
   document.getElementById('lv-refresh').onclick = reload;
   document.getElementById('lv-q').oninput = () => { page = 1; renderTable(); };
-  if (opts.onNew) document.getElementById('lv-new').onclick = opts.onNew;
+  if (opts.onNew && showWrite) document.getElementById('lv-new').onclick = opts.onNew;
   reload();
   return { reload };
 }
@@ -486,40 +508,52 @@ TABS.users = (c) => {
   const view = listView({
     container: c,
     fetch: () => API.get('/aa/users'),
-    searchKeys: ['username','email','full_name'],
+    searchKeys: ['username','email','full_name','role'],
     columns: [
       { label:'ID', key:'id' },
       { label:'Username', key:'username' },
+      { label:'Role', render: r => rolePill(r.role || 'user') },
       { label:'Full name', key:'full_name' },
       { label:'Email', key:'email' },
       { label:'Enabled', render: r => r.is_enabled ? '<span class="pill pill-green">yes</span>' : '<span class="pill pill-red">no</span>' },
       { label:'Locked', render: r => r.locked_at ? '<span class="pill pill-red">locked</span>' : '<span class="pill pill-green">ok</span>' },
       { label:'Last login', render: r => fmtTime(r.last_login_at) },
     ],
-    rowActions: (row) => [
-      { label: t('btn.edit'), fn: () => userForm(row, view.reload) },
-      { label: 'Reset pw', fn: () => resetPwForm(row) },
-      { label: t('btn.delete'), cls:'btn-danger', fn: async () => {
-        if (!confirm('Delete user '+row.username+'?')) return;
-        try { await API.del('/aa/users/'+row.id); toast('deleted'); view.reload(); } catch(e){ toast(e.message,false); }
-      }},
-    ],
+    rowActions: (row) => {
+      const targetIsSuperAdmin = row.role === 'super_admin';
+      const canModify = isSuperAdmin() || !targetIsSuperAdmin;
+      return [
+        { label: t('btn.edit'), fn: () => userForm(row, view.reload), hidden: !canModify },
+        { label: 'Reset pw', fn: () => resetPwForm(row), hidden: !canModify },
+        { label: t('btn.delete'), cls:'btn-danger', hidden: !canModify, fn: async () => {
+          if (!confirm('Delete user '+row.username+'?')) return;
+          try { await API.del('/aa/users/'+row.id); toast('deleted'); view.reload(); } catch(e){ toast(e.message,false); }
+        }},
+      ];
+    },
     onNew: () => userForm(null, view.reload),
   });
 };
 function userForm(row, cb){
+  const roleOpts = [
+    { value:'user', label:'User' },
+    { value:'admin', label:'Admin' },
+  ];
+  if (isSuperAdmin()) roleOpts.push({ value:'super_admin', label:'Super Admin' });
   const createFields = [
     { key:'username', label:'Username', type:'text' },
     { key:'password', label:'Password', type:'password' },
     { key:'email', label:'Email' },
     { key:'full_name', label:'Full name' },
     { key:'phone', label:'Phone' },
+    { key:'role', label:'Role', type:'select', options: roleOpts, default:'user' },
   ];
   const editFields = [
     { key:'email', label:'Email' },
     { key:'full_name', label:'Full name' },
     { key:'phone', label:'Phone' },
     { key:'is_enabled', label:'Enabled', type:'checkbox' },
+    { key:'role', label:'Role', type:'select', options: roleOpts },
   ];
   const fields = row ? editFields : createFields;
   openModal(`<h3>${row ? 'Edit user' : 'New user'}</h3>${buildForm(fields, row||{})}
@@ -778,11 +812,13 @@ TABS['password-policy'] = async (c) => {
     { key:'require_special', label:'Require special', type:'checkbox' },
   ];
   document.getElementById('pp-wrap').innerHTML = `<div class="panel">${buildForm(fields, p)}
-    <div class="actions"><button class="btn btn-primary" id="pp-save">${t('btn.save')}</button></div></div>`;
-  document.getElementById('pp-save').onclick = async () => {
-    try { await API.put('/aa/password-policy', readForm(fields)); toast('saved'); }
-    catch(e){ toast(e.message, false); }
-  };
+    ${isAdmin() ? `<div class="actions"><button class="btn btn-primary" id="pp-save">${t('btn.save')}</button></div>` : ''}</div>`;
+  if (isAdmin()) {
+    document.getElementById('pp-save').onclick = async () => {
+      try { await API.put('/aa/password-policy', readForm(fields)); toast('saved'); }
+      catch(e){ toast(e.message, false); }
+    };
+  }
 };
 
 TABS['access-list'] = (c) => {
@@ -938,7 +974,7 @@ document.getElementById('lang-select').onchange = (e) => {
 };
 applyI18n();
 const uname = localStorage.getItem('username') || '';
-document.getElementById('user-badge').textContent = uname;
+document.getElementById('user-badge').innerHTML = uname ? (esc(uname) + ' ' + rolePill(MY_ROLE)) : '';
 if (!API.token) showLogin(); else showTab('dashboard');
 </script>
 </body>

@@ -22,18 +22,17 @@ func getSecretKey() []byte {
 	return []byte(key)
 }
 
-// CreateToken mints a JWT carrying only `sub` (username). v2 has no role
-// hierarchy — authorization runs entirely against the user's group
-// memberships at the service layer, not against a token claim.
-func CreateToken(username string) (string, error) {
+// CreateToken mints a JWT carrying `sub` (username) and `role`.
+func CreateToken(username, role string) (string, error) {
 	expiry := config.GetJwtConfig().ExpiryHours
 	if expiry <= 0 {
 		expiry = 24
 	}
 
 	claims := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"sub": username,
-		"exp": time.Now().Add(time.Duration(expiry) * time.Hour).Unix(),
+		"sub":  username,
+		"role": role,
+		"exp":  time.Now().Add(time.Duration(expiry) * time.Hour).Unix(),
 	})
 
 	tokenString, err := claims.SignedString(getSecretKey())
@@ -47,28 +46,32 @@ func CreateToken(username string) (string, error) {
 }
 
 // ParseToken parses a JWT (with or without the "Basic " prefix) and returns
-// the username from the `sub` claim.
-func ParseToken(tokenString string) (string, error) {
+// the username and role from the claims.
+func ParseToken(tokenString string) (username string, role string, err error) {
 	tokenString = strings.TrimPrefix(tokenString, prefixKey)
 
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
+	t, err := jwt.Parse(tokenString, func(t *jwt.Token) (interface{}, error) {
+		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, errors.New("unexpected signing method")
 		}
 		return getSecretKey(), nil
 	})
 	if err != nil {
 		logger.Logger.Errorf("token: parse JWT: %v", err)
-		return "", err
+		return "", "", err
 	}
 
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return "", errors.New("invalid token")
+	claims, ok := t.Claims.(jwt.MapClaims)
+	if !ok || !t.Valid {
+		return "", "", errors.New("invalid token")
 	}
 	sub, _ := claims["sub"].(string)
 	if sub == "" {
-		return "", errors.New("invalid token: missing sub")
+		return "", "", errors.New("invalid token: missing sub")
 	}
-	return sub, nil
+	r, _ := claims["role"].(string)
+	if r == "" {
+		r = "user"
+	}
+	return sub, r, nil
 }

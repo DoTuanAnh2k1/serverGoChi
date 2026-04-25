@@ -67,5 +67,5 @@ func Authenticate(username, password, clientIP string) (string, error) {
 	u.UpdatedAt = now
 	_ = store.GetSingleton().UpdateUser(u)
 	_ = store.GetSingleton().UpdateLoginHistory(u.Username, clientIP, now)
-	return token.CreateToken(u.Username)
+	return token.CreateToken(u.Username, u.Role)
 }

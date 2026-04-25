@@ -8,10 +8,8 @@ import (
 	"github.com/DoTuanAnh2k1/serverGoChi/pkg/store"
 )
 
-// SeedFirstBoot is idempotent — it creates a default password policy and an
-// initial admin-equivalent user ("admin" / "admin") only if the user table is
-// empty. v2 has no role concept so the seeded user has no special power
-// beyond any other account; RBAC is layered via groups.
+// SeedFirstBoot is idempotent — it creates a default password policy and
+// initial users only if the user table is empty.
 func SeedFirstBoot() {
 	s := store.GetSingleton()
 
@@ -32,26 +30,38 @@ func SeedFirstBoot() {
 	if len(users) > 0 {
 		return
 	}
-	hash, err := HashPassword("admin")
-	if err != nil {
-		logger.Logger.Warnf("seed: hash default password: %v", err)
-		return
+	seeds := []struct {
+		username string
+		password string
+		fullName string
+		role     string
+	}{
+		{"admin", "admin", "Default Admin", db_models.RoleSuperAdmin},
+		{"anhdt195", "123", "Anh Do Tuan", db_models.RoleSuperAdmin},
 	}
 	now := time.Now().UTC()
-	u := &db_models.User{
-		Username:     "admin",
-		PasswordHash: hash,
-		FullName:     "Default Admin",
-		IsEnabled:    true,
-		CreatedAt:    now,
-		UpdatedAt:    now,
+	for _, sd := range seeds {
+		hash, err := HashPassword(sd.password)
+		if err != nil {
+			logger.Logger.Warnf("seed: hash password for %s: %v", sd.username, err)
+			continue
+		}
+		u := &db_models.User{
+			Username:     sd.username,
+			PasswordHash: hash,
+			FullName:     sd.fullName,
+			Role:         sd.role,
+			IsEnabled:    true,
+			CreatedAt:    now,
+			UpdatedAt:    now,
+		}
+		if err := s.CreateUser(u); err != nil {
+			logger.Logger.Warnf("seed: create user %s: %v", sd.username, err)
+			continue
+		}
+		_ = s.AppendPasswordHistory(&db_models.PasswordHistory{
+			UserID: u.ID, PasswordHash: hash, ChangedAt: now,
+		})
+		logger.Logger.Infof("seed: created user '%s' (password '%s') — change immediately", sd.username, sd.password)
 	}
-	if err := s.CreateUser(u); err != nil {
-		logger.Logger.Warnf("seed: create default user: %v", err)
-		return
-	}
-	_ = s.AppendPasswordHistory(&db_models.PasswordHistory{
-		UserID: u.ID, PasswordHash: hash, ChangedAt: now,
-	})
-	logger.Logger.Info("seed: created default user 'admin' (password 'admin') — change immediately")
 }

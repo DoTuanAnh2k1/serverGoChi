@@ -54,85 +54,69 @@ func Init() {
 		// History save is open (proxy/cli-gate pushes audit events without JWT).
 		r.Post("/history/save", HandlerSaveHistory)
 
-		// Everything else needs a valid JWT. v2 has no role check — access
-		// decisions live in the service layer via NE access / cmd exec
-		// groups, invoked via /authorize/check.
+		// All remaining routes need a valid JWT.
 		r.Group(func(p chi.Router) {
 			p.Use(middleware.Authenticate)
 
+			// Any authenticated user can do these.
 			p.Post("/change-password", HandlerChangePassword)
-
-			p.Route("/users", func(u chi.Router) {
-				u.Get("/", HandlerListUsers)
-				u.Post("/", HandlerCreateUser)
-				u.Get("/{id}", HandlerGetUser)
-				u.Put("/{id}", HandlerUpdateUser)
-				u.Delete("/{id}", HandlerDeleteUser)
-				u.Post("/{id}/reset-password", HandlerAdminResetPassword)
-			})
-
-			p.Route("/nes", func(n chi.Router) {
-				n.Get("/", HandlerListNEs)
-				n.Post("/", HandlerCreateNE)
-				n.Get("/{id}", HandlerGetNE)
-				n.Put("/{id}", HandlerUpdateNE)
-				n.Delete("/{id}", HandlerDeleteNE)
-			})
-
-			p.Route("/commands", func(c chi.Router) {
-				c.Get("/", HandlerListCommands)
-				c.Post("/", HandlerCreateCommand)
-				c.Put("/{id}", HandlerUpdateCommand)
-				c.Delete("/{id}", HandlerDeleteCommand)
-			})
-
-			p.Route("/ne-access-groups", func(g chi.Router) {
-				g.Get("/", HandlerListNeAccessGroups)
-				g.Post("/", HandlerCreateNeAccessGroup)
-				g.Put("/{id}", HandlerUpdateNeAccessGroup)
-				g.Delete("/{id}", HandlerDeleteNeAccessGroup)
-				g.Get("/{id}/users", HandlerNeAccessGroupUsers)
-				g.Post("/{id}/users", HandlerNeAccessGroupAddUser)
-				g.Delete("/{id}/users/{user_id}", HandlerNeAccessGroupRemoveUser)
-				g.Get("/{id}/nes", HandlerNeAccessGroupNEs)
-				g.Post("/{id}/nes", HandlerNeAccessGroupAddNE)
-				g.Delete("/{id}/nes/{ne_id}", HandlerNeAccessGroupRemoveNE)
-			})
-
-			p.Route("/cmd-exec-groups", func(g chi.Router) {
-				g.Get("/", HandlerListCmdExecGroups)
-				g.Post("/", HandlerCreateCmdExecGroup)
-				g.Put("/{id}", HandlerUpdateCmdExecGroup)
-				g.Delete("/{id}", HandlerDeleteCmdExecGroup)
-				g.Get("/{id}/users", HandlerCmdExecGroupUsers)
-				g.Post("/{id}/users", HandlerCmdExecGroupAddUser)
-				g.Delete("/{id}/users/{user_id}", HandlerCmdExecGroupRemoveUser)
-				g.Get("/{id}/commands", HandlerCmdExecGroupCommands)
-				g.Post("/{id}/commands", HandlerCmdExecGroupAddCommand)
-				g.Delete("/{id}/commands/{command_id}", HandlerCmdExecGroupRemoveCommand)
-			})
-
-			p.Route("/password-policy", func(pp chi.Router) {
-				pp.Get("/", HandlerGetPasswordPolicy)
-				pp.Put("/", HandlerUpsertPasswordPolicy)
-			})
-
-			p.Route("/access-list", func(al chi.Router) {
-				al.Get("/", HandlerListAccessList)
-				al.Post("/", HandlerCreateAccessList)
-				al.Delete("/{id}", HandlerDeleteAccessList)
-			})
-
-			p.Route("/authorize", func(a chi.Router) {
-				a.Post("/check", HandlerAuthorizeCheck)
-			})
-
+			p.Get("/users", HandlerListUsers)
+			p.Get("/users/{id}", HandlerGetUser)
+			p.Get("/nes", HandlerListNEs)
+			p.Get("/nes/{id}", HandlerGetNE)
+			p.Get("/commands", HandlerListCommands)
+			p.Get("/ne-access-groups", HandlerListNeAccessGroups)
+			p.Get("/ne-access-groups/{id}/users", HandlerNeAccessGroupUsers)
+			p.Get("/ne-access-groups/{id}/nes", HandlerNeAccessGroupNEs)
+			p.Get("/cmd-exec-groups", HandlerListCmdExecGroups)
+			p.Get("/cmd-exec-groups/{id}/users", HandlerCmdExecGroupUsers)
+			p.Get("/cmd-exec-groups/{id}/commands", HandlerCmdExecGroupCommands)
+			p.Get("/password-policy", HandlerGetPasswordPolicy)
+			p.Get("/access-list", HandlerListAccessList)
+			p.Post("/authorize/check", HandlerAuthorizeCheck)
 			p.Get("/history", HandlerListHistory)
+			p.Get("/config-backup/list", HandlerConfigBackupList)
+			p.Get("/config-backup/{id}", HandlerConfigBackupGet)
 
-			p.Route("/config-backup", func(cb chi.Router) {
-				cb.Post("/save", HandlerConfigBackupSave)
-				cb.Get("/list", HandlerConfigBackupList)
-				cb.Get("/{id}", HandlerConfigBackupGet)
+			// Admin or super_admin required for write operations.
+			p.Group(func(a chi.Router) {
+				a.Use(middleware.RequireAdmin)
+
+				a.Post("/users", HandlerCreateUser)
+				a.Put("/users/{id}", HandlerUpdateUser)
+				a.Delete("/users/{id}", HandlerDeleteUser)
+				a.Post("/users/{id}/reset-password", HandlerAdminResetPassword)
+
+				a.Post("/nes", HandlerCreateNE)
+				a.Put("/nes/{id}", HandlerUpdateNE)
+				a.Delete("/nes/{id}", HandlerDeleteNE)
+
+				a.Post("/commands", HandlerCreateCommand)
+				a.Put("/commands/{id}", HandlerUpdateCommand)
+				a.Delete("/commands/{id}", HandlerDeleteCommand)
+
+				a.Post("/ne-access-groups", HandlerCreateNeAccessGroup)
+				a.Put("/ne-access-groups/{id}", HandlerUpdateNeAccessGroup)
+				a.Delete("/ne-access-groups/{id}", HandlerDeleteNeAccessGroup)
+				a.Post("/ne-access-groups/{id}/users", HandlerNeAccessGroupAddUser)
+				a.Delete("/ne-access-groups/{id}/users/{user_id}", HandlerNeAccessGroupRemoveUser)
+				a.Post("/ne-access-groups/{id}/nes", HandlerNeAccessGroupAddNE)
+				a.Delete("/ne-access-groups/{id}/nes/{ne_id}", HandlerNeAccessGroupRemoveNE)
+
+				a.Post("/cmd-exec-groups", HandlerCreateCmdExecGroup)
+				a.Put("/cmd-exec-groups/{id}", HandlerUpdateCmdExecGroup)
+				a.Delete("/cmd-exec-groups/{id}", HandlerDeleteCmdExecGroup)
+				a.Post("/cmd-exec-groups/{id}/users", HandlerCmdExecGroupAddUser)
+				a.Delete("/cmd-exec-groups/{id}/users/{user_id}", HandlerCmdExecGroupRemoveUser)
+				a.Post("/cmd-exec-groups/{id}/commands", HandlerCmdExecGroupAddCommand)
+				a.Delete("/cmd-exec-groups/{id}/commands/{command_id}", HandlerCmdExecGroupRemoveCommand)
+
+				a.Put("/password-policy", HandlerUpsertPasswordPolicy)
+
+				a.Post("/access-list", HandlerCreateAccessList)
+				a.Delete("/access-list/{id}", HandlerDeleteAccessList)
+
+				a.Post("/config-backup/save", HandlerConfigBackupSave)
 			})
 		})
 	})

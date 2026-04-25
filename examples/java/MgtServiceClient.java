@@ -24,6 +24,7 @@ public class MgtServiceClient {
     private final String baseURL;
     private final HttpClient http;
     private String token;
+    private String role;
 
     public MgtServiceClient(String baseURL) {
         this.baseURL = baseURL.endsWith("/") ? baseURL.substring(0, baseURL.length() - 1) : baseURL;
@@ -32,11 +33,395 @@ public class MgtServiceClient {
 
     public String getToken() { return token; }
     public void setToken(String t) { this.token = t; }
+    public String getRole() { return role; }
+
+    // ── Map extraction helpers ─────────────────────────────────────────
+
+    private static String str(Map<String, Object> m, String k) { Object v = m.get(k); return v == null ? "" : v.toString(); }
+    private static long lng(Map<String, Object> m, String k) { Object v = m.get(k); return v instanceof Number ? ((Number) v).longValue() : 0; }
+    private static int num(Map<String, Object> m, String k) { Object v = m.get(k); return v instanceof Number ? ((Number) v).intValue() : 0; }
+    private static boolean bool(Map<String, Object> m, String k) { return Boolean.TRUE.equals(m.get(k)); }
+
+    // ── Typed model classes ────────────────────────────────────────────
+
+    public static class User {
+        public long id;
+        public String username, email, fullName, phone, role;
+        public boolean isEnabled;
+        public String passwordExpiresAt;
+        public int loginFailureCount;
+        public String lockedAt, lastLoginAt, createdAt, updatedAt;
+
+        public static User fromMap(Map<String, Object> m) {
+            User u = new User();
+            u.id = lng(m, "id");
+            u.username = str(m, "username");
+            u.email = str(m, "email");
+            u.fullName = str(m, "full_name");
+            u.phone = str(m, "phone");
+            u.role = str(m, "role");
+            u.isEnabled = bool(m, "is_enabled");
+            u.passwordExpiresAt = str(m, "password_expires_at");
+            u.loginFailureCount = num(m, "login_failure_count");
+            u.lockedAt = str(m, "locked_at");
+            u.lastLoginAt = str(m, "last_login_at");
+            u.createdAt = str(m, "created_at");
+            u.updatedAt = str(m, "updated_at");
+            return u;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("username", username);
+            m.put("email", email);
+            m.put("full_name", fullName);
+            m.put("phone", phone);
+            m.put("role", role);
+            m.put("is_enabled", isEnabled);
+            m.put("password_expires_at", passwordExpiresAt);
+            m.put("login_failure_count", loginFailureCount);
+            m.put("locked_at", lockedAt);
+            m.put("last_login_at", lastLoginAt);
+            m.put("created_at", createdAt);
+            m.put("updated_at", updatedAt);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "User{id=" + id + ", username=" + username + ", email=" + email
+                    + ", role=" + role + ", isEnabled=" + isEnabled + "}";
+        }
+    }
+
+    public static class NE {
+        public long id;
+        public String namespace, neType, siteName, description;
+        public String masterIp;
+        public int masterPort;
+        public String sshUsername, sshPassword, commandUrl, confMode;
+
+        public static NE fromMap(Map<String, Object> m) {
+            NE n = new NE();
+            n.id = lng(m, "id");
+            n.namespace = str(m, "namespace");
+            n.neType = str(m, "ne_type");
+            n.siteName = str(m, "site_name");
+            n.description = str(m, "description");
+            n.masterIp = str(m, "master_ip");
+            n.masterPort = num(m, "master_port");
+            n.sshUsername = str(m, "ssh_username");
+            n.sshPassword = str(m, "ssh_password");
+            n.commandUrl = str(m, "command_url");
+            n.confMode = str(m, "conf_mode");
+            return n;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("namespace", namespace);
+            m.put("ne_type", neType);
+            m.put("site_name", siteName);
+            m.put("description", description);
+            m.put("master_ip", masterIp);
+            m.put("master_port", masterPort);
+            m.put("ssh_username", sshUsername);
+            m.put("ssh_password", sshPassword);
+            m.put("command_url", commandUrl);
+            m.put("conf_mode", confMode);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "NE{id=" + id + ", namespace=" + namespace + ", neType=" + neType
+                    + ", masterIp=" + masterIp + ":" + masterPort + "}";
+        }
+    }
+
+    public static class Command {
+        public long id, neId;
+        public String service, cmdText, description;
+
+        public static Command fromMap(Map<String, Object> m) {
+            Command c = new Command();
+            c.id = lng(m, "id");
+            c.neId = lng(m, "ne_id");
+            c.service = str(m, "service");
+            c.cmdText = str(m, "cmd_text");
+            c.description = str(m, "description");
+            return c;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("ne_id", neId);
+            m.put("service", service);
+            m.put("cmd_text", cmdText);
+            m.put("description", description);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "Command{id=" + id + ", neId=" + neId + ", service=" + service
+                    + ", cmdText=" + cmdText + "}";
+        }
+    }
+
+    public static class Group {
+        public long id;
+        public String name, description;
+
+        public static Group fromMap(Map<String, Object> m) {
+            Group g = new Group();
+            g.id = lng(m, "id");
+            g.name = str(m, "name");
+            g.description = str(m, "description");
+            return g;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("name", name);
+            m.put("description", description);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "Group{id=" + id + ", name=" + name + "}";
+        }
+    }
+
+    public static class AccessListEntry {
+        public long id;
+        public String listType, matchType, pattern, reason, createdAt;
+
+        public static AccessListEntry fromMap(Map<String, Object> m) {
+            AccessListEntry e = new AccessListEntry();
+            e.id = lng(m, "id");
+            e.listType = str(m, "list_type");
+            e.matchType = str(m, "match_type");
+            e.pattern = str(m, "pattern");
+            e.reason = str(m, "reason");
+            e.createdAt = str(m, "created_at");
+            return e;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("list_type", listType);
+            m.put("match_type", matchType);
+            m.put("pattern", pattern);
+            m.put("reason", reason);
+            m.put("created_at", createdAt);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "AccessListEntry{id=" + id + ", listType=" + listType
+                    + ", pattern=" + pattern + "}";
+        }
+    }
+
+    public static class HistoryEntry {
+        public long id;
+        public String account, cmdText, neNamespace, neIp, scope, result, createdDate;
+
+        public static HistoryEntry fromMap(Map<String, Object> m) {
+            HistoryEntry h = new HistoryEntry();
+            h.id = lng(m, "id");
+            h.account = str(m, "account");
+            h.cmdText = str(m, "cmd_text");
+            h.neNamespace = str(m, "ne_namespace");
+            h.neIp = str(m, "ne_ip");
+            h.scope = str(m, "scope");
+            h.result = str(m, "result");
+            h.createdDate = str(m, "created_date");
+            return h;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("account", account);
+            m.put("cmd_text", cmdText);
+            m.put("ne_namespace", neNamespace);
+            m.put("ne_ip", neIp);
+            m.put("scope", scope);
+            m.put("result", result);
+            m.put("created_date", createdDate);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "HistoryEntry{id=" + id + ", account=" + account
+                    + ", cmdText=" + cmdText + ", scope=" + scope + "}";
+        }
+    }
+
+    public static class PasswordPolicy {
+        public int minLength, maxAgeDays, historyCount, maxLoginFailure, lockoutMinutes;
+        public boolean requireUppercase, requireLowercase, requireDigit, requireSpecial;
+
+        public static PasswordPolicy fromMap(Map<String, Object> m) {
+            PasswordPolicy p = new PasswordPolicy();
+            p.minLength = num(m, "min_length");
+            p.maxAgeDays = num(m, "max_age_days");
+            p.historyCount = num(m, "history_count");
+            p.maxLoginFailure = num(m, "max_login_failure");
+            p.lockoutMinutes = num(m, "lockout_minutes");
+            p.requireUppercase = bool(m, "require_uppercase");
+            p.requireLowercase = bool(m, "require_lowercase");
+            p.requireDigit = bool(m, "require_digit");
+            p.requireSpecial = bool(m, "require_special");
+            return p;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("min_length", minLength);
+            m.put("max_age_days", maxAgeDays);
+            m.put("history_count", historyCount);
+            m.put("max_login_failure", maxLoginFailure);
+            m.put("lockout_minutes", lockoutMinutes);
+            m.put("require_uppercase", requireUppercase);
+            m.put("require_lowercase", requireLowercase);
+            m.put("require_digit", requireDigit);
+            m.put("require_special", requireSpecial);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "PasswordPolicy{minLength=" + minLength + ", maxAgeDays=" + maxAgeDays
+                    + ", maxLoginFailure=" + maxLoginFailure + ", lockoutMinutes=" + lockoutMinutes + "}";
+        }
+    }
+
+    public static class AuthorizeDecision {
+        public boolean allowed;
+        public String reason;
+        public boolean userExists, userEnabled, neReachable, commandOnNe, commandExecAllowed;
+
+        public static AuthorizeDecision fromMap(Map<String, Object> m) {
+            AuthorizeDecision d = new AuthorizeDecision();
+            d.allowed = bool(m, "allowed");
+            d.reason = str(m, "reason");
+            d.userExists = bool(m, "user_exists");
+            d.userEnabled = bool(m, "user_enabled");
+            d.neReachable = bool(m, "ne_reachable");
+            d.commandOnNe = bool(m, "command_on_ne");
+            d.commandExecAllowed = bool(m, "command_exec_allowed");
+            return d;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("allowed", allowed);
+            m.put("reason", reason);
+            m.put("user_exists", userExists);
+            m.put("user_enabled", userEnabled);
+            m.put("ne_reachable", neReachable);
+            m.put("command_on_ne", commandOnNe);
+            m.put("command_exec_allowed", commandExecAllowed);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "AuthorizeDecision{allowed=" + allowed + ", reason=" + reason + "}";
+        }
+    }
+
+    public static class ConfigBackup {
+        public long id;
+        public String neName, neIp, configXml, createdAt;
+
+        public static ConfigBackup fromMap(Map<String, Object> m) {
+            ConfigBackup b = new ConfigBackup();
+            b.id = lng(m, "id");
+            b.neName = str(m, "ne_name");
+            b.neIp = str(m, "ne_ip");
+            b.configXml = str(m, "config_xml");
+            b.createdAt = str(m, "created_at");
+            return b;
+        }
+
+        public Map<String, Object> toMap() {
+            Map<String, Object> m = new HashMap<>();
+            m.put("id", id);
+            m.put("ne_name", neName);
+            m.put("ne_ip", neIp);
+            m.put("config_xml", configXml);
+            m.put("created_at", createdAt);
+            return m;
+        }
+
+        @Override public String toString() {
+            return "ConfigBackup{id=" + id + ", neName=" + neName + ", neIp=" + neIp + "}";
+        }
+    }
+
+    // ── Typed list conversion helpers ──────────────────────────────────
+
+    private static List<User> toUsers(Object v) {
+        List<User> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(User.fromMap(m));
+        return out;
+    }
+
+    private static List<NE> toNEs(Object v) {
+        List<NE> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(NE.fromMap(m));
+        return out;
+    }
+
+    private static List<Command> toCommands(Object v) {
+        List<Command> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(Command.fromMap(m));
+        return out;
+    }
+
+    private static List<Group> toGroups(Object v) {
+        List<Group> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(Group.fromMap(m));
+        return out;
+    }
+
+    private static List<AccessListEntry> toAccessList(Object v) {
+        List<AccessListEntry> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(AccessListEntry.fromMap(m));
+        return out;
+    }
+
+    private static List<HistoryEntry> toHistory(Object v) {
+        List<HistoryEntry> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(HistoryEntry.fromMap(m));
+        return out;
+    }
+
+    private static List<ConfigBackup> toConfigBackups(Object v) {
+        List<ConfigBackup> out = new ArrayList<>();
+        for (Map<String, Object> m : asList(v)) out.add(ConfigBackup.fromMap(m));
+        return out;
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<Long> toLongList(Object v) {
+        List<Long> out = new ArrayList<>();
+        if (v instanceof List) {
+            for (Object o : (List<?>) v) {
+                if (o instanceof Number) out.add(((Number) o).longValue());
+            }
+        }
+        return out;
+    }
 
     // ── Auth ────────────────────────────────────────────────────────────
 
-    /** Login. On success the token is stored on this instance. */
-    public void authenticate(String username, String password) throws IOException, InterruptedException {
+    /** Login. On success the token and role are stored on this instance. Returns the role. */
+    public String authenticate(String username, String password) throws IOException, InterruptedException {
         Map<String, Object> body = new HashMap<>();
         body.put("username", username);
         body.put("password", password);
@@ -44,6 +429,8 @@ public class MgtServiceClient {
         Object tok = res.get("token");
         if (!(tok instanceof String)) throw new IOException("authenticate: no token in response: " + res);
         this.token = (String) tok;
+        this.role = str(res, "role");
+        return this.role;
     }
 
     public Map<String, Object> validateToken(String tok) throws IOException, InterruptedException {
@@ -60,21 +447,22 @@ public class MgtServiceClient {
 
     // ── Users ───────────────────────────────────────────────────────────
 
-    public List<Map<String, Object>> listUsers() throws IOException, InterruptedException {
-        return asList(getJson("/aa/users"));
+    public List<User> listUsers() throws IOException, InterruptedException {
+        return toUsers(getJson("/aa/users"));
     }
 
-    public Map<String, Object> createUser(String username, String password, String email, String fullName) throws IOException, InterruptedException {
+    public User createUser(String username, String password, String email, String fullName, String role) throws IOException, InterruptedException {
         Map<String, Object> body = new HashMap<>();
         body.put("username", username);
         body.put("password", password);
         body.put("email", email);
         body.put("full_name", fullName);
-        return postJson("/aa/users", body);
+        body.put("role", role);
+        return User.fromMap(postJson("/aa/users", body));
     }
 
-    public Map<String, Object> getUser(long id) throws IOException, InterruptedException {
-        return asMap(getJson("/aa/users/" + id));
+    public User getUser(long id) throws IOException, InterruptedException {
+        return User.fromMap(asMap(getJson("/aa/users/" + id)));
     }
 
     public void updateUser(long id, Map<String, Object> patch) throws IOException, InterruptedException {
@@ -92,12 +480,12 @@ public class MgtServiceClient {
 
     // ── NEs ─────────────────────────────────────────────────────────────
 
-    public List<Map<String, Object>> listNEs() throws IOException, InterruptedException {
-        return asList(getJson("/aa/nes"));
+    public List<NE> listNEs() throws IOException, InterruptedException {
+        return toNEs(getJson("/aa/nes"));
     }
 
-    public Map<String, Object> createNE(Map<String, Object> ne) throws IOException, InterruptedException {
-        return postJson("/aa/nes", ne);
+    public NE createNE(Map<String, Object> ne) throws IOException, InterruptedException {
+        return NE.fromMap(postJson("/aa/nes", ne));
     }
 
     public void updateNE(long id, Map<String, Object> ne) throws IOException, InterruptedException {
@@ -110,38 +498,54 @@ public class MgtServiceClient {
 
     // ── Commands ────────────────────────────────────────────────────────
 
-    public List<Map<String, Object>> listCommands() throws IOException, InterruptedException {
-        return asList(getJson("/aa/commands"));
+    public List<Command> listCommands() throws IOException, InterruptedException {
+        return toCommands(getJson("/aa/commands"));
     }
 
-    public List<Map<String, Object>> listCommandsFor(long neId, String service) throws IOException, InterruptedException {
+    public List<Command> listCommandsFor(long neId, String service) throws IOException, InterruptedException {
         StringBuilder q = new StringBuilder("/aa/commands?");
         if (neId > 0) q.append("ne_id=").append(neId).append("&");
         if (service != null && !service.isEmpty()) q.append("service=").append(service);
-        return asList(getJson(q.toString()));
+        return toCommands(getJson(q.toString()));
     }
 
-    public Map<String, Object> createCommand(long neId, String service, String cmdText, String description) throws IOException, InterruptedException {
+    public Command createCommand(long neId, String service, String cmdText, String description) throws IOException, InterruptedException {
         Map<String, Object> body = new HashMap<>();
         body.put("ne_id", neId);
         body.put("service", service);
         body.put("cmd_text", cmdText);
         body.put("description", description);
-        return postJson("/aa/commands", body);
+        return Command.fromMap(postJson("/aa/commands", body));
+    }
+
+    public Command getCommand(long id) throws IOException, InterruptedException {
+        return Command.fromMap(asMap(getJson("/aa/commands/" + id)));
+    }
+
+    public void updateCommand(long id, Map<String, Object> patch) throws IOException, InterruptedException {
+        request("PUT", "/aa/commands/" + id, patch);
     }
 
     public void deleteCommand(long id) throws IOException, InterruptedException {
         request("DELETE", "/aa/commands/" + id, null);
     }
 
-    // ── Groups ──────────────────────────────────────────────────────────
+    // ── Groups — NE Access Groups ──────────────────────────────────────
 
-    public List<Map<String, Object>> listNeAccessGroups() throws IOException, InterruptedException {
-        return asList(getJson("/aa/ne-access-groups"));
+    public List<Group> listNeAccessGroups() throws IOException, InterruptedException {
+        return toGroups(getJson("/aa/ne-access-groups"));
     }
 
-    public Map<String, Object> createNeAccessGroup(String name, String description) throws IOException, InterruptedException {
-        return postJson("/aa/ne-access-groups", group(name, description));
+    public Group createNeAccessGroup(String name, String description) throws IOException, InterruptedException {
+        return Group.fromMap(postJson("/aa/ne-access-groups", groupBody(name, description)));
+    }
+
+    public void updateNeAccessGroup(long id, String name, String description) throws IOException, InterruptedException {
+        request("PUT", "/aa/ne-access-groups/" + id, groupBody(name, description));
+    }
+
+    public void deleteNeAccessGroup(long id) throws IOException, InterruptedException {
+        request("DELETE", "/aa/ne-access-groups/" + id, null);
     }
 
     public void addUserToNeAccessGroup(long groupId, long userId) throws IOException, InterruptedException {
@@ -149,17 +553,43 @@ public class MgtServiceClient {
         postJson("/aa/ne-access-groups/" + groupId + "/users", b);
     }
 
+    public List<Long> listUsersInNeAccessGroup(long groupId) throws IOException, InterruptedException {
+        return toLongList(getJson("/aa/ne-access-groups/" + groupId + "/users"));
+    }
+
+    public void removeUserFromNeAccessGroup(long groupId, long userId) throws IOException, InterruptedException {
+        request("DELETE", "/aa/ne-access-groups/" + groupId + "/users/" + userId, null);
+    }
+
     public void addNeToNeAccessGroup(long groupId, long neId) throws IOException, InterruptedException {
         Map<String, Object> b = new HashMap<>(); b.put("ne_id", neId);
         postJson("/aa/ne-access-groups/" + groupId + "/nes", b);
     }
 
-    public List<Map<String, Object>> listCmdExecGroups() throws IOException, InterruptedException {
-        return asList(getJson("/aa/cmd-exec-groups"));
+    public List<Long> listNEsInNeAccessGroup(long groupId) throws IOException, InterruptedException {
+        return toLongList(getJson("/aa/ne-access-groups/" + groupId + "/nes"));
     }
 
-    public Map<String, Object> createCmdExecGroup(String name, String description) throws IOException, InterruptedException {
-        return postJson("/aa/cmd-exec-groups", group(name, description));
+    public void removeNEFromNeAccessGroup(long groupId, long neId) throws IOException, InterruptedException {
+        request("DELETE", "/aa/ne-access-groups/" + groupId + "/nes/" + neId, null);
+    }
+
+    // ── Groups — Cmd Exec Groups ───────────────────────────────────────
+
+    public List<Group> listCmdExecGroups() throws IOException, InterruptedException {
+        return toGroups(getJson("/aa/cmd-exec-groups"));
+    }
+
+    public Group createCmdExecGroup(String name, String description) throws IOException, InterruptedException {
+        return Group.fromMap(postJson("/aa/cmd-exec-groups", groupBody(name, description)));
+    }
+
+    public void updateCmdExecGroup(long id, String name, String description) throws IOException, InterruptedException {
+        request("PUT", "/aa/cmd-exec-groups/" + id, groupBody(name, description));
+    }
+
+    public void deleteCmdExecGroup(long id) throws IOException, InterruptedException {
+        request("DELETE", "/aa/cmd-exec-groups/" + id, null);
     }
 
     public void addUserToCmdExecGroup(long groupId, long userId) throws IOException, InterruptedException {
@@ -167,12 +597,28 @@ public class MgtServiceClient {
         postJson("/aa/cmd-exec-groups/" + groupId + "/users", b);
     }
 
+    public List<Long> listUsersInCmdExecGroup(long groupId) throws IOException, InterruptedException {
+        return toLongList(getJson("/aa/cmd-exec-groups/" + groupId + "/users"));
+    }
+
+    public void removeUserFromCmdExecGroup(long groupId, long userId) throws IOException, InterruptedException {
+        request("DELETE", "/aa/cmd-exec-groups/" + groupId + "/users/" + userId, null);
+    }
+
     public void addCommandToCmdExecGroup(long groupId, long commandId) throws IOException, InterruptedException {
         Map<String, Object> b = new HashMap<>(); b.put("command_id", commandId);
         postJson("/aa/cmd-exec-groups/" + groupId + "/commands", b);
     }
 
-    private Map<String, Object> group(String name, String description) {
+    public List<Long> listCommandsInCmdExecGroup(long groupId) throws IOException, InterruptedException {
+        return toLongList(getJson("/aa/cmd-exec-groups/" + groupId + "/commands"));
+    }
+
+    public void removeCommandFromCmdExecGroup(long groupId, long commandId) throws IOException, InterruptedException {
+        request("DELETE", "/aa/cmd-exec-groups/" + groupId + "/commands/" + commandId, null);
+    }
+
+    private Map<String, Object> groupBody(String name, String description) {
         Map<String, Object> g = new HashMap<>();
         g.put("name", name);
         g.put("description", description);
@@ -181,17 +627,30 @@ public class MgtServiceClient {
 
     // ── Policy + Access List + Authorize ────────────────────────────────
 
-    public Map<String, Object> getPasswordPolicy() throws IOException, InterruptedException {
-        return asMap(getJson("/aa/password-policy"));
+    public PasswordPolicy getPasswordPolicy() throws IOException, InterruptedException {
+        return PasswordPolicy.fromMap(asMap(getJson("/aa/password-policy")));
     }
 
     public Map<String, Object> upsertPasswordPolicy(Map<String, Object> policy) throws IOException, InterruptedException {
         return asMap(request("PUT", "/aa/password-policy", policy));
     }
 
-    public List<Map<String, Object>> listAccessList(String listType) throws IOException, InterruptedException {
+    public List<AccessListEntry> listAccessList(String listType) throws IOException, InterruptedException {
         String path = "/aa/access-list" + (listType != null && !listType.isEmpty() ? ("?list_type=" + listType) : "");
-        return asList(getJson(path));
+        return toAccessList(getJson(path));
+    }
+
+    public AccessListEntry createAccessListEntry(String listType, String matchType, String pattern, String reason) throws IOException, InterruptedException {
+        Map<String, Object> body = new HashMap<>();
+        body.put("list_type", listType);
+        body.put("match_type", matchType);
+        body.put("pattern", pattern);
+        body.put("reason", reason);
+        return AccessListEntry.fromMap(postJson("/aa/access-list", body));
+    }
+
+    public void deleteAccessListEntry(long id) throws IOException, InterruptedException {
+        request("DELETE", "/aa/access-list/" + id, null);
     }
 
     /** "Can user X execute command Y on NE Z?" */
@@ -200,33 +659,18 @@ public class MgtServiceClient {
         body.put("username", username);
         body.put("ne_id", neId);
         body.put("command_id", commandId);
-        Map<String, Object> res = postJson("/aa/authorize/check", body);
-        AuthorizeDecision d = new AuthorizeDecision();
-        d.allowed            = Boolean.TRUE.equals(res.get("allowed"));
-        d.reason             = (String) res.getOrDefault("reason", "");
-        d.userExists         = Boolean.TRUE.equals(res.get("user_exists"));
-        d.userEnabled        = Boolean.TRUE.equals(res.get("user_enabled"));
-        d.neReachable        = Boolean.TRUE.equals(res.get("ne_reachable"));
-        d.commandOnNe        = Boolean.TRUE.equals(res.get("command_on_ne"));
-        d.commandExecAllowed = Boolean.TRUE.equals(res.get("command_exec_allowed"));
-        return d;
-    }
-
-    public static class AuthorizeDecision {
-        public boolean allowed;
-        public String reason;
-        public boolean userExists, userEnabled, neReachable, commandOnNe, commandExecAllowed;
+        return AuthorizeDecision.fromMap(postJson("/aa/authorize/check", body));
     }
 
     // ── History + Config Backup ─────────────────────────────────────────
 
-    public List<Map<String, Object>> listHistory(int limit, String scope, String neNamespace, String account) throws IOException, InterruptedException {
+    public List<HistoryEntry> listHistory(int limit, String scope, String neNamespace, String account) throws IOException, InterruptedException {
         StringBuilder q = new StringBuilder("/aa/history?");
         if (limit > 0) q.append("limit=").append(limit).append("&");
         if (scope != null && !scope.isEmpty()) q.append("scope=").append(scope).append("&");
         if (neNamespace != null && !neNamespace.isEmpty()) q.append("ne_namespace=").append(neNamespace).append("&");
         if (account != null && !account.isEmpty()) q.append("account=").append(account);
-        return asList(getJson(q.toString()));
+        return toHistory(getJson(q.toString()));
     }
 
     /** /history/save is deliberately unauthenticated — used by the cli-gate proxy. */
@@ -249,13 +693,13 @@ public class MgtServiceClient {
         return postJson("/aa/config-backup/save", body);
     }
 
-    public Map<String, Object> listConfigBackups(String neName) throws IOException, InterruptedException {
+    public List<ConfigBackup> listConfigBackups(String neName) throws IOException, InterruptedException {
         String path = "/aa/config-backup/list" + (neName != null && !neName.isEmpty() ? ("?ne_name=" + neName) : "");
-        return asMap(getJson(path));
+        return toConfigBackups(getJson(path));
     }
 
-    public Map<String, Object> getConfigBackup(long id) throws IOException, InterruptedException {
-        return asMap(getJson("/aa/config-backup/" + id));
+    public ConfigBackup getConfigBackup(long id) throws IOException, InterruptedException {
+        return ConfigBackup.fromMap(asMap(getJson("/aa/config-backup/" + id)));
     }
 
     // ── HTTP / JSON plumbing ────────────────────────────────────────────
@@ -469,37 +913,66 @@ public class MgtServiceClient {
         String pass = System.getenv().getOrDefault("MGT_PASS", "admin");
 
         MgtServiceClient c = new MgtServiceClient(base);
-        c.authenticate(user, pass);
-        System.out.println("logged in");
+        String role = c.authenticate(user, pass);
+        System.out.println("logged in as " + user + "  role=" + role);
 
-        List<Map<String, Object>> users = c.listUsers();
-        System.out.println("users: " + users.size());
-        for (Map<String, Object> u : users) {
-            System.out.println("  " + u.get("id") + " " + u.get("username") + " enabled=" + u.get("is_enabled"));
+        // Users
+        List<User> users = c.listUsers();
+        System.out.println("\nusers: " + users.size());
+        for (User u : users) {
+            System.out.printf("  #%d  %-15s  role=%-12s  enabled=%s%n",
+                    u.id, u.username, u.role, u.isEnabled);
         }
 
-        List<Map<String, Object>> nes = c.listNEs();
-        System.out.println("NEs: " + nes.size());
+        // NEs
+        List<NE> nes = c.listNEs();
+        System.out.println("\nNEs: " + nes.size());
+        for (NE n : nes) System.out.println("  " + n);
 
-        List<Map<String, Object>> cmds = c.listCommands();
-        System.out.println("commands: " + cmds.size());
+        // Commands
+        List<Command> cmds = c.listCommands();
+        System.out.println("\ncommands: " + cmds.size());
+        for (Command cmd : cmds) System.out.println("  " + cmd);
 
+        // Groups
+        List<Group> neGroups = c.listNeAccessGroups();
+        System.out.println("\nNE access groups: " + neGroups.size());
+        for (Group g : neGroups) System.out.println("  " + g);
+
+        List<Group> cmdGroups = c.listCmdExecGroups();
+        System.out.println("cmd exec groups: " + cmdGroups.size());
+        for (Group g : cmdGroups) System.out.println("  " + g);
+
+        // Password policy
+        PasswordPolicy policy = c.getPasswordPolicy();
+        System.out.println("\npassword policy: " + policy);
+
+        // Access list
+        List<AccessListEntry> acl = c.listAccessList(null);
+        System.out.println("access list entries: " + acl.size());
+        for (AccessListEntry e : acl) System.out.println("  " + e);
+
+        // Authorize check
         if (!users.isEmpty() && !nes.isEmpty() && !cmds.isEmpty()) {
-            Map<String, Object> u = users.get(0);
-            Map<String, Object> n = nes.get(0);
-            Map<String, Object> cmd = cmds.get(0);
-            AuthorizeDecision d = c.authorizeCheck(
-                    (String) u.get("username"),
-                    ((Number) n.get("id")).longValue(),
-                    ((Number) cmd.get("id")).longValue());
-            System.out.println("authorize(" + u.get("username") + ", ne=" + n.get("namespace") + ", cmd=#" + cmd.get("id") + ") → "
+            User u = users.get(0);
+            NE n = nes.get(0);
+            Command cmd = cmds.get(0);
+            AuthorizeDecision d = c.authorizeCheck(u.username, n.id, cmd.id);
+            System.out.println("\nauthorize(" + u.username + ", ne=" + n.namespace
+                    + ", cmd=#" + cmd.id + ") -> "
                     + (d.allowed ? "ALLOW" : "DENY: " + d.reason));
         }
 
-        System.out.println("done. Supported endpoints demonstrated:\n  " +
-                String.join("\n  ", Arrays.asList(
-                        "POST /aa/authenticate", "GET  /aa/users",
-                        "GET  /aa/nes", "GET  /aa/commands",
-                        "POST /aa/authorize/check")));
+        // History
+        List<HistoryEntry> hist = c.listHistory(5, null, null, null);
+        System.out.println("\nhistory (last 5): " + hist.size());
+        for (HistoryEntry h : hist) System.out.println("  " + h);
+
+        // Config backups
+        List<ConfigBackup> backups = c.listConfigBackups(null);
+        System.out.println("config backups: " + backups.size());
+        for (ConfigBackup b : backups) System.out.println("  " + b);
+
+        System.out.println("\ndone.");
     }
 }
