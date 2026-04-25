@@ -1,7 +1,7 @@
 # Authorization Design — v2
 
-> v1's RBAC (role hierarchy, NE profiles, command-def patterns, AWS-IAM evaluator,
-> mgt-permissions) has been dropped in full. This doc captures the minimal v2 model.
+> v1's complex RBAC has been replaced with a 3-tier permission model +
+> two-layer group authorization.
 
 ## The one question
 
@@ -36,6 +36,23 @@ site/region, command permissions by job function.
 
 Collapsing both into a single group would force a combinatorial explosion
 (`N × M`) of groups, or punch holes that are hard to audit.
+
+## Management permission tiers
+
+Independent of the authorize rule (which governs NE/command access), the
+**management surface** (API write endpoints + admin frontend) is gated by
+the user's `role` field:
+
+| Role | Management surface | Restriction |
+|------|-------------------|-------------|
+| `super_admin` | Full access — CRUD everything | None |
+| `admin` | CRUD users, NEs, commands, groups, policy, access-list | Cannot modify/delete/reset-pw `super_admin` accounts |
+| `user` | Read-only (all GET endpoints) | All POST/PUT/DELETE return 403 |
+
+The `role` claim is embedded in the JWT token and checked by the
+`RequireAdmin` middleware on all write routes. Fine-grained super_admin
+protection is enforced per-handler (e.g. `HandlerDeleteUser` checks target
+user's role before allowing deletion).
 
 ## Auth-time gates
 
@@ -74,6 +91,18 @@ The minimal set needed to administer + query the v2 model lives under `/aa`.
 See the top-level [README.md](../README.md) for the full list, and
 [pkg/handler/frontend.html](../pkg/handler/frontend.html)'s Guide tab for the
 same list rendered inline.
+
+## Import / Export
+
+CSV import/export is available for users, NEs, and commands:
+
+- **Export** (`GET /aa/export/{users,nes,commands}`): any authenticated user,
+  returns CSV download. Auth via `Authorization` header or `_token` query param.
+- **Import** (`POST /aa/import/{users,nes,commands}`): admin+ required,
+  multipart file upload. Skips duplicates, reports created/skipped/errors.
+
+The frontend has `⬇ Export CSV` and `⬆ Import CSV` buttons on the Users, NEs,
+and Commands tabs (import button hidden for `user` role).
 
 ## Evaluator tests
 

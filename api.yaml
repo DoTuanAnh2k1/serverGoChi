@@ -56,6 +56,8 @@ tags:
     description: Blacklist / whitelist gating login
   - name: Authorize
     description: The one-question evaluator
+  - name: Import/Export
+    description: CSV bulk import/export for users, NEs, commands
   - name: History
     description: Audit log + cli-gate audit push
   - name: Config Backup
@@ -547,6 +549,90 @@ paths:
       responses:
         "201": { description: Saved, content: { application/json: { schema: { $ref: "#/components/schemas/OperationHistory" } } } }
         "400": { description: cmd_text missing }
+
+  # ── Import / Export ────────────────────────────────────────────────
+  /aa/export/users:
+    get:
+      tags: [Import/Export]
+      summary: Export all users as CSV
+      description: Auth via Authorization header or _token query param.
+      parameters:
+        - { name: _token, in: query, schema: { type: string }, description: "JWT token (for browser download links)" }
+      responses:
+        "200": { description: CSV file download, content: { text/csv: { schema: { type: string } } } }
+  /aa/export/nes:
+    get:
+      tags: [Import/Export]
+      summary: Export all NEs as CSV
+      parameters:
+        - { name: _token, in: query, schema: { type: string } }
+      responses:
+        "200": { description: CSV file download }
+  /aa/export/commands:
+    get:
+      tags: [Import/Export]
+      summary: Export all commands as CSV (ne_namespace resolved)
+      parameters:
+        - { name: _token, in: query, schema: { type: string } }
+      responses:
+        "200": { description: CSV file download }
+  /aa/import/users:
+    post:
+      tags: [Import/Export]
+      summary: Bulk import users from CSV (admin+ required)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "CSV file with header: username,password,email,full_name,phone,role,is_enabled" }
+      responses:
+        "200":
+          description: Import result
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  created: { type: integer }
+                  skipped: { type: integer }
+                  errors:  { type: array, items: { type: string } }
+  /aa/import/nes:
+    post:
+      tags: [Import/Export]
+      summary: Bulk import NEs from CSV (admin+ required)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "CSV: namespace,ne_type,site_name,master_ip,master_port,..." }
+      responses:
+        "200": { description: Import result }
+  /aa/import/commands:
+    post:
+      tags: [Import/Export]
+      summary: Bulk import commands from CSV (admin+ required)
+      security: [ { BasicJWT: [] } ]
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: "CSV: ne_namespace,service,cmd_text,description" }
+      responses:
+        "200": { description: Import result }
 
   # ── Config Backup ──────────────────────────────────────────────────
   /aa/config-backup/save:

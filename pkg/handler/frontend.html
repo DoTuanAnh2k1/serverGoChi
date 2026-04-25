@@ -1025,6 +1025,32 @@ TABS.guide = (c) => {
       <h3>CSV Log Export (tự động)</h3>
       <p>Hệ thống tự xuất CSV lịch sử hằng ngày (mặc định 23:00), nhóm theo NE namespace. Cấu hình qua biến môi trường <code>CLI_LOG_EXPORT_DIR</code> và <code>CSV_EXPORT_HOUR</code>.</p>
 
+      <h3>Import / Export (CSV)</h3>
+      <p>Trên mỗi tab <b>Users</b>, <b>NEs</b>, <b>Commands</b> có 2 nút:</p>
+      <ul>
+        <li><b>⬇ Export CSV</b> — tải file CSV chứa toàn bộ dữ liệu hiện tại (bất kỳ user nào cũng export được)</li>
+        <li><b>⬆ Import CSV</b> — chọn file CSV để bulk import (chỉ admin/super_admin). Bỏ qua bản ghi trùng, báo kết quả created/skipped/errors</li>
+      </ul>
+      <p><b>Format CSV:</b></p>
+      <pre># users.csv
+username,password,email,full_name,role
+operator1,Pass1234!,op1@vht.com,Operator 1,user
+operator2,Pass1234!,op2@vht.com,Operator 2,admin
+
+# nes.csv
+namespace,ne_type,site_name,master_ip,master_port,ssh_username,ssh_password,conf_mode
+htsmf01,SMF,HCM,10.0.0.1,830,admin,secret,NETCONF
+
+# commands.csv (dùng ne_namespace thay vì ne_id)
+ne_namespace,service,cmd_text,description
+htsmf01,ne-command,show version,Show software version
+htsmf01,ne-config,set interface eth0,Configure interface</pre>
+      <p><b>API endpoints:</b></p>
+      <ul>
+        <li><code>GET /aa/export/users</code>, <code>GET /aa/export/nes</code>, <code>GET /aa/export/commands</code> — trả CSV download</li>
+        <li><code>POST /aa/import/users</code>, <code>POST /aa/import/nes</code>, <code>POST /aa/import/commands</code> — multipart upload, admin+ required</li>
+      </ul>
+
       <h3>Client Libraries</h3>
       <ul>
         <li><b>Java</b> — <code>examples/java/MgtServiceClient.java</code> (JDK 11+, zero dependency, 9 typed models, 100% API)</li>
@@ -1057,6 +1083,14 @@ GET/POST/DELETE     /aa/access-list
 # Authorization
 POST                /aa/authorize/check
                     { username, ne_id, command_id } → decision + trace
+
+# Import / Export (CSV)
+GET                 /aa/export/users    → CSV download
+GET                 /aa/export/nes
+GET                 /aa/export/commands
+POST                /aa/import/users    multipart file upload (admin+)
+POST                /aa/import/nes
+POST                /aa/import/commands
 
 # History &amp; Backup
 GET                 /aa/history?limit=&amp;scope=&amp;ne_namespace=&amp;account=

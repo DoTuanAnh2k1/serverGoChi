@@ -1,47 +1,66 @@
 # Java client for cli-mgt-svc (v2)
 
-Single-file, zero-dependency Java 11+ client. Drop [MgtServiceClient.java](MgtServiceClient.java)
+Single-file, zero-dependency Java 11+ client with **9 typed model classes** and
+**100% API coverage**. Drop [MgtServiceClient.java](MgtServiceClient.java)
 into your project, adjust the package if needed, and use it.
 
 ## Quick sample
 
 ```java
 MgtServiceClient c = new MgtServiceClient("http://localhost:3000");
-c.authenticate("admin", "admin");
+String role = c.authenticate("admin", "admin");
+System.out.println("logged in as " + role);  // "super_admin"
 
-// List inventory
-c.listUsers();
-c.listNEs();
-c.listCommands();
+// Typed models — not raw maps
+List<MgtServiceClient.User> users = c.listUsers();
+for (User u : users) {
+    System.out.println(u.username + " role=" + u.role);
+}
+
+// Create user with role
+User newUser = c.createUser("operator1", "Pass1234!", "op1@vht.com", "Op 1", "admin");
 
 // Wire up a group
-Map<String, Object> g = c.createNeAccessGroup("site-hcmc", "HCMC operators");
-c.addUserToNeAccessGroup((long) g.get("id"), 42L);
-c.addNeToNeAccessGroup((long) g.get("id"), 7L);
+MgtServiceClient.Group g = c.createNeAccessGroup("site-hcmc", "HCMC operators");
+c.addUserToNeAccessGroup(g.id, newUser.id);
 
-// Ask the service the one question that matters
-MgtServiceClient.AuthorizeDecision d = c.authorizeCheck("alice", 7L, 19L);
+// The one question that matters
+MgtServiceClient.AuthorizeDecision d = c.authorizeCheck("operator1", 7L, 19L);
 if (d.allowed) { /* proceed */ }
 else { System.err.println("denied: " + d.reason); }
 ```
 
+## Typed models
+
+| Class | Fields |
+|-------|--------|
+| `User` | id, username, email, fullName, phone, **role**, isEnabled, lockedAt, lastLoginAt, ... |
+| `NE` | id, namespace, neType, siteName, masterIp, masterPort, confMode, ... |
+| `Command` | id, neId, service, cmdText, description |
+| `Group` | id, name, description |
+| `AccessListEntry` | id, listType, matchType, pattern, reason |
+| `PasswordPolicy` | minLength, maxAgeDays, historyCount, requireUppercase, ... |
+| `AuthorizeDecision` | allowed, reason, userExists, userEnabled, neReachable, commandOnNe, commandExecAllowed |
+| `HistoryEntry` | id, account, cmdText, neNamespace, scope, result, ... |
+| `ConfigBackup` | id, neName, neIp, configXml, createdAt |
+
+Each model has `fromMap()`, `toMap()`, and `toString()`.
+
 ## What's covered
 
-Every v2 endpoint under `/aa/*`:
+Every v2 endpoint under `/aa/*` (100% coverage):
 
-- Auth: `authenticate`, `validateToken`, `changePassword`
-- Users: CRUD + `resetPassword`
-- NEs: CRUD
-- Commands: CRUD, filter by `(ne_id, service)`
-- NE access groups: CRUD + user/NE membership
-- Cmd exec groups: CRUD + user/command membership
-- Password policy: get / upsert
-- Access list: list / create / delete
-- **Authorize check**: `authorizeCheck(username, neId, commandId)` returns a
-  typed decision with the trace flags (`userExists`, `userEnabled`,
-  `neReachable`, `commandOnNe`, `commandExecAllowed`)
-- History: `listHistory`, unauthenticated `saveHistory` (for proxy audit push)
-- Config backup: save / list / get
+- **Auth**: `authenticate` (returns role), `validateToken`, `changePassword`
+- **Users**: full CRUD + `resetPassword` — with **role** field support
+- **NEs**: full CRUD
+- **Commands**: full CRUD, filter by `(ne_id, service)`
+- **NE access groups**: full CRUD + add/remove user + add/remove NE + list members
+- **Cmd exec groups**: full CRUD + add/remove user + add/remove command + list members
+- **Password policy**: get / upsert
+- **Access list**: list / create / delete
+- **Authorize check**: typed `AuthorizeDecision` with trace flags
+- **History**: `listHistory`, unauthenticated `saveHistory` (for proxy audit push)
+- **Config backup**: save / list / get
 
 ## Running the demo main
 

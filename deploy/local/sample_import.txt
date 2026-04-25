@@ -1,38 +1,45 @@
-# Sample import file for MGT Service
-# Usage: make import FILE=deploy/local/sample_import.txt
+# Sample CSV import files for cli-mgt-svc v2
+#
+# Import via frontend (⬆ Import CSV button) or API:
+#   curl -X POST http://localhost:3000/aa/import/users \
+#     -H "Authorization: <token>" -F "file=@users.csv"
+#
+# Each file has a header row. Duplicates are skipped.
 
-[users]
-username,password,email
-admin,admin123,admin@vht.com
-operator1,Pass@123,op1@vht.com
-operator2,Pass@123,op2@vht.com
-viewer1,Pass@123,viewer1@vht.com
+# ── users.csv ────────────────────────────────────────────────────────
+# Fields: username (required), password (required), email, full_name, phone, role, is_enabled
+# role: super_admin | admin | user (default: user)
+# password must satisfy the active password policy
 
-[nes]
-ne_name,site_name,namespace,command_url,conf_mode,conf_master_ip,conf_port_master_ssh,conf_username,conf_password,description
-HTSMF01,HCM,hcm-5gc,http://10.10.1.1:8080,SSH,10.10.1.1,22,admin,admin,HCM SMF Node 01
-HTSMF02,HCM,hcm-5gc,http://10.10.1.2:8080,SSH,10.10.1.2,22,admin,admin,HCM SMF Node 02
-HTAMF01,HCM,hcm-5gc,http://10.10.2.1:8080,SSH,10.10.2.1,22,admin,admin,HCM AMF Node 01
-HTAMF02,HCM,hcm-5gc,http://10.10.2.2:8080,SSH,10.10.2.2,22,admin,admin,HCM AMF Node 02
-HNSMF01,HN,hn-5gc,http://10.20.1.1:8080,NETCONF,10.20.1.1,830,admin,admin,Ha Noi SMF Node 01
-HNAMF01,HN,hn-5gc,http://10.20.2.1:8080,NETCONF,10.20.2.1,830,admin,admin,Ha Noi AMF Node 01
-DNUPF01,DN,dn-5gc,http://10.30.3.1:8080,SSH,10.30.3.1,22,admin,admin,Da Nang UPF Node 01
+username,password,email,full_name,phone,role
+admin,Admin@2024,admin@vht.com,Administrator,,super_admin
+operator1,Pass@1234,op1@vht.com,Operator HCM,0901234567,admin
+operator2,Pass@1234,op2@vht.com,Operator HN,0907654321,admin
+viewer1,Pass@1234,viewer1@vht.com,Viewer DN,,user
 
-[user_roles]
-username,permission
-admin,admin
-operator1,admin
-operator2,user
-viewer1,user
+# ── nes.csv ──────────────────────────────────────────────────────────
+# Fields: namespace (required, unique), ne_type, site_name, description,
+#         master_ip, master_port, ssh_username, ssh_password, command_url, conf_mode
+# conf_mode: SSH | TELNET | NETCONF | RESTCONF
 
-[user_nes]
-username,ne_name
-admin,HTSMF01
-admin,HTSMF02
-admin,HTAMF01
-admin,HTAMF02
-operator1,HNSMF01
-operator1,HNAMF01
-operator2,DNUPF01
-viewer1,DNUPF01
-viewer1,HNAMF01
+namespace,ne_type,site_name,description,master_ip,master_port,ssh_username,ssh_password,command_url,conf_mode
+htsmf01,SMF,HCM,HCM SMF Node 01,10.10.1.1,830,admin,admin,,NETCONF
+htsmf02,SMF,HCM,HCM SMF Node 02,10.10.1.2,830,admin,admin,,NETCONF
+htamf01,AMF,HCM,HCM AMF Node 01,10.10.2.1,22,admin,admin,,SSH
+hnsmf01,SMF,HN,Ha Noi SMF Node 01,10.20.1.1,830,admin,admin,,NETCONF
+hnamf01,AMF,HN,Ha Noi AMF Node 01,10.20.2.1,22,admin,admin,,SSH
+dnupf01,UPF,DN,Da Nang UPF Node 01,10.30.3.1,22,admin,admin,,SSH
+
+# ── commands.csv ─────────────────────────────────────────────────────
+# Fields: ne_namespace (required, must match an existing NE), service (required),
+#         cmd_text (required), description
+# service: ne-config | ne-command
+
+ne_namespace,service,cmd_text,description
+htsmf01,ne-command,show version,Show software version
+htsmf01,ne-command,show interfaces,Show interface status
+htsmf01,ne-config,set interface eth0 ip 10.0.0.1/24,Configure interface IP
+htamf01,ne-command,show version,Show software version
+hnsmf01,ne-command,show running-config,Show running configuration
+dnupf01,ne-command,show version,Show software version
+dnupf01,ne-command,show sessions,Show active sessions

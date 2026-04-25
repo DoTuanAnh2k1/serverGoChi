@@ -60,7 +60,8 @@ Schema đầy đủ ở [db.sql](db.sql) và `models/db_models/`.
 | Authorize check | `POST /aa/authorize/check {username, ne_id, command_id}` → `{allowed, reason, trace}` |
 | History | `/aa/history?limit=&scope=&ne_namespace=&account=`; `POST /aa/history/save` không cần JWT (audit sink) |
 | Config backup | `POST /aa/config-backup/save`, `GET /aa/config-backup/{list,{id}}` |
-| Admin frontend | Embed tại `/admin`; 11 tab; paging 20/page; EN+VI; role-aware UI (user=read-only, admin ẩn nút sửa/xóa super_admin) |
+| Import/Export | CSV import/export cho Users, NEs, Commands. Export: `GET /aa/export/{users,nes,commands}`. Import: `POST /aa/import/{users,nes,commands}` (admin+, multipart upload) |
+| Admin frontend | Embed tại `/admin`; 11 tab; paging 20/page; EN+VI; role-aware UI (user=read-only, admin ẩn nút sửa/xóa super_admin); nút Export/Import CSV trên mỗi tab |
 | Permission | 3 tầng: `super_admin` > `admin` > `user`. GET = any auth, write = admin+. Xem bảng phân quyền ở trên |
 | Multi-DB | MySQL, PostgreSQL (GORM auto-migrate) + MongoDB (index plan + counter collection cho sequential IDs) |
 | Test | Service-layer: evaluator (4 case), authenticate (happy path / wrong pw failure-count / lockout / disabled / blacklist), policy apply chain |
@@ -114,6 +115,9 @@ GET/PUT             /aa/password-policy
 GET/POST/DELETE     /aa/access-list
 POST                /aa/authorize/check
 
+GET                 /aa/export/{users,nes,commands}     (CSV download)
+POST                /aa/import/{users,nes,commands}     (CSV upload, admin+)
+
 GET                 /aa/history
 POST                /aa/history/save                   (public — proxy audit push)
 POST/GET            /aa/config-backup/{save,list,{id}}
@@ -134,7 +138,7 @@ Auth header: `Authorization: Basic <jwt>` (prefix mang tính legacy, giữ nguy�
 | Per-group password policy | Singleton global policy |
 | Mgt-permission (per-group resource×action) | 3-tier role: `user` read-only, `admin` write, `super_admin` full; authorize check cho NE/command |
 | SSH CLI bastion (`cmd/ssh`, `pkg/sshcli`) | Hiện chưa có trong v2 — HTTP API + frontend là interface đầy đủ. CLI sẽ được viết lại sau |
-| Bulk-import tool (`cmd/import`) | Tạm thời dùng frontend / API trực tiếp |
+| Bulk-import tool (`cmd/import`) | CSV import/export qua API (`/aa/import/*`, `/aa/export/*`) + nút trên frontend |
 
 ---
 
