@@ -450,6 +450,48 @@ int mgt_delete_command(mgt_client_t *c, int64_t id) {
     return mgt_delete(c, path);
 }
 
+/* ── User permission lookups ─────────────────────────────────────────── */
+
+int mgt_list_user_executable_commands(mgt_client_t *c, int64_t user_id,
+                                      char **out_json)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/users/%lld/executable-commands",
+             (long long)user_id);
+    return mgt_get(c, path, out_json);
+}
+
+int mgt_list_user_accessible_nes(mgt_client_t *c, int64_t user_id,
+                                 char **out_json)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/users/%lld/accessible-nes",
+             (long long)user_id);
+    return mgt_get(c, path, out_json);
+}
+
+int mgt_list_ne_authorized_users(mgt_client_t *c, int64_t ne_id,
+                                 char **out_json)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/nes/%lld/authorized-users",
+             (long long)ne_id);
+    return mgt_get(c, path, out_json);
+}
+
+int mgt_list_command_authorized_users(mgt_client_t *c, int64_t command_id,
+                                      char **out_json)
+{
+    if (!c) return -1;
+    char path[128];
+    snprintf(path, sizeof(path), "/aa/commands/%lld/authorized-users",
+             (long long)command_id);
+    return mgt_get(c, path, out_json);
+}
+
 /* ── NE access groups ────────────────────────────────────────────────── */
 
 int mgt_list_ne_access_groups(mgt_client_t *c, char **out_json) {

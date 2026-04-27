@@ -478,6 +478,16 @@ public class MgtServiceClient {
         postJson("/aa/users/" + id + "/reset-password", body);
     }
 
+    /** All commands the user can execute (union of all cmd_exec_groups the user belongs to). */
+    public List<Command> listUserExecutableCommands(long userId) throws IOException, InterruptedException {
+        return toCommands(getJson("/aa/users/" + userId + "/executable-commands"));
+    }
+
+    /** All NEs the user can access (union of all ne_access_groups the user belongs to). */
+    public List<NE> listUserAccessibleNEs(long userId) throws IOException, InterruptedException {
+        return toNEs(getJson("/aa/users/" + userId + "/accessible-nes"));
+    }
+
     // ── NEs ─────────────────────────────────────────────────────────────
 
     public List<NE> listNEs() throws IOException, InterruptedException {
@@ -494,6 +504,11 @@ public class MgtServiceClient {
 
     public void deleteNE(long id) throws IOException, InterruptedException {
         request("DELETE", "/aa/nes/" + id, null);
+    }
+
+    /** All users authorized to access this NE (union of all ne_access_groups). */
+    public List<User> listNEAuthorizedUsers(long neId) throws IOException, InterruptedException {
+        return toUsers(getJson("/aa/nes/" + neId + "/authorized-users"));
     }
 
     // ── Commands ────────────────────────────────────────────────────────
@@ -528,6 +543,11 @@ public class MgtServiceClient {
 
     public void deleteCommand(long id) throws IOException, InterruptedException {
         request("DELETE", "/aa/commands/" + id, null);
+    }
+
+    /** All users authorized to execute this command (union of all cmd_exec_groups). */
+    public List<User> listCommandAuthorizedUsers(long commandId) throws IOException, InterruptedException {
+        return toUsers(getJson("/aa/commands/" + commandId + "/authorized-users"));
     }
 
     // ── Groups — NE Access Groups ──────────────────────────────────────

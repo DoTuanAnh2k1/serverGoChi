@@ -225,6 +225,28 @@ paths:
           application/json:
             schema: { type: object, required: [new_password], properties: { new_password: { type: string } } }
       responses: { "200": { description: OK } }
+  /aa/users/{id}/executable-commands:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [Users]
+      summary: List all commands a user can execute (union of all cmd_exec_groups)
+      security: [ { BasicJWT: [] } ]
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Command" } } } }
+  /aa/users/{id}/accessible-nes:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [Users]
+      summary: List all NEs a user can access (union of all ne_access_groups)
+      security: [ { BasicJWT: [] } ]
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/NE" } } } }
 
   # ── NEs ────────────────────────────────────────────────────────────
   /aa/nes:
@@ -262,6 +284,17 @@ paths:
       security: [ { BasicJWT: [] } ]
       summary: Delete NE — cascades to commands on this NE and group pivots
       responses: { "200": { description: OK } }
+  /aa/nes/{id}/authorized-users:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [NEs]
+      summary: List all users authorized to access this NE (union of all ne_access_groups)
+      security: [ { BasicJWT: [] } ]
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/User" } } } }
 
   # ── Commands ───────────────────────────────────────────────────────
   /aa/commands:
@@ -297,6 +330,17 @@ paths:
       security: [ { BasicJWT: [] } ]
       summary: Delete command — cascades to cmd_exec_group pivots
       responses: { "200": { description: OK } }
+  /aa/commands/{id}/authorized-users:
+    parameters:
+      - { name: id, in: path, required: true, schema: { type: integer, format: int64 } }
+    get:
+      tags: [Commands]
+      summary: List all users authorized to execute this command (union of all cmd_exec_groups)
+      security: [ { BasicJWT: [] } ]
+      responses:
+        "200":
+          description: OK
+          content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/User" } } } }
 
   # ── NE Access Groups ───────────────────────────────────────────────
   /aa/ne-access-groups:

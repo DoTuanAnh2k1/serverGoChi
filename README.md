@@ -100,8 +100,12 @@ POST /aa/change-password        (auth) { old_password, new_password }
 
 GET/POST/PUT/DELETE /aa/users[/id]
 POST                /aa/users/{id}/reset-password
+GET                 /aa/users/{id}/executable-commands  → [Command]
+GET                 /aa/users/{id}/accessible-nes       → [NE]
 GET/POST/PUT/DELETE /aa/nes[/id]
+GET                 /aa/nes/{id}/authorized-users       → [User]
 GET/POST/PUT/DELETE /aa/commands[/id]  (GET ?ne_id=&service=)
+GET                 /aa/commands/{id}/authorized-users   → [User]
 
 GET/POST/PUT/DELETE /aa/ne-access-groups[/id]
 GET/POST/DELETE     /aa/ne-access-groups/{id}/users

@@ -149,6 +149,13 @@ int mgt_create_command(mgt_client_t *c, int64_t ne_id, const char *service,
 int mgt_update_command(mgt_client_t *c, int64_t id, const char *json_patch);
 int mgt_delete_command(mgt_client_t *c, int64_t id);
 
+/* ── User permission lookups ─────────────────────────────────────────── */
+
+int mgt_list_user_executable_commands(mgt_client_t *c, int64_t user_id, char **out_json);
+int mgt_list_user_accessible_nes(mgt_client_t *c, int64_t user_id, char **out_json);
+int mgt_list_ne_authorized_users(mgt_client_t *c, int64_t ne_id, char **out_json);
+int mgt_list_command_authorized_users(mgt_client_t *c, int64_t command_id, char **out_json);
+
 /* ── NE access groups ────────────────────────────────────────────────── */
 
 int mgt_list_ne_access_groups(mgt_client_t *c, char **out_json);

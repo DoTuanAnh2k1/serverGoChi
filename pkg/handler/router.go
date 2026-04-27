@@ -64,12 +64,17 @@ func Init() {
 			p.Use(middleware.Authenticate)
 
 			// Any authenticated user can do these.
+			p.Get("/dashboard-stats", HandlerDashboardStats)
 			p.Post("/change-password", HandlerChangePassword)
 			p.Get("/users", HandlerListUsers)
 			p.Get("/users/{id}", HandlerGetUser)
+			p.Get("/users/{id}/executable-commands", HandlerUserExecutableCommands)
+			p.Get("/users/{id}/accessible-nes", HandlerUserAccessibleNEs)
 			p.Get("/nes", HandlerListNEs)
 			p.Get("/nes/{id}", HandlerGetNE)
+			p.Get("/nes/{id}/authorized-users", HandlerNEAuthorizedUsers)
 			p.Get("/commands", HandlerListCommands)
+			p.Get("/commands/{id}/authorized-users", HandlerCommandAuthorizedUsers)
 			p.Get("/ne-access-groups", HandlerListNeAccessGroups)
 			p.Get("/ne-access-groups/{id}/users", HandlerNeAccessGroupUsers)
 			p.Get("/ne-access-groups/{id}/nes", HandlerNeAccessGroupNEs)
