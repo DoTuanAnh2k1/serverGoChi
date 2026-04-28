@@ -1,0 +1,50 @@
+# cli-gate v2 — SSH bastion for operator access to NEs.
+#
+# Accepts operator SSH connections (port 2223), authenticates against
+# cli-mgt-svc, and proxies interactive sessions to NEs over SSH.
+#
+# Required env vars:
+#   MGT_SVC_BASE          URL of cli-mgt-svc (e.g. http://mgt:3000)
+#
+# Optional env vars (all have defaults):
+#   SSH_CLI_LISTEN_ADDR        :2223
+#   SSH_CLI_HOST_KEY_PATH      /data/ssh-gate/host_key  (auto-generated ECDSA if missing)
+#   SSH_CLI_AUTO_GEN_HOST_KEY  true
+#   SSH_CLI_HTTP_TIMEOUT       15s
+#   SSH_CLI_IDLE_TIMEOUT       0  (disabled)
+#   LOG_LEVEL                  info
+
+# ── Build stage ───────────────────────────────────────────────────────────────
+FROM golang:1.24-alpine AS builder
+ENV GOTOOLCHAIN=auto
+
+WORKDIR /build
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . .
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -trimpath -o ssh-cli ./cmd/ssh
+
+# ── Final stage ───────────────────────────────────────────────────────────────
+FROM alpine:3.19
+
+RUN apk add --no-cache ca-certificates tzdata openssh-client \
+    && addgroup -S app \
+    && adduser  -S app -G app
+
+WORKDIR /app
+
+COPY --from=builder /build/ssh-cli ./ssh-cli
+
+# /data/ssh-gate is the volume mount point for the persisted host key.
+RUN mkdir -p /data/ssh-gate \
+    && chown -R app:app /app /data
+
+USER app
+
+EXPOSE 2223
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=10s --retries=3 \
+    CMD nc -z 127.0.0.1 ${SSH_CLI_LISTEN_ADDR##*:} || exit 1
+
+ENTRYPOINT ["./ssh-cli"]
